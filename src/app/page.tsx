@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRightIcon } from '@heroicons/react/24/outline';
-import { CpuChipIcon } from '@heroicons/react/24/outline';
+import { CpuChipIcon, BookOpenIcon, ServerIcon } from '@heroicons/react/24/outline';
 
 export default function Home() {
   return (
@@ -56,62 +56,34 @@ export default function Home() {
           </div>
           
           <div className="grid gap-8 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-            {/* Test Generator Card */}
+            {/* Test and Class Generator Card */}
             <div className="flex flex-col px-8 md:px-20 py-20 w-full items-center justify-center space-y-12 bg-gradient-to-b from-white/60 to-[var(--background)]">
               <Link href="/test-generator" className="card flex flex-col items-center justify-center space-y-4 p-6 rounded-xl shadow-lg hover:shadow-xl transition-all bg-white/90 max-w-md w-full">
                 <CpuChipIcon className="w-16 h-16 text-[var(--primary)]" />
-                <h2 className="text-xl font-semibold">English Test Generator</h2>
+                <h2 className="text-xl font-semibold">Test and Class Generator</h2>
                 <p className="text-sm text-[var(--primary)]">Generate tests, conversation questions, and teaching resources</p>
                 <p className="text-xs text-gray-500 mt-2">Version 1.2.0 (Mar 23, 2024)</p>
               </Link>
             </div>
             
-            {/* Vocabulary Builder Card (Coming Soon) */}
-            <div className="apple-card bg-white">
-              <div className="h-40 bg-gradient-to-r from-[var(--secondary)] to-[var(--secondary-light)] p-6 flex items-end">
-                <div className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-md shadow-lg flex items-center justify-center">
-                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
-                </div>
-              </div>
-              
-              <div className="px-6 py-8">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-2xl font-bold text-[var(--foreground)]">Vocabulary Builder</h3>
-                  <span className="text-xs font-medium px-3 py-1 bg-[var(--background)] text-[var(--subtle)] rounded-full">Coming Soon</span>
-                </div>
-                <p className="mt-4 text-[var(--subtle)]">
-                  Industry-specific vocabulary and terminology organized for effective business communication
-                </p>
-                <div className="mt-6 pt-6 border-t border-[var(--border)]">
-                  <p className="text-sm text-[var(--secondary)]">For finance, tech, healthcare, and more</p>
-                </div>
-              </div>
+            {/* Class Diary and Evaluation Card */}
+            <div className="flex flex-col px-8 md:px-20 py-20 w-full items-center justify-center space-y-12 bg-gradient-to-b from-white/60 to-[var(--background)]">
+              <Link href="#" className="card flex flex-col items-center justify-center space-y-4 p-6 rounded-xl shadow-lg hover:shadow-xl transition-all bg-white/90 max-w-md w-full">
+                <BookOpenIcon className="w-16 h-16 text-[var(--secondary)]" />
+                <h2 className="text-xl font-semibold">Class Diary and Evaluation</h2>
+                <p className="text-sm text-[var(--secondary)]">Track student progress and manage class notes</p>
+                <p className="text-xs text-gray-500 mt-2">Coming Soon</p>
+              </Link>
             </div>
             
-            {/* Presentation Coach Card (Coming Soon) */}
-            <div className="apple-card bg-white">
-              <div className="h-40 bg-gradient-to-r from-[#29cc41] to-[#5ed86c] p-6 flex items-end">
-                <div className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-md shadow-lg flex items-center justify-center">
-                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                  </svg>
-                </div>
-              </div>
-              
-              <div className="px-6 py-8">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-2xl font-bold text-[var(--foreground)]">Presentation Coach</h3>
-                  <span className="text-xs font-medium px-3 py-1 bg-[var(--background)] text-[var(--subtle)] rounded-full">Coming Soon</span>
-                </div>
-                <p className="mt-4 text-[var(--subtle)]">
-                  Improve presentation skills for business meetings, sales pitches, and conferences
-                </p>
-                <div className="mt-6 pt-6 border-t border-[var(--border)]">
-                  <p className="text-sm text-[#29cc41]">Real-time feedback and practical exercises</p>
-                </div>
-              </div>
+            {/* Database Card */}
+            <div className="flex flex-col px-8 md:px-20 py-20 w-full items-center justify-center space-y-12 bg-gradient-to-b from-white/60 to-[var(--background)]">
+              <Link href="#" className="card flex flex-col items-center justify-center space-y-4 p-6 rounded-xl shadow-lg hover:shadow-xl transition-all bg-white/90 max-w-md w-full">
+                <ServerIcon className="w-16 h-16 text-[#29cc41]" />
+                <h2 className="text-xl font-semibold">Database</h2>
+                <p className="text-sm text-[#29cc41]">Access teaching resources and lesson materials</p>
+                <p className="text-xs text-gray-500 mt-2">Coming Soon</p>
+              </Link>
             </div>
           </div>
         </div>
