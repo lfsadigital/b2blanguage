@@ -430,8 +430,8 @@ export default function TestGeneratorPage() {
                     onClick={() => setActiveTab('test')}
                     className={`${
                       activeTab === 'test'
-                        ? 'border-[var(--primary)] text-[var(--primary)]'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-[var(--primary)] text-[var(--primary)] font-bold'
+                        : 'border-transparent text-gray-700 hover:text-gray-900 hover:border-gray-300'
                     } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors`}
                   >
                     Test
@@ -440,8 +440,8 @@ export default function TestGeneratorPage() {
                     onClick={() => setActiveTab('conversation')}
                     className={`${
                       activeTab === 'conversation'
-                        ? 'border-[var(--primary)] text-[var(--primary)]'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-[var(--primary)] text-[var(--primary)] font-bold'
+                        : 'border-transparent text-gray-700 hover:text-gray-900 hover:border-gray-300'
                     } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors ${!conversationQuestions ? 'opacity-50 cursor-not-allowed' : ''}`}
                     disabled={!conversationQuestions}
                   >
@@ -451,8 +451,8 @@ export default function TestGeneratorPage() {
                     onClick={() => setActiveTab('tips')}
                     className={`${
                       activeTab === 'tips'
-                        ? 'border-[var(--primary)] text-[var(--primary)]'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                        ? 'border-[var(--primary)] text-[var(--primary)] font-bold'
+                        : 'border-transparent text-gray-700 hover:text-gray-900 hover:border-gray-300'
                     } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors ${!teacherTips ? 'opacity-50 cursor-not-allowed' : ''}`}
                     disabled={!teacherTips}
                   >
@@ -468,9 +468,9 @@ export default function TestGeneratorPage() {
                   <div className="p-6">
                     <div className="prose max-w-none text-gray-800">
                       {testHeader.map((line, i) => (
-                        <p key={i} className="font-medium">{line}</p>
+                        <p key={i} className="font-medium text-black">{line}</p>
                       ))}
-                      <div className="whitespace-pre-wrap">{questions}</div>
+                      <div className="whitespace-pre-wrap text-black">{questions}</div>
                     </div>
                   </div>
                   
@@ -501,8 +501,8 @@ export default function TestGeneratorPage() {
               
               {activeTab === 'conversation' && conversationQuestions && (
                 <div className="bg-white p-6 rounded-xl">
-                  <h4 className="text-lg font-medium text-gray-800 mb-4">Conversation Questions</h4>
-                  <div className="prose max-w-none text-gray-800" dangerouslySetInnerHTML={{ __html: conversationQuestions }} />
+                  <h4 className="text-lg font-medium text-black mb-4">Conversation Questions</h4>
+                  <div className="prose max-w-none text-black" dangerouslySetInnerHTML={{ __html: conversationQuestions }} />
                   
                   <div className="flex justify-center mt-6">
                     <button
@@ -517,8 +517,8 @@ export default function TestGeneratorPage() {
               
               {activeTab === 'tips' && teacherTips && (
                 <div className="bg-white p-6 rounded-xl">
-                  <h4 className="text-lg font-medium text-gray-800 mb-4">Teacher Tips</h4>
-                  <div className="prose max-w-none text-gray-800" dangerouslySetInnerHTML={{ __html: teacherTips }} />
+                  <h4 className="text-lg font-medium text-black mb-4">Teacher Tips</h4>
+                  <div className="prose max-w-none text-black" dangerouslySetInnerHTML={{ __html: teacherTips }} />
                   
                   <div className="flex justify-center mt-6">
                     <button

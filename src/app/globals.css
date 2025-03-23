@@ -21,6 +21,7 @@
   --error: #ff3b30; /* Keep error red */
   --input-bg: #FFFFFF; /* White background for inputs */
   --input-text: #333333; /* Dark text for inputs */
+  --question-text: #000000; /* Black text for questions */
 }
 
 @layer base {
@@ -110,6 +111,16 @@ label, .label {
   color: var(--foreground) !important;
 }
 
+/* Make question type labels always dark/visible */
+.text-gray-800, .text-sm.font-medium {
+  color: var(--question-text) !important;
+}
+
+/* Make sure secondary question text is readable */
+.text-xs.text-gray-600 {
+  color: #333333 !important;
+}
+
 /* ENSURE DARK BROWN BUTTONS WITH WHITE TEXT */
 .apple-button, 
 button[type="submit"],
@@ -117,11 +128,19 @@ button[type="submit"],
   background-color: var(--primary) !important;
   color: white !important;
   @apply rounded-md;
+  opacity: 1 !important; /* Ensure no transparency when enabled */
 }
 
 .apple-button:hover,
 button[type="submit"]:hover {
   background-color: var(--primary-dark) !important;
+}
+
+/* Only apply opacity to disabled buttons */
+.apple-button[disabled],
+button[type="submit"][disabled],
+.generate-test-btn[disabled] {
+  opacity: 0.5 !important;
 }
 
 /* Override text-xs color to be lighter on dark background */

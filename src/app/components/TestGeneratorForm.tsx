@@ -167,7 +167,7 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
 
           <div className="sm:col-span-2 bg-gray-50 p-5 rounded-xl border border-gray-200">
             <fieldset>
-              <legend className="text-sm font-medium text-gray-800">Question Types</legend>
+              <legend className="text-sm font-medium text-black">Question Types</legend>
               <div className="mt-4 space-y-3">
                 <div className="flex items-center">
                   <input
@@ -179,8 +179,8 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                     className="h-5 w-5 text-[var(--primary)] focus:ring-[var(--primary)] border-gray-300 rounded"
                   />
                   <label htmlFor="multiple-choice" className="ml-3">
-                    <span className="block text-sm font-medium text-gray-800">Multiple Choice</span>
-                    <span className="block text-xs text-gray-600">Standard format with options</span>
+                    <span className="block text-sm font-medium text-black">Multiple Choice</span>
+                    <span className="block text-xs text-gray-800">Standard format with options</span>
                   </label>
                 </div>
                 <div className="flex items-center">
@@ -193,8 +193,8 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                     className="h-5 w-5 text-[var(--primary)] focus:ring-[var(--primary)] border-gray-300 rounded"
                   />
                   <label htmlFor="open-ended" className="ml-3">
-                    <span className="block text-sm font-medium text-gray-800">Open Ended</span>
-                    <span className="block text-xs text-gray-600">Free-form responses</span>
+                    <span className="block text-sm font-medium text-black">Open Ended</span>
+                    <span className="block text-xs text-gray-800">Free-form responses</span>
                   </label>
                 </div>
                 <div className="flex items-center">
@@ -207,8 +207,8 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                     className="h-5 w-5 text-[var(--primary)] focus:ring-[var(--primary)] border-gray-300 rounded"
                   />
                   <label htmlFor="true-false" className="ml-3">
-                    <span className="block text-sm font-medium text-gray-800">True/False</span>
-                    <span className="block text-xs text-gray-600">Binary choice questions</span>
+                    <span className="block text-sm font-medium text-black">True/False</span>
+                    <span className="block text-xs text-gray-800">Binary choice questions</span>
                   </label>
                 </div>
               </div>
