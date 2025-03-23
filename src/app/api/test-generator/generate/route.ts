@@ -11,6 +11,9 @@ import youtubeDl from 'youtube-dl-exec';
 import { generateSubjectExtractionPrompt } from '@/app/lib/prompts/test-generator/subject-extraction';
 import { generateTestPrompt } from '@/app/lib/prompts/test-generator/main-test';
 
+// Supadata API Key (will be moved to environment variables)
+const SUPADATA_API_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IjEifQ.eyJpc3MiOiJuYWRsZXMiLCJpYXQiOiIxNzQyNzYwMzA0IiwicHVycG9zZSI6ImFwaV9hdXRoZW50aWNhdGlvbiIsInN1YiI6ImU1OWI0Y2MyZWNmNzQwOTBhZTgzN2ZmZWQ3NjY3NjkyIn0.0ee3lode52dXvdaQKVC79oaAyNDdftSciOzP2-GeFXI';
+
 const execAsync = promisify(exec);
 
 // Only initialize OpenAI client if API key is available
@@ -683,7 +686,58 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
   }
 }
 
-// Now modify the getVideoTranscript function to include our new approach
+// Add this new function before the getVideoTranscript function
+
+/**
+ * Get YouTube transcript using Supadata API
+ */
+async function getTranscriptWithSupadata(videoId: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
+  try {
+    console.log(`[Supadata] Fetching transcript for video ID: ${videoId}`);
+    
+    const response = await fetch(`https://api.supadata.ai/v1/youtube/transcript?videoId=${videoId}`, {
+      headers: {
+        'x-api-key': SUPADATA_API_KEY,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`[Supadata] API Error (${response.status}): ${errorText}`);
+      throw new Error(`Supadata API error: ${response.status} ${errorText}`);
+    }
+    
+    const data = await response.json();
+    
+    if (!data || !data.transcript || data.transcript.length === 0) {
+      console.error(`[Supadata] No transcript returned for video ID: ${videoId}`);
+      throw new Error('No transcript available from Supadata API');
+    }
+    
+    console.log(`[Supadata] Successfully retrieved transcript (${data.transcript.length} segments)`);
+    
+    // Format the transcript with timestamps
+    const formattedTranscript = data.transcript
+      .map((segment: any) => {
+        // Supadata often provides timestamps in seconds
+        const timestampSeconds = segment.start || 0;
+        return `[${formatTimestamp(timestampSeconds)}] ${segment.text}`;
+      })
+      .join(' ');
+    
+    return {
+      transcript: formattedTranscript,
+      isYouTubeTranscript: true
+    };
+  } catch (error) {
+    console.error(`[Supadata] Error fetching transcript:`, error);
+    throw error;
+  }
+}
+
+// Now modify the getVideoTranscript function to use Supadata first
+
 async function getVideoTranscript(url: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
   try {
     console.log(`Getting transcript for ${url}...`);
@@ -703,11 +757,22 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
     console.log(`Video ID: ${videoId}`);
     
     // Track all errors for better debugging
+    let supadataError: Error | null = null;
     let directError: Error | null = null;
     let ytError = null;
     let whisperError = null;
     
-    // Method 1: Try our direct fetching method first
+    // Method 1: Try Supadata API first (most reliable)
+    try {
+      console.log('Attempting to get transcript via Supadata API...');
+      return await getTranscriptWithSupadata(videoId);
+    } catch (error) {
+      console.log('Supadata API failed with error:', error);
+      supadataError = error as Error;
+      console.log('Falling back to direct method...');
+    }
+    
+    // Method 2: Try our direct fetching method
     try {
       console.log('Attempting direct method to get YouTube captions...');
       return await fetchYouTubeTranscriptDirect(videoId);
@@ -717,7 +782,7 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
       console.log('Falling back to YouTube transcript library...');
     }
     
-    // Method 2: Try original YouTube transcript method
+    // Method 3: Try original YouTube transcript method
     try {
       console.log('Attempting to get YouTube captions via library...');
       const transcript = await YoutubeTranscript.fetchTranscript(videoId);
@@ -737,7 +802,7 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
       ytError = error;
       console.log('Falling back to Whisper transcription...');
       
-      // Method 3: Try Whisper transcription
+      // Method 4: Try Whisper transcription
       try {
         const whisperTranscript = await getVideoTranscriptWithWhisper(url);
         return { transcript: whisperTranscript, isYouTubeTranscript: false };
@@ -746,7 +811,7 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
         whisperError = wError;
         
         // No more fallbacks - all methods failed
-        throw new Error(`All transcript methods failed. Direct method error: ${directError ? directError.message : 'N/A'}, YouTube error: ${ytError.message}, Whisper error: ${whisperError.message}`);
+        throw new Error(`All transcript methods failed. Supadata error: ${supadataError ? supadataError.message : 'N/A'}, Direct method error: ${directError ? directError.message : 'N/A'}, YouTube error: ${ytError.message}, Whisper error: ${whisperError.message}`);
       }
     }
   } catch (error) {
