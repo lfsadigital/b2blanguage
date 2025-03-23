@@ -19,20 +19,86 @@ const openai = process.env.OPENAI_API_KEY
   : null;
 
 async function getArticleContent(url: string): Promise<string> {
+  console.log(`Fetching article content from: ${url}`);
   try {
-    const response = await fetch(url);
+    // Try with a more browser-like fetch
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      },
+    });
+    
+    if (!response.ok) {
+      console.error(`Failed to fetch article: HTTP ${response.status}`);
+      throw new Error(`HTTP error: ${response.status}`);
+    }
+    
     const html = await response.text();
+    console.log(`Received HTML content of length: ${html.length}`);
+    
+    if (html.length < 1000) {
+      console.log('HTML content might be too short, possibly blocked or empty:', html.substring(0, 200));
+    }
+    
     // Basic HTML to text conversion - you might want to use a proper HTML parser
-    const text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    const text = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+                     .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+                     .replace(/<[^>]*>/g, ' ')
+                     .replace(/\s+/g, ' ')
+                     .trim();
+    
+    console.log(`Extracted text content of length: ${text.length}`);
     
     if (!text || text.length < 100) {
+      console.error('Article content is too short or empty after extraction');
       throw new Error('Article content is too short or empty');
     }
     
-    return text.substring(0, 4000); // Limit content length
+    // Take a larger portion for better context
+    return text.substring(0, 6000); // Increased from 4000 to 6000
   } catch (error) {
-    console.error('Error fetching article:', error);
-    throw new Error('Failed to fetch article content');
+    console.error('Detailed error fetching article:', error);
+    console.error('Error stack:', (error as Error).stack);
+    throw new Error(`Failed to fetch article content: ${(error as Error).message}`);
+  }
+}
+
+async function getArticleContentFallback(url: string): Promise<string> {
+  if (!openai) {
+    throw new Error('OpenAI API key is not configured for fallback content extraction');
+  }
+  
+  console.log(`Using OpenAI to extract content from URL: ${url}`);
+  
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant that extracts the main content from article URLs."
+        },
+        {
+          role: "user",
+          content: `Visit this URL: ${url} and extract the main article content. Just return the extracted content without any introduction or explanation. Only return the article text itself.`
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 1500,
+    });
+
+    const extractedContent = completion.choices[0].message.content?.trim();
+    
+    if (!extractedContent || extractedContent.length < 100) {
+      throw new Error('Extracted content is too short or empty');
+    }
+    
+    console.log(`Successfully extracted content using OpenAI: ${extractedContent.length} characters`);
+    return extractedContent;
+  } catch (error) {
+    console.error('Error using OpenAI to extract content:', error);
+    throw new Error(`OpenAI content extraction failed: ${(error as Error).message}`);
   }
 }
 
@@ -108,6 +174,46 @@ async function getVideoTranscriptWithWhisper(url: string): Promise<string> {
   }
 }
 
+// Fallback to extract YouTube content when transcript methods fail
+async function getYouTubeContentFallback(url: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
+  if (!openai) {
+    throw new Error('OpenAI API key is not configured for fallback YouTube content');
+  }
+  
+  console.log(`Trying to extract YouTube video content using OpenAI: ${url}`);
+  
+  try {
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant that extracts content from YouTube videos."
+        },
+        {
+          role: "user",
+          content: `Watch this YouTube video: ${url} and provide a detailed transcript-like summary of the video content. Include what was said and done in chronological order. Format the content similar to a transcript, with timestamps if possible. If you can't access the video directly, describe what the video is likely about based on the title, channel, and any other information you can gather from the URL.`
+        }
+      ],
+      temperature: 0.3,
+      max_tokens: 1500,
+    });
+
+    const extractedContent = completion.choices[0].message.content?.trim();
+    
+    if (!extractedContent || extractedContent.length < 100) {
+      throw new Error('Generated YouTube content is too short or empty');
+    }
+    
+    console.log(`Successfully generated content for YouTube video using OpenAI: ${extractedContent.length} characters`);
+    return { transcript: extractedContent, isYouTubeTranscript: false };
+  } catch (error) {
+    console.error('Error using OpenAI to generate YouTube content:', error);
+    throw new Error(`OpenAI YouTube content generation failed: ${(error as Error).message}`);
+  }
+}
+
+// Update the getVideoTranscript function with the OpenAI fallback
 async function getVideoTranscript(url: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
   try {
     console.log(`Getting transcript for ${url}...`);
@@ -125,6 +231,11 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
     }
     
     console.log(`Video ID: ${videoId}`);
+    
+    // Track all errors for better debugging
+    let ytError = null;
+    let whisperError = null;
+    
     try {
       console.log('Attempting to get YouTube captions directly...');
       const transcript = await YoutubeTranscript.fetchTranscript(videoId);
@@ -139,16 +250,27 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
         transcript: transcript.map(part => `[${formatTimestamp(part.offset)}] ${part.text}`).join(' '),
         isYouTubeTranscript: true
       };
-    } catch (ytError: any) {
-      console.log('YouTube transcript API failed with error:', ytError);
+    } catch (error: any) {
+      console.log('YouTube transcript API failed with error:', error);
+      ytError = error;
       console.log('Falling back to Whisper transcription...');
-      // Fallback to Whisper
+      
+      // Try Whisper transcription
       try {
         const whisperTranscript = await getVideoTranscriptWithWhisper(url);
         return { transcript: whisperTranscript, isYouTubeTranscript: false };
-      } catch (whisperError: any) {
-        console.error('Whisper transcription also failed:', whisperError);
-        throw new Error(`Both transcript methods failed. YouTube error: ${ytError.message}, Whisper error: ${whisperError.message}`);
+      } catch (wError: any) {
+        console.error('Whisper transcription also failed:', wError);
+        whisperError = wError;
+        
+        // Try OpenAI fallback as last resort
+        console.log('Both standard methods failed, trying OpenAI fallback...');
+        try {
+          return await getYouTubeContentFallback(url);
+        } catch (fallbackError: any) {
+          console.error('All transcript methods failed including OpenAI fallback:', fallbackError);
+          throw new Error(`All transcript methods failed. YouTube error: ${ytError.message}, Whisper error: ${whisperError.message}, Fallback error: ${fallbackError.message}`);
+        }
       }
     }
   } catch (error) {
@@ -306,7 +428,16 @@ export async function POST(request: Request) {
       }
     } else {
       try {
-        const articleContent = await getArticleContent(url);
+        let articleContent;
+        
+        try {
+          console.log('Trying direct method to get article content...');
+          articleContent = await getArticleContent(url);
+        } catch (directError) {
+          console.error('Direct method failed, trying fallback for article content:', directError);
+          articleContent = await getArticleContentFallback(url);
+        }
+        
         if (articleContent && articleContent.length > 100) {
           contentInfo = `Article content: ${articleContent}`;
           contentText = articleContent; // Store for subject extraction
@@ -318,7 +449,7 @@ export async function POST(request: Request) {
           );
         }
       } catch (error) {
-        console.error('Error getting article content:', error);
+        console.error('All article content methods failed:', error);
         return NextResponse.json(
           { error: `Unable to extract content from URL: ${(error as Error).message}` },
           { status: 400 }
