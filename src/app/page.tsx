@@ -142,7 +142,7 @@ export default function Home() {
             </h2>
             <blockquote className="mt-10">
               <p className="text-xl text-[var(--foreground)] italic">
-                "B2B Language tools have transformed my teaching. My corporate clients love the customized materials that perfectly match their industry vocabulary and business contexts."
+                &quot;B2B Language tools have transformed my teaching. My corporate clients love the customized materials that perfectly match their industry vocabulary and business contexts.&quot;
               </p>
               <footer className="mt-4">
                 <div className="font-medium text-[var(--foreground)]">Sarah Johnston</div>
