@@ -1,6 +1,13 @@
-# Ansh & Riley Full-Stack Template
+# B2B Language
 
-This is a full-stack template project for Software Composers to create  applications with AI.
+A Next.js application for business English teachers.
+
+## Features
+
+- Test Generator
+- More features coming soon
+
+Last updated: May 2024
 
 ## Getting started
 To create a new project, you go to `/paths`, choose from our list of Paths, and then use Cursor's Composer feature to quickly scaffold your project!
