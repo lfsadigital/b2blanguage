@@ -9,6 +9,17 @@
     "src/app/api/test-generator/generate/route.ts": {
       "memory": 1024,
       "maxDuration": 60
+    },
+    "src/app/api/test-generator/conversation/route.ts": {
+      "memory": 512,
+      "maxDuration": 30
+    },
+    "src/app/api/test-generator/teacher-tips/route.ts": {
+      "memory": 512,
+      "maxDuration": 30
     }
+  },
+  "github": {
+    "silent": false
   }
 } 
