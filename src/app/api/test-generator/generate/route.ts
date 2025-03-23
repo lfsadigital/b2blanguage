@@ -235,6 +235,7 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.5',
+        'Cookie': 'CONSENT=YES+; GPS=1'
       }
     });
     
@@ -245,47 +246,161 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
     const html = await response.text();
     console.log(`Received YouTube page HTML (${html.length} chars)`);
     
-    // Look for the timedtext URL in the page
-    const timedTextRegex = /https:\/\/www.youtube.com\/api\/timedtext[^"]+/;
-    const match = html.match(timedTextRegex);
+    // Try multiple approaches to find caption data
     
-    if (!match || !match[0]) {
+    // Approach 1: Check for timedtext in various formats
+    let captionUrl = null;
+    
+    // Look for timedtext URL directly
+    const patterns = [
+      /https:\/\/www.youtube.com\/api\/timedtext[^"'\s]+/,
+      /playerCaptionsTracklistRenderer.*?url":"(https:\/\/www.youtube.com\/api\/timedtext[^"]+)"/,
+      /"captionTracks":\s*\[\s*\{\s*"baseUrl":\s*"([^"]+)"/
+    ];
+    
+    for (const pattern of patterns) {
+      const match = html.match(pattern);
+      if (match) {
+        captionUrl = match[1] || match[0];
+        captionUrl = captionUrl.replace(/\\u0026/g, '&').replace(/\\/g, '');
+        console.log(`Found caption URL with pattern: ${captionUrl}`);
+        break;
+      }
+    }
+    
+    // Approach 2: Check for inner JSON data
+    if (!captionUrl) {
+      console.log('Trying to extract caption URL from embedded JSON data...');
+      
+      // Look for player_response or ytInitialPlayerResponse in the HTML
+      const dataMatch = html.match(/ytInitialPlayerResponse\s*=\s*({.+?});/) || 
+                        html.match(/player_response\s*=\s*'(.+?)'/) ||
+                        html.match(/"player_response":"(.+?)"/);
+                        
+      if (dataMatch) {
+        try {
+          const jsonStr = dataMatch[1].replace(/\\(.)/g, "$1"); // Basic unescaping
+          const data = JSON.parse(dataMatch[1].includes('{') ? dataMatch[1] : jsonStr);
+          
+          // Extract caption info from the parsed data
+          const captions = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks || 
+                          data?.playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+                          
+          if (captions && captions.length > 0) {
+            captionUrl = captions[0].baseUrl;
+            console.log(`Found caption URL in JSON data: ${captionUrl}`);
+          } else {
+            console.log('No caption tracks found in JSON data');
+          }
+        } catch (jsonError) {
+          console.error('Error parsing JSON data from HTML:', jsonError);
+        }
+      }
+    }
+    
+    // If no caption URL found after all attempts
+    if (!captionUrl) {
+      // Check for a specific indicator that captions are disabled
+      if (html.includes('"playerCaptionsTracklistRenderer":{}') || 
+          html.includes('"captionTracks":[]')) {
+        throw new Error('Captions are disabled for this video');
+      }
       throw new Error('Could not find transcript URL in the YouTube page');
     }
     
-    const transcriptUrl = decodeURIComponent(match[0].replace(/\\u0026/g, '&'));
-    console.log(`Found transcript URL: ${transcriptUrl}`);
+    captionUrl = decodeURIComponent(captionUrl);
+    console.log(`Processing transcript URL: ${captionUrl}`);
     
-    // Fetch the transcript data
-    const transcriptResponse = await fetch(transcriptUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-      }
-    });
-    
-    if (!transcriptResponse.ok) {
-      throw new Error(`Failed to fetch transcript: ${transcriptResponse.status}`);
+    // Add parameters if they're not present (lang, format, etc.)
+    if (!captionUrl.includes('&lang=')) {
+      captionUrl += '&lang=en';
+    }
+    if (!captionUrl.includes('&fmt=')) {
+      captionUrl += '&fmt=json3';
     }
     
-    const transcriptXml = await transcriptResponse.text();
+    // Try different formats if the first one fails
+    let transcriptData = null;
+    let format = 'xml';
     
-    // Parse the XML to extract text and timestamps
-    const segments = [];
-    const textRegex = /<text start="([^"]+)" dur="([^"]+)"[^>]*>(.*?)<\/text>/g;
-    
-    let matchText;
-    while ((matchText = textRegex.exec(transcriptXml)) !== null) {
-      const start = parseFloat(matchText[1]);
-      const duration = parseFloat(matchText[2]);
-      const text = matchText[3]
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .replace(/<[^>]*>/g, ''); // Remove any HTML tags
+    // First try with JSON format
+    try {
+      const jsonUrl = captionUrl.includes('&fmt=') 
+        ? captionUrl.replace(/&fmt=[^&]+/, '&fmt=json3') 
+        : captionUrl + '&fmt=json3';
+        
+      console.log(`Trying JSON format: ${jsonUrl}`);
+      const jsonResponse = await fetch(jsonUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        }
+      });
       
-      segments.push({ start, duration, text });
+      if (jsonResponse.ok) {
+        const jsonData = await jsonResponse.json();
+        if (jsonData.events && jsonData.events.length > 0) {
+          transcriptData = jsonData;
+          format = 'json';
+        }
+      }
+    } catch (jsonError) {
+      console.log('JSON format failed, falling back to XML:', jsonError);
+    }
+    
+    // If JSON failed, try XML format
+    if (!transcriptData) {
+      const xmlUrl = captionUrl.includes('&fmt=') 
+        ? captionUrl.replace(/&fmt=[^&]+/, '&fmt=srv1') 
+        : captionUrl + '&fmt=srv1';
+        
+      console.log(`Trying XML format: ${xmlUrl}`);
+      const xmlResponse = await fetch(xmlUrl, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        }
+      });
+      
+      if (!xmlResponse.ok) {
+        throw new Error(`Failed to fetch transcript: ${xmlResponse.status}`);
+      }
+      
+      transcriptData = await xmlResponse.text();
+    }
+    
+    // Parse based on the format we got
+    const segments = [];
+    
+    if (format === 'json') {
+      // Parse JSON format
+      for (const event of transcriptData.events) {
+        if (event.segs && event.segs.length > 0) {
+          const start = event.tStartMs / 1000;
+          const duration = (event.dDurationMs || 1000) / 1000;
+          const text = event.segs.map((seg: { utf8: string }) => seg.utf8).join(' ');
+          
+          if (text.trim()) {
+            segments.push({ start, duration, text });
+          }
+        }
+      }
+    } else {
+      // Parse XML format
+      const textRegex = /<text start="([^"]+)" dur="([^"]+)"[^>]*>(.*?)<\/text>/g;
+      
+      let matchText;
+      while ((matchText = textRegex.exec(transcriptData)) !== null) {
+        const start = parseFloat(matchText[1]);
+        const duration = parseFloat(matchText[2]);
+        const text = matchText[3]
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&#39;/g, "'")
+          .replace(/<[^>]*>/g, ''); // Remove any HTML tags
+        
+        segments.push({ start, duration, text });
+      }
     }
     
     if (segments.length === 0) {
