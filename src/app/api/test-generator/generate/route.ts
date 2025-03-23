@@ -224,7 +224,92 @@ async function getVideoTranscriptWithWhisper(url: string): Promise<string> {
   }
 }
 
-// Update the getVideoTranscript function to remove the OpenAI fallback
+// Add this new helper function near the top of the file after the other imports
+async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
+  try {
+    console.log(`Attempting direct YouTube transcript fetch for video ID: ${videoId}`);
+    
+    // Fetch the YouTube video page with proper headers
+    const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch YouTube page: ${response.status}`);
+    }
+    
+    const html = await response.text();
+    console.log(`Received YouTube page HTML (${html.length} chars)`);
+    
+    // Look for the timedtext URL in the page
+    const timedTextRegex = /https:\/\/www.youtube.com\/api\/timedtext[^"]+/;
+    const match = html.match(timedTextRegex);
+    
+    if (!match || !match[0]) {
+      throw new Error('Could not find transcript URL in the YouTube page');
+    }
+    
+    const transcriptUrl = decodeURIComponent(match[0].replace(/\\u0026/g, '&'));
+    console.log(`Found transcript URL: ${transcriptUrl}`);
+    
+    // Fetch the transcript data
+    const transcriptResponse = await fetch(transcriptUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+      }
+    });
+    
+    if (!transcriptResponse.ok) {
+      throw new Error(`Failed to fetch transcript: ${transcriptResponse.status}`);
+    }
+    
+    const transcriptXml = await transcriptResponse.text();
+    
+    // Parse the XML to extract text and timestamps
+    const segments = [];
+    const textRegex = /<text start="([^"]+)" dur="([^"]+)"[^>]*>(.*?)<\/text>/g;
+    
+    let matchText;
+    while ((matchText = textRegex.exec(transcriptXml)) !== null) {
+      const start = parseFloat(matchText[1]);
+      const duration = parseFloat(matchText[2]);
+      const text = matchText[3]
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/<[^>]*>/g, ''); // Remove any HTML tags
+      
+      segments.push({ start, duration, text });
+    }
+    
+    if (segments.length === 0) {
+      throw new Error('No transcript segments found');
+    }
+    
+    console.log(`Parsed ${segments.length} transcript segments`);
+    
+    // Format the transcript with timestamps
+    const formattedTranscript = segments.map(
+      part => `[${formatTimestamp(part.start)}] ${part.text}`
+    ).join(' ');
+    
+    return { 
+      transcript: formattedTranscript,
+      isYouTubeTranscript: true
+    };
+  } catch (error) {
+    console.error('Error in direct YouTube transcript fetch:', error);
+    throw error;
+  }
+}
+
+// Now modify the getVideoTranscript function to include our new approach
 async function getVideoTranscript(url: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
   try {
     console.log(`Getting transcript for ${url}...`);
@@ -244,11 +329,23 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
     console.log(`Video ID: ${videoId}`);
     
     // Track all errors for better debugging
+    let directError: Error | null = null;
     let ytError = null;
     let whisperError = null;
     
+    // Method 1: Try our direct fetching method first
     try {
-      console.log('Attempting to get YouTube captions directly...');
+      console.log('Attempting direct method to get YouTube captions...');
+      return await fetchYouTubeTranscriptDirect(videoId);
+    } catch (error) {
+      console.log('Direct caption fetch method failed with error:', error);
+      directError = error as Error;
+      console.log('Falling back to YouTube transcript library...');
+    }
+    
+    // Method 2: Try original YouTube transcript method
+    try {
+      console.log('Attempting to get YouTube captions via library...');
       const transcript = await YoutubeTranscript.fetchTranscript(videoId);
       
       if (!transcript || transcript.length === 0) {
@@ -266,7 +363,7 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
       ytError = error;
       console.log('Falling back to Whisper transcription...');
       
-      // Try Whisper transcription
+      // Method 3: Try Whisper transcription
       try {
         const whisperTranscript = await getVideoTranscriptWithWhisper(url);
         return { transcript: whisperTranscript, isYouTubeTranscript: false };
@@ -275,7 +372,7 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
         whisperError = wError;
         
         // No more fallbacks - all methods failed
-        throw new Error(`All transcript methods failed. YouTube error: ${ytError.message}, Whisper error: ${whisperError.message}`);
+        throw new Error(`All transcript methods failed. Direct method error: ${directError ? directError.message : 'N/A'}, YouTube error: ${ytError.message}, Whisper error: ${whisperError.message}`);
       }
     }
   } catch (error) {
