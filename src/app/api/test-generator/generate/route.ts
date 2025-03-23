@@ -686,8 +686,6 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
   }
 }
 
-// Add this new function before the getVideoTranscript function
-
 /**
  * Get YouTube transcript using Supadata API
  */
@@ -695,7 +693,10 @@ async function getTranscriptWithSupadata(videoId: string): Promise<{ transcript:
   try {
     console.log(`[Supadata] Fetching transcript for video ID: ${videoId}`);
     
-    const response = await fetch(`https://api.supadata.ai/v1/youtube/transcript?videoId=${videoId}`, {
+    const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    
+    // Try with URL parameter and text=true for plaintext response (recommended in docs)
+    const response = await fetch(`https://api.supadata.ai/v1/youtube/transcript?url=${encodeURIComponent(youtubeUrl)}&text=true`, {
       headers: {
         'x-api-key': SUPADATA_API_KEY,
         'Content-Type': 'application/json'
@@ -705,26 +706,90 @@ async function getTranscriptWithSupadata(videoId: string): Promise<{ transcript:
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[Supadata] API Error (${response.status}): ${errorText}`);
+      
+      // If language might be the issue, try again with explicit English
+      if (response.status === 404 || errorText.includes('language')) {
+        console.log('[Supadata] Trying with explicit language parameter (en)...');
+        
+        const langResponse = await fetch(`https://api.supadata.ai/v1/youtube/transcript?url=${encodeURIComponent(youtubeUrl)}&text=true&lang=en`, {
+          headers: {
+            'x-api-key': SUPADATA_API_KEY,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!langResponse.ok) {
+          throw new Error(`Supadata API error with explicit language: ${langResponse.status}`);
+        }
+        
+        const langData = await langResponse.json();
+        
+        if (!langData.content || typeof langData.content !== 'string' || langData.content.length === 0) {
+          throw new Error('No transcript content returned with explicit language');
+        }
+        
+        // Format the plain text into our timestamp format (approximate)
+        const lines = langData.content.split('\n');
+        const formattedTranscript = lines.map((line: string, index: number) => 
+          `[${formatTimestamp(index * 5)}] ${line}`
+        ).join(' ');
+        
+        return {
+          transcript: formattedTranscript,
+          isYouTubeTranscript: true
+        };
+      }
+      
       throw new Error(`Supadata API error: ${response.status} ${errorText}`);
     }
     
+    // Handle successful response
     const data = await response.json();
     
-    if (!data || !data.transcript || data.transcript.length === 0) {
-      console.error(`[Supadata] No transcript returned for video ID: ${videoId}`);
-      throw new Error('No transcript available from Supadata API');
+    if (!data.content || typeof data.content !== 'string' || data.content.length === 0) {
+      // If plain text is empty, try with structured format
+      console.log('[Supadata] Plain text content empty, trying structured format...');
+      
+      const structuredResponse = await fetch(`https://api.supadata.ai/v1/youtube/transcript?url=${encodeURIComponent(youtubeUrl)}`, {
+        headers: {
+          'x-api-key': SUPADATA_API_KEY,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (!structuredResponse.ok) {
+        throw new Error(`Supadata API error with structured format: ${structuredResponse.status}`);
+      }
+      
+      const structuredData = await structuredResponse.json();
+      
+      if (!structuredData.content || !Array.isArray(structuredData.content) || structuredData.content.length === 0) {
+        throw new Error('No transcript segments available in structured format');
+      }
+      
+      // Format the structured response
+      const formattedTranscript = structuredData.content
+        .map((segment: any) => {
+          const timestamp = segment.offset ? segment.offset / 1000 : 0;
+          return `[${formatTimestamp(timestamp)}] ${segment.text}`;
+        })
+        .join(' ');
+      
+      console.log(`[Supadata] Successfully retrieved structured transcript (${structuredData.content.length} segments)`);
+      
+      return {
+        transcript: formattedTranscript,
+        isYouTubeTranscript: true
+      };
     }
     
-    console.log(`[Supadata] Successfully retrieved transcript (${data.transcript.length} segments)`);
+    // Format the plain text into our timestamp format (approximate)
+    const lines = data.content.split('\n');
+    const formattedTranscript = lines.map((line: string, index: number) => 
+      `[${formatTimestamp(index * 5)}] ${line}`
+    ).join(' ');
     
-    // Format the transcript with timestamps
-    const formattedTranscript = data.transcript
-      .map((segment: any) => {
-        // Supadata often provides timestamps in seconds
-        const timestampSeconds = segment.start || 0;
-        return `[${formatTimestamp(timestampSeconds)}] ${segment.text}`;
-      })
-      .join(' ');
+    console.log(`[Supadata] Successfully retrieved plain text transcript (${lines.length} lines)`);
     
     return {
       transcript: formattedTranscript,
