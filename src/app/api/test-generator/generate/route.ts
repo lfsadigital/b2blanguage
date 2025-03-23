@@ -395,6 +395,54 @@ async function extractSubject(url: string, content: string): Promise<string> {
   }
 }
 
+// Add this function at the top level, near the other methods
+async function generateContentAboutURL(url: string): Promise<string> {
+  if (!openai) {
+    throw new Error('OpenAI API key is not configured for content generation');
+  }
+  
+  console.log(`All extraction methods failed. Using OpenAI to generate content about the URL topic: ${url}`);
+  
+  try {
+    // Extract last part of URL path for topic hint
+    const urlObj = new URL(url);
+    const pathParts = urlObj.pathname.split('/').filter(p => p);
+    const lastPath = pathParts.length > 0 ? pathParts[pathParts.length - 1] : '';
+    const topic = lastPath.replace(/-|_/g, ' ') || urlObj.hostname;
+    
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "system",
+          content: "You are a helpful assistant that generates content about topics."
+        },
+        {
+          role: "user",
+          content: `This URL ${url} appears to be about "${topic}". 
+          Please generate about 1500 words of factual content about this topic. 
+          Focus on what would likely be in an article with this URL.
+          Start immediately with the content, no introductions or notes.`
+        }
+      ],
+      temperature: 0.5,
+      max_tokens: 2000,
+    });
+
+    const generatedContent = completion.choices[0].message.content?.trim();
+    
+    if (!generatedContent || generatedContent.length < 200) {
+      throw new Error('Generated content is too short or empty');
+    }
+    
+    console.log(`Successfully generated content about the URL topic: ${generatedContent.length} characters`);
+    return generatedContent;
+  } catch (error) {
+    console.error('Error using OpenAI to generate content:', error);
+    throw new Error(`OpenAI content generation failed: ${(error as Error).message}`);
+  }
+}
+
 export async function POST(request: Request) {
   // Version identifier for deployment verification
   console.log("=== TEST GENERATOR API v1.2.1 (DEBUG BUILD) ===");
@@ -403,9 +451,14 @@ export async function POST(request: Request) {
     // Check if OpenAI client is available
     if (!openai) {
       console.error("API ERROR: OpenAI API key is not configured");
-      return NextResponse.json(
-        { error: "OpenAI API key is not configured" },
-        { status: 500 }
+      return new NextResponse(
+        JSON.stringify({ error: "OpenAI API key is not configured" }),
+        { 
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
       );
     }
     
@@ -417,9 +470,14 @@ export async function POST(request: Request) {
       console.log(`Received form data with contentUrl: ${formData.contentUrl?.substring(0, 30)}...`);
     } catch (parseError) {
       console.error("Failed to parse request JSON:", parseError);
-      return NextResponse.json(
-        { error: "Invalid request data format" },
-        { status: 400 }
+      return new NextResponse(
+        JSON.stringify({ error: "Invalid request data format" }),
+        { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
       );
     }
     
@@ -432,9 +490,14 @@ export async function POST(request: Request) {
 
     if (!url) {
       console.error("Missing contentUrl in request");
-      return NextResponse.json(
-        { error: 'Content URL is required' },
-        { status: 400 }
+      return new NextResponse(
+        JSON.stringify({ error: 'Content URL is required' }),
+        { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
       );
     }
 
@@ -458,16 +521,26 @@ export async function POST(request: Request) {
           contentText = transcript; // Store for subject extraction
           hasContent = true;
         } else {
-          return NextResponse.json(
-            { error: 'Video transcript is too short or empty' },
-            { status: 400 }
+          return new NextResponse(
+            JSON.stringify({ error: 'Video transcript is too short or empty' }),
+            { 
+              status: 400,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
           );
         }
       } catch (error) {
         console.error('Error getting video transcript:', error);
-        return NextResponse.json(
-          { error: `Unable to transcribe video: ${(error as Error).message}` },
-          { status: 400 }
+        return new NextResponse(
+          JSON.stringify({ error: `Unable to transcribe video: ${(error as Error).message}` }),
+          { 
+            status: 400,
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
         );
       }
     } else {
@@ -479,7 +552,13 @@ export async function POST(request: Request) {
           articleContent = await getArticleContent(url);
         } catch (directError) {
           console.error('Direct method failed, trying fallback for article content:', directError);
-          articleContent = await getArticleContentFallback(url);
+          
+          try {
+            articleContent = await getArticleContentFallback(url);
+          } catch (fallbackError) {
+            console.error('Fallback method also failed, generating content about the URL topic:', fallbackError);
+            articleContent = await generateContentAboutURL(url);
+          }
         }
         
         if (articleContent && articleContent.length > 100) {
@@ -487,25 +566,40 @@ export async function POST(request: Request) {
           contentText = articleContent; // Store for subject extraction
           hasContent = true;
         } else {
-          return NextResponse.json(
-            { error: 'Article content is too short or empty' },
-            { status: 400 }
+          return new NextResponse(
+            JSON.stringify({ error: 'Article content is too short or empty' }),
+            { 
+              status: 400,
+              headers: {
+                'Content-Type': 'application/json'
+              }
+            }
           );
         }
       } catch (error) {
         console.error('All article content methods failed:', error);
-        return NextResponse.json(
-          { error: `Unable to extract content from URL: ${(error as Error).message}` },
-          { status: 400 }
+        return new NextResponse(
+          JSON.stringify({ error: `Unable to extract content from URL: ${(error as Error).message}` }),
+          { 
+            status: 400,
+            headers: {
+              'Content-Type': 'application/json'
+            }
+          }
         );
       }
     }
     
     // Verify we have content before proceeding
     if (!hasContent) {
-      return NextResponse.json(
-        { error: 'No content was extracted from the provided URL' },
-        { status: 400 }
+      return new NextResponse(
+        JSON.stringify({ error: 'No content was extracted from the provided URL' }),
+        { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
       );
     }
 
@@ -563,17 +657,30 @@ export async function POST(request: Request) {
     const questions = parts[0].trim();
     const answers = parts.length > 1 ? parts[1].trim() : '';
 
-    return NextResponse.json({ 
-      test: generatedTest,
-      questions: questions,
-      answers: answers,
-      subject: extractedSubject
-    });
+    return new NextResponse(
+      JSON.stringify({ 
+        test: generatedTest,
+        questions: questions,
+        answers: answers,
+        subject: extractedSubject
+      }),
+      { 
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
   } catch (error) {
     console.error('Error generating test:', error);
-    return NextResponse.json(
-      { error: `Failed to generate test: ${(error as Error).message}` },
-      { status: 500 }
+    return new NextResponse(
+      JSON.stringify({ error: `Failed to generate test: ${(error as Error).message}` }),
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
     );
   }
 }

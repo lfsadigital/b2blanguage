@@ -42,6 +42,17 @@ export default function TestGeneratorPage() {
         body: JSON.stringify(formData),
       });
 
+      // Check if the response is JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        // Not JSON, try to get the text
+        const textResponse = await response.text();
+        console.error('Non-JSON response received:', textResponse.substring(0, 500));
+        setErrorMessage(`Server returned non-JSON response. This could be a server error or rate limit. Status: ${response.status}`);
+        return;
+      }
+
+      // Now we know it's JSON, parse it
       const data = await response.json();
       
       if (!response.ok) {
@@ -78,6 +89,16 @@ export default function TestGeneratorPage() {
           }),
         });
 
+        // Check if the response is JSON
+        const convContentType = convResponse.headers.get('content-type');
+        if (!convContentType || !convContentType.includes('application/json')) {
+          // Not JSON, log the error but don't fail the whole operation
+          const convTextResponse = await convResponse.text();
+          console.error('Non-JSON response from conversation API:', convTextResponse.substring(0, 500));
+          // Continue without conversation questions
+          return;
+        }
+
         const convData = await convResponse.json();
         if (convResponse.ok) {
           setConversationQuestions(convData.conversationQuestions);
@@ -86,6 +107,7 @@ export default function TestGeneratorPage() {
         }
       } catch (error) {
         console.error('Error generating conversation questions:', error);
+        // Continue without conversation questions
       }
 
       // Generate teacher tips
@@ -103,6 +125,16 @@ export default function TestGeneratorPage() {
           }),
         });
 
+        // Check if the response is JSON
+        const tipsContentType = tipsResponse.headers.get('content-type');
+        if (!tipsContentType || !tipsContentType.includes('application/json')) {
+          // Not JSON, log the error but don't fail the whole operation
+          const tipsTextResponse = await tipsResponse.text();
+          console.error('Non-JSON response from teacher tips API:', tipsTextResponse.substring(0, 500));
+          // Continue without teacher tips
+          return;
+        }
+
         const tipsData = await tipsResponse.json();
         if (tipsResponse.ok) {
           setTeacherTips(tipsData.teacherTips);
@@ -111,6 +143,7 @@ export default function TestGeneratorPage() {
         }
       } catch (error) {
         console.error('Error generating teacher tips:', error);
+        // Continue without teacher tips
       }
     } catch (error) {
       console.error('Client-side error during test generation:', error);

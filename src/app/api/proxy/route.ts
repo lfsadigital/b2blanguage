@@ -7,10 +7,37 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request) {
   try {
     // Extract the URL to fetch from the request body
-    const { url, headers = {} } = await request.json();
+    let requestBody;
+    try {
+      requestBody = await request.json();
+    } catch (error) {
+      console.error('[DEBUG PROXY] Failed to parse request JSON:', error);
+      return new NextResponse(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Invalid JSON in request body' 
+        }),
+        { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
+    
+    const { url, headers = {} } = requestBody;
     
     if (!url) {
-      return NextResponse.json({ error: 'URL is required' }, { status: 400 });
+      return new NextResponse(
+        JSON.stringify({ success: false, error: 'URL is required' }),
+        { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
     }
     
     console.log(`[DEBUG PROXY] Fetching content from: ${url}`);
@@ -25,9 +52,27 @@ export async function POST(request: Request) {
     console.log('[DEBUG PROXY] Using headers:', fetchHeaders);
     
     // Make the request
-    const response = await fetch(url, {
-      headers: fetchHeaders
-    });
+    let response;
+    try {
+      response = await fetch(url, {
+        headers: fetchHeaders
+      });
+    } catch (fetchError) {
+      console.error('[DEBUG PROXY] Fetch error:', fetchError);
+      return new NextResponse(
+        JSON.stringify({
+          success: false,
+          error: `Fetch error: ${(fetchError as Error).message}`,
+          stack: (fetchError as Error).stack
+        }),
+        { 
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
     
     // Get response status and headers
     const status = response.status;
@@ -40,7 +85,27 @@ export async function POST(request: Request) {
     console.log('[DEBUG PROXY] Response headers:', responseHeaders);
     
     // Get response body
-    const text = await response.text();
+    let text;
+    try {
+      text = await response.text();
+    } catch (textError) {
+      console.error('[DEBUG PROXY] Error reading response text:', textError);
+      return new NextResponse(
+        JSON.stringify({
+          success: false,
+          error: `Error reading response: ${(textError as Error).message}`,
+          status,
+          headers: responseHeaders
+        }),
+        { 
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+    }
+    
     console.log(`[DEBUG PROXY] Response body length: ${text.length}`);
     
     if (text.length < 1000) {
@@ -50,22 +115,38 @@ export async function POST(request: Request) {
     }
     
     // Return all the debug information
-    return NextResponse.json({
-      success: true,
-      url,
-      status,
-      headers: responseHeaders,
-      bodyLength: text.length,
-      bodyPreview: text.substring(0, 1000),
-      body: text
-    });
+    return new NextResponse(
+      JSON.stringify({
+        success: true,
+        url,
+        status,
+        headers: responseHeaders,
+        bodyLength: text.length,
+        bodyPreview: text.substring(0, 1000),
+        body: text
+      }),
+      { 
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
     
   } catch (error) {
     console.error('[DEBUG PROXY] Error:', error);
-    return NextResponse.json({
-      success: false,
-      error: `Error fetching content: ${(error as Error).message}`,
-      stack: (error as Error).stack
-    }, { status: 500 });
+    return new NextResponse(
+      JSON.stringify({
+        success: false,
+        error: `Error fetching content: ${(error as Error).message}`,
+        stack: (error as Error).stack
+      }),
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
   }
 } 
