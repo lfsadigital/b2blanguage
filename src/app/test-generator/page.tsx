@@ -57,6 +57,7 @@ export default function TestGeneratorPage() {
       if (formData.professorName) header.push(`Teacher: ${formData.professorName}`);
       if (formData.studentName) header.push(`Student: ${formData.studentName}`);
       if (data.subject) header.push(`Subject: ${data.subject}`);
+      // Version marker to verify deployment (23-MAR-2024)
       setTestHeader(header);
 
       // Generate conversation questions

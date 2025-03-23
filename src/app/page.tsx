@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowRightIcon } from '@heroicons/react/24/outline';
+import { CpuChipIcon } from '@heroicons/react/24/outline';
 
 export default function Home() {
   return (
@@ -56,31 +57,14 @@ export default function Home() {
           
           <div className="grid gap-8 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
             {/* Test Generator Card */}
-            <Link 
-              href="/test-generator"
-              className="apple-card group"
-            >
-              <div className="h-40 bg-gradient-to-r from-[var(--primary)] to-[var(--primary-light)] p-6 flex items-end">
-                <div className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur-md shadow-lg flex items-center justify-center">
-                  <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                  </svg>
-                </div>
-              </div>
-              
-              <div className="px-6 py-8">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-2xl font-bold text-[var(--foreground)]">Test Generator</h3>
-                  <ArrowRightIcon className="h-5 w-5 text-[var(--primary)] group-hover:translate-x-1 transition-transform duration-200" />
-                </div>
-                <p className="mt-4 text-[var(--subtle)]">
-                  Create customized English tests from videos or articles for your business professionals
-                </p>
-                <div className="mt-6 pt-6 border-t border-[var(--border)]">
-                  <p className="text-sm text-[var(--primary)]">Generate tests, conversation questions, and teaching resources</p>
-                </div>
-              </div>
-            </Link>
+            <div className="flex flex-col px-8 md:px-20 py-20 w-full items-center justify-center space-y-12 bg-gradient-to-b from-white/60 to-[var(--background)]">
+              <Link href="/test-generator" className="card flex flex-col items-center justify-center space-y-4 p-6 rounded-xl shadow-lg hover:shadow-xl transition-all bg-white/90 max-w-md w-full">
+                <CpuChipIcon className="w-16 h-16 text-[var(--primary)]" />
+                <h2 className="text-xl font-semibold">English Test Generator</h2>
+                <p className="text-sm text-[var(--primary)]">Generate tests, conversation questions, and teaching resources</p>
+                <p className="text-xs text-gray-500 mt-2">Version 1.2.0 (Mar 23, 2024)</p>
+              </Link>
+            </div>
             
             {/* Vocabulary Builder Card (Coming Soon) */}
             <div className="apple-card bg-white">
