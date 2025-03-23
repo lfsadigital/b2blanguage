@@ -33,6 +33,7 @@ export default function TestGeneratorPage() {
     setContentUrl(formData.contentUrl);
     
     try {
+      console.log('Submitting request to generate test...', formData.contentUrl);
       const response = await fetch('/api/test-generator/generate', {
         method: 'POST',
         headers: {
@@ -44,10 +45,12 @@ export default function TestGeneratorPage() {
       const data = await response.json();
       
       if (!response.ok) {
+        console.error('Error response from test generator API:', data);
         setErrorMessage(data.error || 'Failed to generate test. Please try again.');
         return;
       }
 
+      console.log('Test generation successful');
       setGeneratedTest(data.test);
       setQuestions(data.questions);
       setAnswers(data.answers);
@@ -62,6 +65,7 @@ export default function TestGeneratorPage() {
 
       // Generate conversation questions
       try {
+        console.log('Requesting conversation questions...');
         const convResponse = await fetch('/api/test-generator/conversation', {
           method: 'POST',
           headers: {
@@ -86,6 +90,7 @@ export default function TestGeneratorPage() {
 
       // Generate teacher tips
       try {
+        console.log('Requesting teacher tips...');
         const tipsResponse = await fetch('/api/test-generator/teacher-tips', {
           method: 'POST',
           headers: {
@@ -108,8 +113,8 @@ export default function TestGeneratorPage() {
         console.error('Error generating teacher tips:', error);
       }
     } catch (error) {
-      console.error('Error:', error);
-      setErrorMessage('An error occurred. Please try again.');
+      console.error('Client-side error during test generation:', error);
+      setErrorMessage(`An error occurred: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsGenerating(false);
     }
@@ -411,15 +416,29 @@ export default function TestGeneratorPage() {
         {/* Error Message */}
         {errorMessage && (
           <div className="p-6 bg-red-50 border border-red-200 rounded-xl mb-8">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <ExclamationCircleIcon className="h-5 w-5 text-red-600" aria-hidden="true" />
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-red-800">Error Generating Test</h3>
-                <div className="mt-2 text-sm text-red-700">
-                  <p>{errorMessage}</p>
+            <div className="flex flex-col">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <ExclamationCircleIcon className="h-5 w-5 text-red-600" aria-hidden="true" />
                 </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-red-800">Error Generating Test</h3>
+                  <div className="mt-2 text-sm text-red-700">
+                    <p>{errorMessage}</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-4 text-center">
+                <button
+                  onClick={() => {
+                    console.log("Copying error to clipboard");
+                    navigator.clipboard.writeText(`Error: ${errorMessage}\nURL: ${contentUrl}`);
+                  }}
+                  className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200"
+                >
+                  <DocumentDuplicateIcon className="h-4 w-4 mr-1" />
+                  Copy Error Details
+                </button>
               </div>
             </div>
           </div>

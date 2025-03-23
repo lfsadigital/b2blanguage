@@ -21,7 +21,7 @@ const openai = process.env.OPENAI_API_KEY
 async function getArticleContent(url: string): Promise<string> {
   console.log(`Fetching article content from: ${url}`);
   try {
-    // Try with a more browser-like fetch
+    // First try using Vercel's built-in fetch
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -41,27 +41,71 @@ async function getArticleContent(url: string): Promise<string> {
       console.log('HTML content might be too short, possibly blocked or empty:', html.substring(0, 200));
     }
     
-    // Basic HTML to text conversion - you might want to use a proper HTML parser
-    const text = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
-                     .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
-                     .replace(/<[^>]*>/g, ' ')
-                     .replace(/\s+/g, ' ')
-                     .trim();
-    
-    console.log(`Extracted text content of length: ${text.length}`);
-    
-    if (!text || text.length < 100) {
-      console.error('Article content is too short or empty after extraction');
-      throw new Error('Article content is too short or empty');
-    }
-    
-    // Take a larger portion for better context
-    return text.substring(0, 6000); // Increased from 4000 to 6000
+    return processHtmlContent(html);
   } catch (error) {
-    console.error('Detailed error fetching article:', error);
-    console.error('Error stack:', (error as Error).stack);
-    throw new Error(`Failed to fetch article content: ${(error as Error).message}`);
+    console.error('Error with direct fetch approach:', error);
+    
+    // Try another method if direct fetch fails - sometimes CORS or other issues prevent direct fetching
+    console.log('Attempting alternative article extraction method...');
+    
+    try {
+      // We'll use an external API service that specializes in content extraction
+      // For demonstration, we'll use another approach where we check through our proxy
+      const proxyUrl = process.env.VERCEL_URL 
+        ? `https://${process.env.VERCEL_URL}/api/proxy`
+        : 'http://localhost:3000/api/proxy';
+      
+      console.log(`Using proxy at ${proxyUrl} to fetch content`);
+      
+      const proxyResponse = await fetch(proxyUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url: url,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+          }
+        }),
+      });
+      
+      const proxyData = await proxyResponse.json();
+      
+      if (!proxyData.success) {
+        console.error('Proxy fetch failed:', proxyData.error);
+        throw new Error(`Proxy fetch failed: ${proxyData.error}`);
+      }
+      
+      console.log(`Proxy successful, received body of length: ${proxyData.bodyLength}`);
+      
+      return processHtmlContent(proxyData.body);
+    } catch (proxyError) {
+      console.error('Proxy approach also failed:', proxyError);
+      throw new Error(`All direct extraction methods failed: ${(error as Error).message}. Proxy error: ${(proxyError as Error).message}`);
+    }
   }
+}
+
+// Helper function to process HTML content into plain text
+function processHtmlContent(html: string): string {
+  // Basic HTML to text conversion
+  const text = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
+                   .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
+                   .replace(/<[^>]*>/g, ' ')
+                   .replace(/\s+/g, ' ')
+                   .trim();
+  
+  console.log(`Extracted text content of length: ${text.length}`);
+  
+  if (!text || text.length < 100) {
+    console.error('Article content is too short or empty after extraction');
+    throw new Error('Article content is too short or empty');
+  }
+  
+  // Take a larger portion for better context
+  return text.substring(0, 6000); // Increased from 4000 to 6000
 }
 
 async function getArticleContentFallback(url: string): Promise<string> {
