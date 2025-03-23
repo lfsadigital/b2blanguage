@@ -1,0 +1,11 @@
+{
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/next",
+      "config": {
+        "installCommand": "npm install && apt-get update && apt-get install -y youtube-dl"
+      }
+    }
+  ]
+} 
