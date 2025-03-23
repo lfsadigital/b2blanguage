@@ -12,14 +12,10 @@ import { generateTestPrompt } from '@/app/lib/prompts/test-generator/main-test';
 
 const execAsync = promisify(exec);
 
-// Check if OpenAI API key exists
-if (!process.env.OPENAI_API_KEY) {
-  console.error('OPENAI_API_KEY is not set in environment variables');
-}
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Only initialize OpenAI client if API key is available
+const openai = process.env.OPENAI_API_KEY 
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
 async function getArticleContent(url: string): Promise<string> {
   try {
@@ -40,6 +36,10 @@ async function getArticleContent(url: string): Promise<string> {
 }
 
 async function getVideoTranscriptWithWhisper(url: string): Promise<string> {
+  if (!openai) {
+    throw new Error('OpenAI API key is not configured');
+  }
+  
   try {
     // Create a temp directory
     const tmpDir = path.join(os.tmpdir(), 'youtube-audio-' + Math.random().toString(36).substring(2, 15));
@@ -144,33 +144,35 @@ function formatTimestamp(seconds: number): string {
 async function extractSubject(url: string, content: string): Promise<string> {
   try {
     // First, try using the OpenAI to generate a concise subject
-    try {
-      const subjectPrompt = generateSubjectExtractionPrompt(content);
-      
-      const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content: "You are an expert at identifying main topics and themes in content."
-          },
-          {
-            role: "user",
-            content: subjectPrompt
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 50,
-      });
-      
-      const generatedSubject = response.choices[0].message.content?.trim();
-      if (generatedSubject && generatedSubject.length > 3) {
-        console.log(`Generated subject: ${generatedSubject}`);
-        return generatedSubject;
+    if (openai) {
+      try {
+        const subjectPrompt = generateSubjectExtractionPrompt(content);
+        
+        const response = await openai.chat.completions.create({
+          model: "gpt-3.5-turbo",
+          messages: [
+            {
+              role: "system",
+              content: "You are an expert at identifying main topics and themes in content."
+            },
+            {
+              role: "user",
+              content: subjectPrompt
+            }
+          ],
+          temperature: 0.3,
+          max_tokens: 50,
+        });
+        
+        const generatedSubject = response.choices[0].message.content?.trim();
+        if (generatedSubject && generatedSubject.length > 3) {
+          console.log(`Generated subject: ${generatedSubject}`);
+          return generatedSubject;
+        }
+      } catch (aiError) {
+        console.error('Error generating subject with AI:', aiError);
+        // Continue with fallback methods
       }
-    } catch (aiError) {
-      console.error('Error generating subject with AI:', aiError);
-      // Continue with fallback methods
     }
     
     // Try to extract title from URL if it's YouTube
@@ -205,6 +207,14 @@ async function extractSubject(url: string, content: string): Promise<string> {
 
 export async function POST(request: Request) {
   try {
+    // Check if OpenAI client is available
+    if (!openai) {
+      return NextResponse.json(
+        { error: "OpenAI API key is not configured" },
+        { status: 500 }
+      );
+    }
+    
     const formData: TestFormData = await request.json();
     const url = formData.contentUrl;
     const today = new Date().toLocaleDateString('en-US', {

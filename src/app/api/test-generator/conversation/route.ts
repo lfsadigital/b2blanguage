@@ -2,17 +2,21 @@ import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { generateConversationPrompt } from '@/app/lib/prompts/test-generator/conversation';
 
-// Check if OpenAI API key exists
-if (!process.env.OPENAI_API_KEY) {
-  console.error('OPENAI_API_KEY is not set in environment variables');
-}
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Only initialize OpenAI client if API key is available
+const openai = process.env.OPENAI_API_KEY 
+  ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  : null;
 
 export async function POST(request: Request) {
   try {
+    // Check if OpenAI client is available
+    if (!openai) {
+      return NextResponse.json(
+        { error: "OpenAI API key is not configured" },
+        { status: 500 }
+      );
+    }
+
     const { contentUrl, subject, studentLevel } = await request.json();
 
     if (!subject) {
