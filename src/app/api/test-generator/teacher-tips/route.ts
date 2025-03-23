@@ -19,49 +19,18 @@ export async function POST(request: Request) {
 
     const { contentUrl, subject, studentLevel } = await request.json();
     
-    // If subject is not provided directly, extract it from the URL
-    let topicSubject = subject;
+    // IMPORTANT: We should ONLY proceed if we have a valid subject from the main content extraction
+    // This ensures we don't generate content based solely on URLs when content extraction failed
+    if (!subject) {
+      console.error('No valid subject provided - this indicates content extraction failed');
+      return NextResponse.json(
+        { error: "Cannot generate teacher tips without valid content extraction" },
+        { status: 400 }
+      );
+    }
     
-    if (!topicSubject && contentUrl) {
-      console.log('No subject provided, attempting to extract from URL for teacher tips...');
-      
-      try {
-        // Simple extraction from YouTube title or URL
-        if (contentUrl.includes('youtube.com') || contentUrl.includes('youtu.be')) {
-          // Try to extract from URL parameters
-          const urlObj = new URL(contentUrl);
-          const titleParam = urlObj.searchParams.get('title');
-          if (titleParam) {
-            topicSubject = decodeURIComponent(titleParam).replace(/\+/g, ' ');
-          } else {
-            // Extract video ID and use that for now
-            let videoId = '';
-            if (contentUrl.includes('youtube.com/watch')) {
-              videoId = urlObj.searchParams.get('v') || '';
-            } else if (contentUrl.includes('youtu.be/')) {
-              videoId = contentUrl.split('youtu.be/')[1].split('?')[0];
-            }
-            topicSubject = `English Lesson on Video ${videoId}`;
-          }
-        } else {
-          // Try to extract from article URL
-          const urlParts = new URL(contentUrl).pathname.split('/');
-          const lastUrlPart = urlParts[urlParts.length - 1];
-          topicSubject = lastUrlPart
-            .replace(/-/g, ' ')
-            .replace(/\.(html|php|aspx)$/, '')
-            .replace(/[0-9]/g, '')
-            .trim() || 'English Lesson';
-        }
-      } catch (error) {
-        console.error('Error extracting subject from URL:', error);
-        topicSubject = 'English Teaching Tips';
-      }
-    }
-
-    if (!topicSubject) {
-      topicSubject = 'English Teaching Tips';
-    }
+    // Use the subject that was provided from the successful content extraction
+    const topicSubject = subject;
     
     console.log(`Using subject: "${topicSubject}" for teacher tips`);
 
