@@ -47,6 +47,9 @@ async function getVideoTranscriptWithWhisper(url: string): Promise<string> {
     const randomId = Math.random().toString(36).substring(2, 15);
     const tmpDir = path.join(tempDir, `yt-${randomId}`);
     
+    // Debug trace for deployment verification (23-Mar-2024)
+    console.log(`[DEBUG v1.2.0] Starting YouTube download process for ${url}`);
+    
     try {
       fs.mkdirSync(tmpDir, { recursive: true });
     } catch (error) {
@@ -353,7 +356,7 @@ export async function POST(request: Request) {
         }
       ],
       temperature: 0.7,
-      max_tokens: 3500, // Increased token limit to accommodate all sections
+      max_tokens: 2000,
     });
 
     const generatedTest = completion.choices[0].message.content;
@@ -362,48 +365,15 @@ export async function POST(request: Request) {
       throw new Error('Failed to generate test content');
     }
     
-    console.log('Processing generated content...');
-    
-    // Extract the different sections
-    let questions = '';
-    let answers = '';
-    let conversationQuestions = '';
-    let teacherTips = '';
-    
-    // Check for the conversation section marker
-    if (generatedTest.includes('---CONVERSATION---')) {
-      // Split by the conversation marker
-      const mainParts = generatedTest.split('---CONVERSATION---');
-      
-      // The first part contains questions and answers
-      const testParts = mainParts[0].split('---');
-      questions = testParts[0].trim();
-      answers = testParts.length > 1 ? testParts[1].trim() : '';
-      
-      // Check if there are tips as well
-      if (mainParts[1].includes('---TIPS---')) {
-        const secondaryParts = mainParts[1].split('---TIPS---');
-        conversationQuestions = secondaryParts[0].trim();
-        teacherTips = secondaryParts[1].trim();
-      } else {
-        // No tips section found
-        conversationQuestions = mainParts[1].trim();
-      }
-    } else {
-      // Fall back to the original format if no conversation section is found
-      const parts = generatedTest.split('---');
-      questions = parts[0].trim();
-      answers = parts.length > 1 ? parts[1].trim() : '';
-    }
-    
-    console.log('Sections extracted successfully');
+    // Split the test into questions and answers
+    const parts = generatedTest.split('---');
+    const questions = parts[0].trim();
+    const answers = parts.length > 1 ? parts[1].trim() : '';
 
     return NextResponse.json({ 
       test: generatedTest,
       questions: questions,
       answers: answers,
-      conversationQuestions: conversationQuestions,
-      teacherTips: teacherTips,
       subject: extractedSubject
     });
   } catch (error) {
