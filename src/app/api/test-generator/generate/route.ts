@@ -255,7 +255,8 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
     const patterns = [
       /https:\/\/www.youtube.com\/api\/timedtext[^"'\s]+/,
       /playerCaptionsTracklistRenderer.*?url":"(https:\/\/www.youtube.com\/api\/timedtext[^"]+)"/,
-      /"captionTracks":\s*\[\s*\{\s*"baseUrl":\s*"([^"]+)"/
+      /"captionTracks":\s*\[\s*\{\s*"baseUrl":\s*"([^"]+)"/,
+      /"captionTracks":.*?"kind":"asr".*?"baseUrl":"([^"]+)"/  // Specific pattern for auto-generated captions
     ];
     
     for (const pattern of patterns) {
@@ -283,12 +284,38 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
           const data = JSON.parse(dataMatch[1].includes('{') ? dataMatch[1] : jsonStr);
           
           // Extract caption info from the parsed data
-          const captions = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks || 
+          let captions = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks || 
                           data?.playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+          
+          // Look in alternate locations for captions data
+          if (!captions && data?.playerConfig?.captions) {
+            captions = data.playerConfig.captions.playerCaptionsTracklistRenderer?.captionTracks;
+          }
+          
+          // Try to find captions in the playerResponse
+          if (!captions && data?.playerResponse) {
+            try {
+              const playerResponse = typeof data.playerResponse === 'string' 
+                ? JSON.parse(data.playerResponse) 
+                : data.playerResponse;
+              
+              captions = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+            } catch (e) {
+              console.log('Error parsing nested playerResponse:', e);
+            }
+          }
                           
           if (captions && captions.length > 0) {
-            captionUrl = captions[0].baseUrl;
-            console.log(`Found caption URL in JSON data: ${captionUrl}`);
+            // First try to find auto-captions if they exist
+            const autoCaption = captions.find((track: { kind: string, baseUrl: string }) => track.kind === 'asr');
+            if (autoCaption) {
+              captionUrl = autoCaption.baseUrl;
+              console.log(`Found auto-generated caption URL: ${captionUrl}`);
+            } else {
+              // Fall back to first available caption
+              captionUrl = captions[0].baseUrl;
+              console.log(`Found caption URL in JSON data: ${captionUrl}`);
+            }
           } else {
             console.log('No caption tracks found in JSON data');
           }
@@ -313,7 +340,12 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
     
     // Add parameters if they're not present (lang, format, etc.)
     if (!captionUrl.includes('&lang=')) {
-      captionUrl += '&lang=en';
+      // Check if there's a tlang parameter already
+      if (!captionUrl.includes('&tlang=')) {
+        // Try to detect user's language or fallback to multiple options
+        // First try with user's language if we can detect it
+        captionUrl += '&lang=en';
+      }
     }
     if (!captionUrl.includes('&fmt=')) {
       captionUrl += '&fmt=json3';
