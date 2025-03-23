@@ -10,6 +10,7 @@ import os from 'os';
 import youtubeDl from 'youtube-dl-exec';
 import { generateSubjectExtractionPrompt } from '@/app/lib/prompts/test-generator/subject-extraction';
 import { generateTestPrompt } from '@/app/lib/prompts/test-generator/main-test';
+import { generateContentExtractionPrompt, contentExtractionSystemMessage } from '@/app/lib/prompts/test-generator/content-extraction';
 
 // Supadata API Key (will be moved to environment variables)
 const SUPADATA_API_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IjEifQ.eyJpc3MiOiJuYWRsZXMiLCJpYXQiOiIxNzQyNzYwMzA0IiwicHVycG9zZSI6ImFwaV9hdXRoZW50aWNhdGlvbiIsInN1YiI6ImU1OWI0Y2MyZWNmNzQwOTBhZTgzN2ZmZWQ3NjY3NjkyIn0.0ee3lode52dXvdaQKVC79oaAyNDdftSciOzP2-GeFXI';
@@ -124,17 +125,11 @@ async function getArticleContentFallback(url: string): Promise<string> {
       messages: [
         {
           role: "system",
-          content: "You are a precise content extractor that only extracts real content from web URLs. You MUST NEVER invent or make up content. If you cannot access the real content, clearly state that you cannot extract it rather than generating anything."
+          content: contentExtractionSystemMessage
         },
         {
           role: "user",
-          content: `Extract the main article content from this URL: ${url}
-
-VERY IMPORTANT: 
-1. If you cannot access the actual content, respond ONLY with: "CANNOT_ACCESS_CONTENT"
-2. DO NOT generate or make up ANY content
-3. Only return the extracted content if you can actually access it
-4. No introduction or explanation - only return the extracted content itself`
+          content: generateContentExtractionPrompt(url)
         }
       ],
       temperature: 0.2,
