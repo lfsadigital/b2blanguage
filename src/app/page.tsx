@@ -92,59 +92,21 @@ export default function Home() {
       {/* About Us Section */}
       <section id="about" className="py-20 bg-gradient-to-r from-[#FAEBD7] to-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-            <div>
-              <div className="max-w-md">
-                <h2 className="text-3xl font-bold text-[#8B4513] mb-6">NOSSA PRIORIDADE</h2>
-                <h3 className="text-xl font-medium text-[#A0522D] mb-8">Utilize no trabalho amanhã o que foi aprendido em aula hoje!</h3>
-                
-                <div className="prose text-[#5D4037]">
-                  <p className="mb-4">
-                    Na B2B Languages, nossa prioridade é garantir que tudo que é aprendido hoje em aula pelos alunos seja utilizado para o trabalho amanhã. Temos orgulho de nossa compreensão das especificidades de nossos parceiros corporativos e oferecemos soluções de excelência para o treinamento de idiomas estrangeiros para negócios.
-                  </p>
-                  <p className="mb-4">
-                    Formamos uma equipe de instrutores em comunicação apaixonada e dedicada ao objetivo comum de identificar e suprir as necessidades de nossos clientes.
-                  </p>
-                  <p>
-                    Para cumprir tal objetivo, cada aluno tem um programa personalizado, desenvolvido através de uma avaliação detalhada, visando que todos os pontos abordados durante o curso sejam de aplicação prática e direta em suas rotinas e que atendam suas expectativas e necessidades específicas.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white p-8 rounded-xl shadow-lg">
-              <h3 className="text-xl font-bold text-[#8B4513] mb-6">EMPRESAS ONDE TEMOS CLIENTES</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <ul className="space-y-2 text-[#5D4037]">
-                  <li>• Allianz</li>
-                  <li>• UOL Diveo</li>
-                  <li>• Grupo Libra</li>
-                  <li>• Machado Meyer</li>
-                  <li>• Generali</li>
-                  <li>• Corrêa Meyer</li>
-                  <li>• Demarest</li>
-                </ul>
-                <ul className="space-y-2 text-[#5D4037]">
-                  <li>• ACE</li>
-                  <li>• CE</li>
-                  <li>• JBS</li>
-                  <li>• Novo-Nordisk</li>
-                  <li>• Pernod-Ricard</li>
-                  <li>• SCBF</li>
-                  <li>• Ulhoa-Canto</li>
-                </ul>
-              </div>
+          <div className="flex justify-center">
+            <div className="max-w-2xl">
+              <h2 className="text-3xl font-bold text-[#8B4513] mb-6 text-center">OUR PRIORITY</h2>
+              <h3 className="text-xl font-medium text-[#A0522D] mb-8 text-center">Use tomorrow at work what was learned in class today!</h3>
               
-              <div className="mt-8 pt-6 border-t border-[#DEB887]">
-                <h4 className="text-lg font-semibold text-[#8B4513] mb-4">Contato</h4>
-                <p className="text-[#5D4037] mb-4">Temos as soluções que você precisa e estamos à disposição para ajudá-lo! Entre em contato conosco! Será um prazer auxiliá-lo!</p>
-                <div className="space-y-1 text-[#5D4037]">
-                  <p>11 3280-0014</p>
-                  <p>11 98108-8908</p>
-                  <p>contato@b2blanguages.com.br</p>
-                  <p>Rua Caramuru, 1438 112B Saúde</p>
-                  <p>São Paulo, SP - CEP 04138-002</p>
-                </div>
+              <div className="prose text-[#5D4037] mx-auto">
+                <p className="mb-4">
+                  At B2B Languages, our priority is to ensure that everything students learn in class today can be applied to their work tomorrow. We take pride in our understanding of the specific needs of our corporate partners and offer excellent solutions for foreign language training for business.
+                </p>
+                <p className="mb-4">
+                  We form a team of passionate communication instructors dedicated to the common goal of identifying and meeting our clients' needs.
+                </p>
+                <p>
+                  To fulfill this objective, each student has a personalized program, developed through a detailed assessment, ensuring that all topics covered during the course have practical and direct application in their routines and meet their specific expectations and needs.
+                </p>
               </div>
             </div>
           </div>
