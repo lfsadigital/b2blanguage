@@ -6,6 +6,8 @@ import { TestFormData } from '@/app/lib/types';
 import { jsPDF } from 'jspdf';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } from 'docx';
 import { saveAs } from 'file-saver';
+import Link from 'next/link';
+import { ArrowLeftIcon, ExclamationCircleIcon, DocumentArrowDownIcon, DocumentDuplicateIcon } from '@heroicons/react/24/outline';
 
 export default function TestGeneratorPage() {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -363,180 +365,158 @@ export default function TestGeneratorPage() {
   };
   
   return (
-    <div className="min-h-screen bg-[var(--background)]">
-      {/* Header Banner */}
-      <div className="bg-gradient-to-r from-[var(--primary-dark)] via-[var(--primary)] to-[var(--primary-light)] text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 md:py-16">
-          <div className="md:flex md:items-center md:justify-between">
-            <div>
-              <h1 className="text-3xl font-bold apple-heading">Test Generator</h1>
-              <p className="mt-2 text-white/80">
-                Create customized English tests from videos or articles for your business professionals
-              </p>
-            </div>
-            <div className="mt-4 md:mt-0 flex">
-              <div className="inline-flex items-center px-4 py-2 border border-white/20 rounded-full text-sm text-white backdrop-blur-sm">
-                <span className="h-2 w-2 rounded-full bg-[var(--success)] mr-2"></span>
-                B2B Language Professional Tool
-              </div>
-            </div>
-          </div>
-        </div>
+    <div className="container mx-auto py-8 max-w-7xl">
+      <div className="flex justify-between items-center mb-8 px-4 md:px-0">
+        <h1 className="text-2xl sm:text-3xl font-bold text-[var(--foreground)]">Test Generator</h1>
+        <Link 
+          href="/"
+          className="text-[var(--primary)] hover:text-[var(--primary-dark)] flex items-center gap-1 text-sm font-medium"
+        >
+          <ArrowLeftIcon className="h-4 w-4" />
+          Back to Home
+        </Link>
       </div>
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-8">
-          {/* Generator Form */}
-          <div className="apple-card">
-            <TestGeneratorForm onSubmit={handleSubmit} isGenerating={isGenerating} />
-          </div>
-
-          {/* Error Message */}
-          {errorMessage && (
-            <div className="bg-[var(--error)]/10 border-l-4 border-[var(--error)] p-4 rounded-md">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <svg className="h-5 w-5 text-[var(--error)]" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                </div>
-                <div className="ml-3">
-                  <p className="text-sm text-[var(--error)]">{errorMessage}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Generated Content */}
-          {generatedTest && (
-            <div className="apple-card">
-              <div className="border-b border-[var(--border)]">
-                <div className="px-6 py-5">
-                  <h3 className="text-lg font-medium text-[var(--foreground)] apple-heading">Generated Materials</h3>
-                  <p className="mt-1 text-sm text-[var(--subtle)]">
-                    {testHeader.join(' • ')}
-                  </p>
-                </div>
-                <div className="border-b border-[var(--border)]">
-                  <nav className="flex -mb-px">
-                    <button
-                      onClick={() => setActiveTab('test')}
-                      className={`${
-                        activeTab === 'test'
-                          ? 'border-[var(--primary)] text-[var(--primary)]'
-                          : 'border-transparent text-[var(--subtle)] hover:text-[var(--foreground)] hover:border-[var(--border)]'
-                      } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors`}
-                    >
-                      Test
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('conversation')}
-                      className={`${
-                        activeTab === 'conversation'
-                          ? 'border-[var(--primary)] text-[var(--primary)]'
-                          : 'border-transparent text-[var(--subtle)] hover:text-[var(--foreground)] hover:border-[var(--border)]'
-                      } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors ${!conversationQuestions ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      disabled={!conversationQuestions}
-                    >
-                      Conversation Questions
-                    </button>
-                    <button
-                      onClick={() => setActiveTab('tips')}
-                      className={`${
-                        activeTab === 'tips'
-                          ? 'border-[var(--primary)] text-[var(--primary)]'
-                          : 'border-transparent text-[var(--subtle)] hover:text-[var(--foreground)] hover:border-[var(--border)]'
-                      } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors ${!teacherTips ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      disabled={!teacherTips}
-                    >
-                      Teacher Tips
-                    </button>
-                  </nav>
-                </div>
-              </div>
-              
-              <div className="px-6 py-5">
-                {activeTab === 'test' && (
-                  <div className="space-y-6">
-                    {/* Questions */}
-                    <div className="bg-[var(--background)] p-6 rounded-2xl border border-[var(--border)]">
-                      <h4 className="text-lg font-medium text-[var(--foreground)] mb-4 apple-heading">Test Questions</h4>
-                      <div className="prose prose-[var(--primary)] max-w-none" dangerouslySetInnerHTML={{ __html: generatedTest || '' }} />
-                    </div>
-                    
-                    {/* Answers */}
-                    {answers && (
-                      <div className="bg-[var(--background)] p-6 rounded-2xl border border-[var(--border)]">
-                        <h4 className="text-lg font-medium text-[var(--foreground)] mb-4 apple-heading">Answer Key</h4>
-                        <div className="prose prose-[var(--primary)] max-w-none" dangerouslySetInnerHTML={{ __html: answers }} />
-                      </div>
-                    )}
-                    
-                    {/* Export Buttons */}
-                    <div className="flex flex-wrap gap-3 justify-end pt-4">
-                      <button
-                        onClick={() => generatePDF(questions || '', 'test_questions.pdf')}
-                        className="apple-button-secondary text-sm"
-                      >
-                        Export Questions PDF
-                      </button>
-                      <button
-                        onClick={() => generatePDF(answers || '', 'answer_key.pdf')}
-                        className="apple-button-secondary text-sm"
-                      >
-                        Export Answers PDF
-                      </button>
-                      <button
-                        onClick={generateCombinedPDF}
-                        className="apple-button text-sm"
-                      >
-                        Export Combined PDF
-                      </button>
-                      <button
-                        onClick={generateWordDocument}
-                        className="apple-button text-sm bg-[var(--secondary)] hover:bg-[var(--secondary-light)]"
-                      >
-                        Export Word Document
-                      </button>
-                    </div>
-                  </div>
-                )}
-                
-                {activeTab === 'conversation' && conversationQuestions && (
-                  <div className="bg-[var(--background)] p-6 rounded-2xl border border-[var(--border)]">
-                    <h4 className="text-lg font-medium text-[var(--foreground)] mb-4 apple-heading">Conversation Questions</h4>
-                    <div className="prose prose-[var(--primary)] max-w-none" dangerouslySetInnerHTML={{ __html: conversationQuestions }} />
-                    
-                    <div className="flex justify-end mt-6">
-                      <button
-                        onClick={() => generatePDF(conversationQuestions || '', 'conversation_questions.pdf')}
-                        className="apple-button-secondary text-sm"
-                      >
-                        Export as PDF
-                      </button>
-                    </div>
-                  </div>
-                )}
-                
-                {activeTab === 'tips' && teacherTips && (
-                  <div className="bg-[var(--background)] p-6 rounded-2xl border border-[var(--border)]">
-                    <h4 className="text-lg font-medium text-[var(--foreground)] mb-4 apple-heading">Teacher Tips</h4>
-                    <div className="prose prose-[var(--primary)] max-w-none" dangerouslySetInnerHTML={{ __html: teacherTips }} />
-                    
-                    <div className="flex justify-end mt-6">
-                      <button
-                        onClick={() => generatePDF(teacherTips || '', 'teacher_tips.pdf')}
-                        className="apple-button-secondary text-sm"
-                      >
-                        Export as PDF
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+      <div className="space-y-8">
+        {/* Generator Form */}
+        <div className="apple-card">
+          <TestGeneratorForm onSubmit={handleSubmit} isGenerating={isGenerating} />
         </div>
+
+        {/* Error Message */}
+        {errorMessage && (
+          <div className="p-6 bg-red-50 border border-red-200 rounded-xl mb-8">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <ExclamationCircleIcon className="h-5 w-5 text-red-600" aria-hidden="true" />
+              </div>
+              <div className="ml-3">
+                <h3 className="text-sm font-medium text-red-800">Error Generating Test</h3>
+                <div className="mt-2 text-sm text-red-700">
+                  <p>{errorMessage}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Generated Content */}
+        {generatedTest && (
+          <div className="apple-card">
+            <div className="border-b border-[var(--border)]">
+              <div className="px-6 py-5">
+                <h3 className="text-lg font-medium text-[var(--foreground)] apple-heading">Generated Materials</h3>
+                <p className="mt-1 text-sm text-[var(--subtle)]">
+                  {testHeader.join(' • ')}
+                </p>
+              </div>
+              <div className="border-b border-[var(--border)]">
+                <nav className="flex -mb-px">
+                  <button
+                    onClick={() => setActiveTab('test')}
+                    className={`${
+                      activeTab === 'test'
+                        ? 'border-[var(--primary)] text-[var(--primary)]'
+                        : 'border-transparent text-[var(--subtle)] hover:text-[var(--foreground)] hover:border-[var(--border)]'
+                    } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors`}
+                  >
+                    Test
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('conversation')}
+                    className={`${
+                      activeTab === 'conversation'
+                        ? 'border-[var(--primary)] text-[var(--primary)]'
+                        : 'border-transparent text-[var(--subtle)] hover:text-[var(--foreground)] hover:border-[var(--border)]'
+                    } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors ${!conversationQuestions ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={!conversationQuestions}
+                  >
+                    Conversation Questions
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('tips')}
+                    className={`${
+                      activeTab === 'tips'
+                        ? 'border-[var(--primary)] text-[var(--primary)]'
+                        : 'border-transparent text-[var(--subtle)] hover:text-[var(--foreground)] hover:border-[var(--border)]'
+                    } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors ${!teacherTips ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={!teacherTips}
+                  >
+                    Teacher Tips
+                  </button>
+                </nav>
+              </div>
+            </div>
+            
+            <div className="px-6 py-5">
+              {activeTab === 'test' && questions && (
+                <div className="mt-8 p-0 bg-white rounded-xl shadow overflow-hidden">
+                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-lg font-medium text-[var(--foreground)]">Generated Test</h3>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => questions && generatePDF(questions, 'test-questions.pdf')}
+                          className="flex items-center space-x-1 px-3 py-1 text-sm text-[var(--primary)] bg-white rounded border border-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors"
+                        >
+                          <DocumentArrowDownIcon className="h-4 w-4" />
+                          <span>Download Questions</span>
+                        </button>
+                        <button
+                          onClick={() => answers && generatePDF(answers, 'test-answers.pdf')}
+                          className="flex items-center space-x-1 px-3 py-1 text-sm text-[var(--primary)] bg-white rounded border border-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors"
+                        >
+                          <DocumentDuplicateIcon className="h-4 w-4" />
+                          <span>Download Answers</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-6">
+                    <div className="prose max-w-none text-[var(--foreground)]">
+                      {testHeader.map((line, i) => (
+                        <p key={i} className="font-medium">{line}</p>
+                      ))}
+                      <div className="whitespace-pre-wrap">{questions}</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {activeTab === 'conversation' && conversationQuestions && (
+                <div className="bg-[var(--background)] p-6 rounded-2xl border border-[var(--border)]">
+                  <h4 className="text-lg font-medium text-[var(--foreground)] mb-4 apple-heading">Conversation Questions</h4>
+                  <div className="prose prose-[var(--primary)] max-w-none" dangerouslySetInnerHTML={{ __html: conversationQuestions }} />
+                  
+                  <div className="flex justify-end mt-6">
+                    <button
+                      onClick={() => generatePDF(conversationQuestions || '', 'conversation_questions.pdf')}
+                      className="apple-button-secondary text-sm"
+                    >
+                      Export as PDF
+                    </button>
+                  </div>
+                </div>
+              )}
+              
+              {activeTab === 'tips' && teacherTips && (
+                <div className="bg-[var(--background)] p-6 rounded-2xl border border-[var(--border)]">
+                  <h4 className="text-lg font-medium text-[var(--foreground)] mb-4 apple-heading">Teacher Tips</h4>
+                  <div className="prose prose-[var(--primary)] max-w-none" dangerouslySetInnerHTML={{ __html: teacherTips }} />
+                  
+                  <div className="flex justify-end mt-6">
+                    <button
+                      onClick={() => generatePDF(teacherTips || '', 'teacher_tips.pdf')}
+                      className="apple-button-secondary text-sm"
+                    >
+                      Export as PDF
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

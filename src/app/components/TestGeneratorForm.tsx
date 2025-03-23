@@ -121,7 +121,7 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                 className="block w-full rounded-lg border-[var(--border)] focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4"
                 placeholder="YouTube video or article URL"
               />
-              <p className="mt-1 text-xs text-[var(--subtle)]">
+              <p className="mt-1 text-xs text-gray-700">
                 Supports YouTube URLs or web articles for business content analysis
               </p>
             </div>
@@ -165,7 +165,7 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
             </div>
           </div>
 
-          <div className="sm:col-span-2 bg-[var(--background)] p-5 rounded-xl">
+          <div className="sm:col-span-2 bg-[var(--background)] p-5 rounded-xl border border-gray-200">
             <fieldset>
               <legend className="text-sm font-medium text-[var(--foreground)]">Question Types</legend>
               <div className="mt-4 space-y-3">
@@ -180,7 +180,7 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                   />
                   <label htmlFor="multiple-choice" className="ml-3">
                     <span className="block text-sm font-medium text-[var(--foreground)]">Multiple Choice</span>
-                    <span className="block text-xs text-[var(--subtle)]">Standard format with options</span>
+                    <span className="block text-xs text-gray-700">Standard format with options</span>
                   </label>
                 </div>
                 <div className="flex items-center">
@@ -194,7 +194,7 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                   />
                   <label htmlFor="open-ended" className="ml-3">
                     <span className="block text-sm font-medium text-[var(--foreground)]">Open Ended</span>
-                    <span className="block text-xs text-[var(--subtle)]">Free-form responses</span>
+                    <span className="block text-xs text-gray-700">Free-form responses</span>
                   </label>
                 </div>
                 <div className="flex items-center">
@@ -208,7 +208,7 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                   />
                   <label htmlFor="true-false" className="ml-3">
                     <span className="block text-sm font-medium text-[var(--foreground)]">True/False</span>
-                    <span className="block text-xs text-[var(--subtle)]">Binary choice questions</span>
+                    <span className="block text-xs text-gray-700">Binary choice questions</span>
                   </label>
                 </div>
               </div>
@@ -237,10 +237,10 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
           <button
             type="submit"
             disabled={isGenerating || !formData.contentUrl}
-            className={`apple-button inline-flex items-center px-8 py-3 text-base font-medium ${
+            className={`apple-button inline-flex items-center px-8 py-3 text-base font-medium bg-[var(--primary)] text-white ${
               isGenerating || !formData.contentUrl
                 ? 'opacity-50 cursor-not-allowed'
-                : ''
+                : 'hover:bg-[var(--primary-dark)]'
             }`}
           >
             {isGenerating ? (
@@ -249,7 +249,7 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
-                Generating Test...
+                Generating...
               </>
             ) : (
               'Generate Test'
