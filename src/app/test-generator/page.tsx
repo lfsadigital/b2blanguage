@@ -457,14 +457,14 @@ export default function TestGeneratorPage() {
                       <div className="flex space-x-2">
                         <button
                           onClick={() => questions && generatePDF(questions, 'test-questions.pdf')}
-                          className="flex items-center space-x-1 px-3 py-1 text-sm text-[var(--primary)] bg-white rounded border border-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors"
+                          className="flex items-center space-x-1 px-3 py-1 text-sm text-white bg-[var(--primary)] rounded border border-[var(--primary)] hover:bg-[var(--primary-dark)] transition-colors"
                         >
                           <DocumentArrowDownIcon className="h-4 w-4" />
                           <span>Download Questions</span>
                         </button>
                         <button
                           onClick={() => answers && generatePDF(answers, 'test-answers.pdf')}
-                          className="flex items-center space-x-1 px-3 py-1 text-sm text-[var(--primary)] bg-white rounded border border-[var(--primary)] hover:bg-[var(--primary)] hover:text-white transition-colors"
+                          className="flex items-center space-x-1 px-3 py-1 text-sm text-white bg-[var(--primary)] rounded border border-[var(--primary)] hover:bg-[var(--primary-dark)] transition-colors"
                         >
                           <DocumentDuplicateIcon className="h-4 w-4" />
                           <span>Download Answers</span>
@@ -491,7 +491,7 @@ export default function TestGeneratorPage() {
                   <div className="flex justify-end mt-6">
                     <button
                       onClick={() => generatePDF(conversationQuestions || '', 'conversation_questions.pdf')}
-                      className="apple-button-secondary text-sm"
+                      className="apple-button text-sm"
                     >
                       Export as PDF
                     </button>
@@ -507,7 +507,7 @@ export default function TestGeneratorPage() {
                   <div className="flex justify-end mt-6">
                     <button
                       onClick={() => generatePDF(teacherTips || '', 'teacher_tips.pdf')}
-                      className="apple-button-secondary text-sm"
+                      className="apple-button text-sm"
                     >
                       Export as PDF
                     </button>

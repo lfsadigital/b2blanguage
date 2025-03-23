@@ -121,7 +121,7 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                 className="block w-full rounded-lg border-[var(--border)] focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4"
                 placeholder="YouTube video or article URL"
               />
-              <p className="mt-1 text-xs text-gray-700">
+              <p className="mt-1 text-xs">
                 Supports YouTube URLs or web articles for business content analysis
               </p>
             </div>
@@ -180,7 +180,7 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                   />
                   <label htmlFor="multiple-choice" className="ml-3">
                     <span className="block text-sm font-medium text-[var(--foreground)]">Multiple Choice</span>
-                    <span className="block text-xs text-gray-700">Standard format with options</span>
+                    <span className="block text-xs">Standard format with options</span>
                   </label>
                 </div>
                 <div className="flex items-center">
@@ -194,7 +194,7 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                   />
                   <label htmlFor="open-ended" className="ml-3">
                     <span className="block text-sm font-medium text-[var(--foreground)]">Open Ended</span>
-                    <span className="block text-xs text-gray-700">Free-form responses</span>
+                    <span className="block text-xs">Free-form responses</span>
                   </label>
                 </div>
                 <div className="flex items-center">
@@ -208,7 +208,7 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                   />
                   <label htmlFor="true-false" className="ml-3">
                     <span className="block text-sm font-medium text-[var(--foreground)]">True/False</span>
-                    <span className="block text-xs text-gray-700">Binary choice questions</span>
+                    <span className="block text-xs">Binary choice questions</span>
                   </label>
                 </div>
               </div>
@@ -237,10 +237,10 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
           <button
             type="submit"
             disabled={isGenerating || !formData.contentUrl}
-            className={`apple-button inline-flex items-center px-8 py-3 text-base font-medium bg-[var(--primary)] text-white ${
+            className={`apple-button inline-flex items-center px-8 py-3 text-base font-medium ${
               isGenerating || !formData.contentUrl
                 ? 'opacity-50 cursor-not-allowed'
-                : 'hover:bg-[var(--primary-dark)]'
+                : ''
             }`}
           >
             {isGenerating ? (

@@ -4,7 +4,7 @@
 
 :root {
   /* B2B Language brand colors from screenshot */
-  --primary: #8B2020; /* Maroon/burgundy */
+  --primary: #8B2020; /* Dark brown/burgundy */
   --primary-dark: #701A1A;
   --primary-light: #A62828;
   --secondary: #000000; /* Black */
@@ -19,33 +19,11 @@
   --success: #29cc41; /* Keep success green */
   --warning: #ff9f0a; /* Keep warning orange */
   --error: #ff3b30; /* Keep error red */
-  
-  /* New input field styles for better contrast */
-  --input-bg: #f8f9fa;
-  --input-text: #333333;
-  --input-placeholder: #6c757d; 
-  --input-label-bg: rgba(0, 0, 0, 0.7);
-  --input-label-text: #ffffff;
 }
 
 @layer base {
   body {
     @apply bg-[var(--background)] text-[var(--foreground)];
-  }
-  
-  /* Improve form input contrast */
-  input, textarea, select {
-    @apply text-[var(--input-text)] !important;
-    @apply bg-[var(--input-bg)] !important;
-  }
-  
-  input::placeholder, textarea::placeholder {
-    @apply text-[var(--input-placeholder)] !important;
-  }
-  
-  /* Fix contrast for form labels */
-  .form-label, .form-label-bg {
-    @apply text-[var(--foreground)] bg-opacity-0 font-medium !important;
   }
 }
 
@@ -89,37 +67,13 @@
     background-color: var(--secondary);
     color: white;
   }
-  
-  /* Better styling for form inputs with light backgrounds */
-  .form-field {
-    @apply border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[var(--primary)] bg-white text-gray-800;
-  }
-  
-  /* Better styling for form labels on light backgrounds */
-  .form-label {
-    @apply block text-sm font-medium text-gray-800 mb-1;
-  }
-  
-  /* Style for light-colored notes/info text with better contrast */
-  .info-text {
-    @apply text-gray-700 !important;
-  }
-  
-  /* Fix for any blue background elements with text */
-  .blue-bg-element {
-    @apply bg-blue-100 text-blue-800 !important;
-  }
 }
 
-/* Fix dark mode */
 @media (prefers-color-scheme: dark) {
   :root {
     --foreground-rgb: 255, 255, 255;
     --background-start-rgb: 0, 0, 0;
     --background-end-rgb: 0, 0, 0;
-    --input-bg: #333;
-    --input-text: #ffffff;
-    --input-placeholder: #aaaaaa;
   }
 }
 
@@ -139,21 +93,29 @@ body {
   }
 }
 
-/* Fix for specific UI elements in Test Generator */
+/* ENSURE DARK TEXT FOR INPUTS */
+input, textarea, select {
+  color: #333333 !important;
+}
+
+input::placeholder, textarea::placeholder {
+  color: #666666 !important;
+}
+
+/* ENSURE DARK BROWN BUTTONS WITH WHITE TEXT */
+.apple-button, 
+button[type="submit"],
 .generate-test-btn {
-  @apply bg-[var(--primary)] text-white !important;
+  background-color: #8B2020 !important;
+  color: white !important;
 }
 
-/* Fix for input fields with light backgrounds */
-input[type="url"],
-input[type="text"],
-input[type="number"],
-textarea,
-select {
-  @apply bg-white border border-gray-300 text-gray-900 !important;
+.apple-button:hover,
+button[type="submit"]:hover {
+  background-color: #701A1A !important;
 }
 
-/* Fix for hints and helper text */
+/* Override text-xs color to be darker */
 .text-xs {
-  @apply text-gray-700 !important;
+  color: #666666 !important;
 }
