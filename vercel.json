@@ -1,19 +1,4 @@
 {
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/next"
-    }
-  ],
-  "functions": {
-    "src/app/api/**/*.ts": {
-      "memory": 1024,
-      "maxDuration": 60
-    }
-  },
-  "github": {
-    "silent": false,
-    "autoJobCancelation": false
-  },
-  "buildCommand": "next build"
+  "buildCommand": "npm run build",
+  "cleanUrls": true
 } 
