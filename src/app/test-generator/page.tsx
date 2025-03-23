@@ -367,10 +367,10 @@ export default function TestGeneratorPage() {
   return (
     <div className="container mx-auto py-8 max-w-7xl">
       <div className="flex justify-between items-center mb-8 px-4 md:px-0">
-        <h1 className="text-2xl sm:text-3xl font-bold text-[var(--foreground)]">Test Generator</h1>
+        <h1 className="text-3xl font-bold text-white">Test Generator</h1>
         <Link 
           href="/"
-          className="text-[var(--primary)] hover:text-[var(--primary-dark)] flex items-center gap-1 text-sm font-medium"
+          className="text-white hover:text-gray-200 flex items-center gap-1 text-sm font-medium"
         >
           <ArrowLeftIcon className="h-4 w-4" />
           Back to Home
@@ -382,6 +382,20 @@ export default function TestGeneratorPage() {
         <div className="apple-card">
           <TestGeneratorForm onSubmit={handleSubmit} isGenerating={isGenerating} />
         </div>
+
+        {/* Loading state */}
+        {isGenerating && (
+          <div className="bg-white rounded-xl shadow p-6 mb-8 text-center">
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="relative w-24 h-24">
+                <div className="absolute top-0 left-0 w-full h-full border-8 border-gray-200 rounded-full"></div>
+                <div className="absolute top-0 left-0 w-full h-full border-8 border-t-[var(--primary)] rounded-full animate-spin"></div>
+              </div>
+              <h3 className="mt-6 text-xl font-medium text-gray-800">Generating Test...</h3>
+              <p className="mt-2 text-gray-600">This may take up to a minute. We're analyzing the content and creating a tailored test.</p>
+            </div>
+          </div>
+        )}
 
         {/* Error Message */}
         {errorMessage && (
@@ -402,22 +416,22 @@ export default function TestGeneratorPage() {
 
         {/* Generated Content */}
         {generatedTest && (
-          <div className="apple-card">
-            <div className="border-b border-[var(--border)]">
+          <div className="bg-white rounded-xl shadow overflow-hidden">
+            <div className="border-b border-gray-200">
               <div className="px-6 py-5">
-                <h3 className="text-lg font-medium text-[var(--foreground)] apple-heading">Generated Materials</h3>
-                <p className="mt-1 text-sm text-[var(--subtle)]">
+                <h3 className="text-lg font-medium text-gray-800">Generated Materials</h3>
+                <p className="mt-1 text-sm text-gray-600">
                   {testHeader.join(' • ')}
                 </p>
               </div>
-              <div className="border-b border-[var(--border)]">
+              <div className="border-b border-gray-200">
                 <nav className="flex -mb-px">
                   <button
                     onClick={() => setActiveTab('test')}
                     className={`${
                       activeTab === 'test'
                         ? 'border-[var(--primary)] text-[var(--primary)]'
-                        : 'border-transparent text-[var(--subtle)] hover:text-[var(--foreground)] hover:border-[var(--border)]'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors`}
                   >
                     Test
@@ -427,7 +441,7 @@ export default function TestGeneratorPage() {
                     className={`${
                       activeTab === 'conversation'
                         ? 'border-[var(--primary)] text-[var(--primary)]'
-                        : 'border-transparent text-[var(--subtle)] hover:text-[var(--foreground)] hover:border-[var(--border)]'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors ${!conversationQuestions ? 'opacity-50 cursor-not-allowed' : ''}`}
                     disabled={!conversationQuestions}
                   >
@@ -438,7 +452,7 @@ export default function TestGeneratorPage() {
                     className={`${
                       activeTab === 'tips'
                         ? 'border-[var(--primary)] text-[var(--primary)]'
-                        : 'border-transparent text-[var(--subtle)] hover:text-[var(--foreground)] hover:border-[var(--border)]'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                     } whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors ${!teacherTips ? 'opacity-50 cursor-not-allowed' : ''}`}
                     disabled={!teacherTips}
                   >
@@ -450,45 +464,47 @@ export default function TestGeneratorPage() {
             
             <div className="px-6 py-5">
               {activeTab === 'test' && questions && (
-                <div className="mt-8 p-0 bg-white rounded-xl shadow overflow-hidden">
-                  <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-medium text-[var(--foreground)]">Generated Test</h3>
-                      <div className="flex space-x-2">
-                        <button
-                          onClick={() => questions && generatePDF(questions, 'test-questions.pdf')}
-                          className="flex items-center space-x-1 px-3 py-1 text-sm text-white bg-[var(--primary)] rounded border border-[var(--primary)] hover:bg-[var(--primary-dark)] transition-colors"
-                        >
-                          <DocumentArrowDownIcon className="h-4 w-4" />
-                          <span>Download Questions</span>
-                        </button>
-                        <button
-                          onClick={() => answers && generatePDF(answers, 'test-answers.pdf')}
-                          className="flex items-center space-x-1 px-3 py-1 text-sm text-white bg-[var(--primary)] rounded border border-[var(--primary)] hover:bg-[var(--primary-dark)] transition-colors"
-                        >
-                          <DocumentDuplicateIcon className="h-4 w-4" />
-                          <span>Download Answers</span>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                <div className="bg-white rounded-xl overflow-hidden">
                   <div className="p-6">
-                    <div className="prose max-w-none text-[var(--foreground)]">
+                    <div className="prose max-w-none text-gray-800">
                       {testHeader.map((line, i) => (
                         <p key={i} className="font-medium">{line}</p>
                       ))}
                       <div className="whitespace-pre-wrap">{questions}</div>
                     </div>
                   </div>
+                  
+                  <div className="flex justify-center space-x-4 mt-6 pb-6">
+                    <button
+                      onClick={() => questions && generatePDF(questions, 'test-questions.pdf')}
+                      className="apple-button flex items-center space-x-2 px-4 py-2 text-sm"
+                    >
+                      <DocumentArrowDownIcon className="h-4 w-4" />
+                      <span>Download Questions</span>
+                    </button>
+                    <button
+                      onClick={() => answers && generatePDF(answers, 'test-answers.pdf')}
+                      className="apple-button flex items-center space-x-2 px-4 py-2 text-sm"
+                    >
+                      <DocumentDuplicateIcon className="h-4 w-4" />
+                      <span>Download Answers</span>
+                    </button>
+                    <button
+                      onClick={generateCombinedPDF}
+                      className="apple-button flex items-center space-x-2 px-4 py-2 text-sm"
+                    >
+                      <span>Export Combined PDF</span>
+                    </button>
+                  </div>
                 </div>
               )}
               
               {activeTab === 'conversation' && conversationQuestions && (
-                <div className="bg-[var(--background)] p-6 rounded-2xl border border-[var(--border)]">
-                  <h4 className="text-lg font-medium text-[var(--foreground)] mb-4 apple-heading">Conversation Questions</h4>
-                  <div className="prose prose-[var(--primary)] max-w-none" dangerouslySetInnerHTML={{ __html: conversationQuestions }} />
+                <div className="bg-white p-6 rounded-xl">
+                  <h4 className="text-lg font-medium text-gray-800 mb-4">Conversation Questions</h4>
+                  <div className="prose max-w-none text-gray-800" dangerouslySetInnerHTML={{ __html: conversationQuestions }} />
                   
-                  <div className="flex justify-end mt-6">
+                  <div className="flex justify-center mt-6">
                     <button
                       onClick={() => generatePDF(conversationQuestions || '', 'conversation_questions.pdf')}
                       className="apple-button text-sm"
@@ -500,11 +516,11 @@ export default function TestGeneratorPage() {
               )}
               
               {activeTab === 'tips' && teacherTips && (
-                <div className="bg-[var(--background)] p-6 rounded-2xl border border-[var(--border)]">
-                  <h4 className="text-lg font-medium text-[var(--foreground)] mb-4 apple-heading">Teacher Tips</h4>
-                  <div className="prose prose-[var(--primary)] max-w-none" dangerouslySetInnerHTML={{ __html: teacherTips }} />
+                <div className="bg-white p-6 rounded-xl">
+                  <h4 className="text-lg font-medium text-gray-800 mb-4">Teacher Tips</h4>
+                  <div className="prose max-w-none text-gray-800" dangerouslySetInnerHTML={{ __html: teacherTips }} />
                   
-                  <div className="flex justify-end mt-6">
+                  <div className="flex justify-center mt-6">
                     <button
                       onClick={() => generatePDF(teacherTips || '', 'teacher_tips.pdf')}
                       className="apple-button text-sm"

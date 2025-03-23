@@ -62,18 +62,18 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
   };
 
   return (
-    <form onSubmit={handleSubmit} className="p-6">
+    <form onSubmit={handleSubmit} className="form-container">
       <div className="space-y-8">
         <div>
-          <h3 className="text-xl font-semibold text-[var(--foreground)] apple-heading">Create New Test</h3>
-          <p className="mt-2 text-sm text-[var(--subtle)]">
+          <h3 className="text-xl font-semibold text-gray-800 apple-heading">Create New Test</h3>
+          <p className="mt-2 text-sm text-gray-600">
             Enter the details below to generate a customized English test
           </p>
         </div>
 
         <div className="grid grid-cols-1 gap-y-6 gap-x-6 sm:grid-cols-2">
           <div>
-            <label htmlFor="professorName" className="block text-sm font-medium text-[var(--foreground)]">
+            <label htmlFor="professorName" className="block text-sm font-medium text-gray-800">
               Teacher Name
             </label>
             <div className="mt-1 relative rounded-md">
@@ -83,14 +83,14 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                 id="professorName"
                 value={formData.professorName}
                 onChange={handleChange}
-                className="block w-full rounded-lg border-[var(--border)] focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4"
+                className="block w-full rounded-lg border-gray-300 focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4"
                 placeholder="Optional"
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="studentName" className="block text-sm font-medium text-[var(--foreground)]">
+            <label htmlFor="studentName" className="block text-sm font-medium text-gray-800">
               Student Name
             </label>
             <div className="mt-1 relative rounded-md">
@@ -100,14 +100,14 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                 id="studentName"
                 value={formData.studentName}
                 onChange={handleChange}
-                className="block w-full rounded-lg border-[var(--border)] focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4"
+                className="block w-full rounded-lg border-gray-300 focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4"
                 placeholder="Optional"
               />
             </div>
           </div>
 
           <div className="sm:col-span-2">
-            <label htmlFor="contentUrl" className="block text-sm font-medium text-[var(--foreground)]">
+            <label htmlFor="contentUrl" className="block text-sm font-medium text-gray-800">
               Content URL <span className="text-[var(--error)]">*</span>
             </label>
             <div className="mt-1 relative rounded-md">
@@ -118,17 +118,17 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                 value={formData.contentUrl}
                 onChange={handleChange}
                 required
-                className="block w-full rounded-lg border-[var(--border)] focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4"
+                className="block w-full rounded-lg border-gray-300 focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4"
                 placeholder="YouTube video or article URL"
               />
-              <p className="mt-1 text-xs">
+              <p className="mt-1 text-xs text-gray-600">
                 Supports YouTube URLs or web articles for business content analysis
               </p>
             </div>
           </div>
 
           <div>
-            <label htmlFor="studentLevel" className="block text-sm font-medium text-[var(--foreground)]">
+            <label htmlFor="studentLevel" className="block text-sm font-medium text-gray-800">
               Student Level
             </label>
             <div className="mt-1 relative rounded-md">
@@ -137,7 +137,7 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                 name="studentLevel"
                 value={formData.studentLevel}
                 onChange={handleChange}
-                className="block w-full rounded-lg border-[var(--border)] focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4 appearance-none"
+                className="block w-full rounded-lg border-gray-300 focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4 appearance-none"
                 style={{ backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")", backgroundPosition: "right 0.5rem center", backgroundRepeat: "no-repeat", backgroundSize: "1.5em 1.5em", paddingRight: "2.5rem" }}
               >
                 <option value="Beginner">Beginner</option>
@@ -148,7 +148,7 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
           </div>
 
           <div>
-            <label htmlFor="numberOfQuestions" className="block text-sm font-medium text-[var(--foreground)]">
+            <label htmlFor="numberOfQuestions" className="block text-sm font-medium text-gray-800">
               Number of Questions
             </label>
             <div className="mt-1 relative rounded-md">
@@ -160,14 +160,14 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                 onChange={handleNumberChange}
                 min="1"
                 max="20"
-                className="block w-full rounded-lg border-[var(--border)] focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4"
+                className="block w-full rounded-lg border-gray-300 focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4"
               />
             </div>
           </div>
 
-          <div className="sm:col-span-2 bg-[var(--background)] p-5 rounded-xl border border-gray-200">
+          <div className="sm:col-span-2 bg-gray-50 p-5 rounded-xl border border-gray-200">
             <fieldset>
-              <legend className="text-sm font-medium text-[var(--foreground)]">Question Types</legend>
+              <legend className="text-sm font-medium text-gray-800">Question Types</legend>
               <div className="mt-4 space-y-3">
                 <div className="flex items-center">
                   <input
@@ -176,11 +176,11 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                     type="checkbox"
                     checked={formData.questionTypes.includes('multiple-choice')}
                     onChange={() => handleCheckboxChange('multiple-choice')}
-                    className="h-5 w-5 text-[var(--primary)] focus:ring-[var(--primary)] border-[var(--border)] rounded"
+                    className="h-5 w-5 text-[var(--primary)] focus:ring-[var(--primary)] border-gray-300 rounded"
                   />
                   <label htmlFor="multiple-choice" className="ml-3">
-                    <span className="block text-sm font-medium text-[var(--foreground)]">Multiple Choice</span>
-                    <span className="block text-xs">Standard format with options</span>
+                    <span className="block text-sm font-medium text-gray-800">Multiple Choice</span>
+                    <span className="block text-xs text-gray-600">Standard format with options</span>
                   </label>
                 </div>
                 <div className="flex items-center">
@@ -190,11 +190,11 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                     type="checkbox"
                     checked={formData.questionTypes.includes('open-ended')}
                     onChange={() => handleCheckboxChange('open-ended')}
-                    className="h-5 w-5 text-[var(--primary)] focus:ring-[var(--primary)] border-[var(--border)] rounded"
+                    className="h-5 w-5 text-[var(--primary)] focus:ring-[var(--primary)] border-gray-300 rounded"
                   />
                   <label htmlFor="open-ended" className="ml-3">
-                    <span className="block text-sm font-medium text-[var(--foreground)]">Open Ended</span>
-                    <span className="block text-xs">Free-form responses</span>
+                    <span className="block text-sm font-medium text-gray-800">Open Ended</span>
+                    <span className="block text-xs text-gray-600">Free-form responses</span>
                   </label>
                 </div>
                 <div className="flex items-center">
@@ -204,11 +204,11 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                     type="checkbox"
                     checked={formData.questionTypes.includes('true-false')}
                     onChange={() => handleCheckboxChange('true-false')}
-                    className="h-5 w-5 text-[var(--primary)] focus:ring-[var(--primary)] border-[var(--border)] rounded"
+                    className="h-5 w-5 text-[var(--primary)] focus:ring-[var(--primary)] border-gray-300 rounded"
                   />
                   <label htmlFor="true-false" className="ml-3">
-                    <span className="block text-sm font-medium text-[var(--foreground)]">True/False</span>
-                    <span className="block text-xs">Binary choice questions</span>
+                    <span className="block text-sm font-medium text-gray-800">True/False</span>
+                    <span className="block text-xs text-gray-600">Binary choice questions</span>
                   </label>
                 </div>
               </div>
@@ -216,7 +216,7 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
           </div>
 
           <div className="sm:col-span-2">
-            <label htmlFor="additionalNotes" className="block text-sm font-medium text-[var(--foreground)]">
+            <label htmlFor="additionalNotes" className="block text-sm font-medium text-gray-800">
               Additional Notes
             </label>
             <div className="mt-1 relative rounded-md">
@@ -226,18 +226,18 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
                 rows={3}
                 value={formData.additionalNotes}
                 onChange={handleChange}
-                className="block w-full rounded-lg border-[var(--border)] focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4"
+                className="block w-full rounded-lg border-gray-300 focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4"
                 placeholder="Any specific requirements or focus areas for this test..."
               />
             </div>
           </div>
         </div>
 
-        <div className="pt-5 flex justify-end">
+        <div className="centered-button-container">
           <button
             type="submit"
             disabled={isGenerating || !formData.contentUrl}
-            className={`apple-button inline-flex items-center px-8 py-3 text-base font-medium ${
+            className={`apple-button inline-flex items-center px-8 py-3 text-base font-medium text-white ${
               isGenerating || !formData.contentUrl
                 ? 'opacity-50 cursor-not-allowed'
                 : ''

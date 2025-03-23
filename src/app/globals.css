@@ -3,22 +3,24 @@
 @tailwind utilities;
 
 :root {
-  /* B2B Language brand colors from screenshot */
+  /* B2B Language brand colors based on screenshot */
   --primary: #8B2020; /* Dark brown/burgundy */
   --primary-dark: #701A1A;
   --primary-light: #A62828;
   --secondary: #000000; /* Black */
   --secondary-light: #333333;
-  --background: #FFFFFF; /* White background */
-  --foreground: #000000; /* Black text */
+  --background: #8B2020; /* Dark brown background */
+  --foreground: #FFFFFF; /* White text */
   --card: #ffffff;
   --card-foreground: #000000;
-  --subtle: #666666; /* Gray text */
+  --subtle: #E0E0E0; /* Light gray text */
   --border: #DDDDDD;
   --accent: #CB0000; /* Red accent/navigation underline */
   --success: #29cc41; /* Keep success green */
   --warning: #ff9f0a; /* Keep warning orange */
   --error: #ff3b30; /* Keep error red */
+  --input-bg: #FFFFFF; /* White background for inputs */
+  --input-text: #333333; /* Dark text for inputs */
 }
 
 @layer base {
@@ -67,6 +69,11 @@
     background-color: var(--secondary);
     color: white;
   }
+
+  /* Form container with white background */
+  .form-container {
+    @apply bg-white rounded-xl shadow-md p-6 my-4;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -79,12 +86,7 @@
 
 body {
   color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+  background: var(--background);
 }
 
 @layer utilities {
@@ -95,27 +97,50 @@ body {
 
 /* ENSURE DARK TEXT FOR INPUTS */
 input, textarea, select {
-  color: #333333 !important;
+  background-color: var(--input-bg) !important;
+  color: var(--input-text) !important;
 }
 
 input::placeholder, textarea::placeholder {
   color: #666666 !important;
 }
 
+/* Style for labels on dark background */
+label, .label {
+  color: var(--foreground) !important;
+}
+
 /* ENSURE DARK BROWN BUTTONS WITH WHITE TEXT */
 .apple-button, 
 button[type="submit"],
 .generate-test-btn {
-  background-color: #8B2020 !important;
+  background-color: var(--primary) !important;
   color: white !important;
+  @apply rounded-md;
 }
 
 .apple-button:hover,
 button[type="submit"]:hover {
-  background-color: #701A1A !important;
+  background-color: var(--primary-dark) !important;
 }
 
-/* Override text-xs color to be darker */
+/* Override text-xs color to be lighter on dark background */
 .text-xs {
-  color: #666666 !important;
+  color: var(--subtle) !important;
+}
+
+/* Style for form cards with white background */
+.apple-card, .form-card {
+  @apply bg-white rounded-xl shadow-md overflow-hidden;
+  color: #333333;
+}
+
+/* Style for section headings */
+.section-heading {
+  @apply text-white text-2xl font-bold mb-4;
+}
+
+/* Center button container */
+.centered-button-container {
+  @apply flex justify-center mt-8;
 }
