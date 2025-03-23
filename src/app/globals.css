@@ -3,9 +3,70 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
+  /* B2B Language brand colors from screenshot */
+  --primary: #8B2020; /* Maroon/burgundy */
+  --primary-dark: #701A1A;
+  --primary-light: #A62828;
+  --secondary: #000000; /* Black */
+  --secondary-light: #333333;
+  --background: #FFFFFF; /* White background */
+  --foreground: #000000; /* Black text */
+  --card: #ffffff;
+  --card-foreground: #000000;
+  --subtle: #666666; /* Gray text */
+  --border: #DDDDDD;
+  --accent: #CB0000; /* Red accent/navigation underline */
+  --success: #29cc41; /* Keep success green */
+  --warning: #ff9f0a; /* Keep warning orange */
+  --error: #ff3b30; /* Keep error red */
+}
+
+@layer base {
+  body {
+    @apply bg-[var(--background)] text-[var(--foreground)];
+  }
+}
+
+@layer components {
+  .b2b-card {
+    @apply bg-white rounded-none shadow-md overflow-hidden border border-[var(--border)];
+    transition: all 0.3s ease;
+  }
+  
+  .b2b-card:hover {
+    @apply shadow-lg;
+  }
+  
+  .b2b-button {
+    @apply bg-[var(--primary)] text-white font-medium px-6 py-2;
+    transition: all 0.2s ease;
+  }
+  
+  .b2b-button:hover {
+    @apply bg-[var(--primary-dark)];
+  }
+  
+  .b2b-button-secondary {
+    @apply bg-[var(--secondary)] text-white font-medium px-6 py-2;
+    transition: all 0.2s ease;
+  }
+  
+  .b2b-button-secondary:hover {
+    @apply bg-[var(--secondary-light)];
+  }
+  
+  .b2b-gradient {
+    background: linear-gradient(135deg, var(--primary-dark), var(--primary), var(--primary-light));
+  }
+  
+  .b2b-heading {
+    @apply font-bold;
+  }
+  
+  .b2b-hero {
+    background-color: var(--secondary);
+    color: white;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
