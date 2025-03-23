@@ -166,7 +166,7 @@ export default function TestGeneratorPage() {
     doc.save(filename);
   };
 
-  const generateCombinedPDF = () => {
+  const generateTeachingMaterialsPDF = () => {
     if (!testHeader || !conversationQuestions || !teacherTips || !answers) return;
 
     const doc = new jsPDF();
@@ -242,6 +242,10 @@ export default function TestGeneratorPage() {
     doc.addPage();
     y = 20;
     
+    doc.setFont('helvetica', 'bold');
+    doc.text("Test Answers:", 10, y);
+    y += 10;
+    
     // Extract answer section headers
     const answerLines = answers.split('\n');
     let headerEnded = false;
@@ -287,7 +291,7 @@ export default function TestGeneratorPage() {
     }
     
     // Save the PDF
-    doc.save('teacher-complete-guide.pdf');
+    doc.save('teacher-materials.pdf');
   };
 
   const generateWordDocument = () => {
@@ -482,24 +486,18 @@ export default function TestGeneratorPage() {
                   
                   <div className="flex justify-center space-x-4 mt-6 pb-6">
                     <button
-                      onClick={() => questions && generatePDF(questions, 'test-questions.pdf')}
+                      onClick={generateWordDocument}
                       className="apple-button flex items-center space-x-2 px-4 py-2 text-sm"
                     >
                       <DocumentArrowDownIcon className="h-4 w-4" />
-                      <span>Download Questions</span>
+                      <span>Export Questions (Word)</span>
                     </button>
                     <button
-                      onClick={() => answers && generatePDF(answers, 'test-answers.pdf')}
+                      onClick={generateTeachingMaterialsPDF}
                       className="apple-button flex items-center space-x-2 px-4 py-2 text-sm"
                     >
                       <DocumentDuplicateIcon className="h-4 w-4" />
-                      <span>Download Answers</span>
-                    </button>
-                    <button
-                      onClick={generateCombinedPDF}
-                      className="apple-button flex items-center space-x-2 px-4 py-2 text-sm"
-                    >
-                      <span>Export Combined PDF</span>
+                      <span>Export Teaching Materials (PDF)</span>
                     </button>
                   </div>
                 </div>
@@ -510,13 +508,10 @@ export default function TestGeneratorPage() {
                   <h4 className="text-lg font-medium text-black mb-4">Conversation Questions</h4>
                   <div className="prose max-w-none text-black" dangerouslySetInnerHTML={{ __html: conversationQuestions }} />
                   
-                  <div className="flex justify-center mt-6">
-                    <button
-                      onClick={() => generatePDF(conversationQuestions || '', 'conversation_questions.pdf')}
-                      className="apple-button text-sm"
-                    >
-                      Export as PDF
-                    </button>
+                  <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-sm text-blue-800">
+                      These conversation questions are included in the "Export Teaching Materials" PDF available in the Test tab.
+                    </p>
                   </div>
                 </div>
               )}
@@ -526,13 +521,10 @@ export default function TestGeneratorPage() {
                   <h4 className="text-lg font-medium text-black mb-4">Teacher Tips</h4>
                   <div className="prose max-w-none text-black" dangerouslySetInnerHTML={{ __html: teacherTips }} />
                   
-                  <div className="flex justify-center mt-6">
-                    <button
-                      onClick={() => generatePDF(teacherTips || '', 'teacher_tips.pdf')}
-                      className="apple-button text-sm"
-                    >
-                      Export as PDF
-                    </button>
+                  <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-md">
+                    <p className="text-sm text-blue-800">
+                      These teacher tips are included in the "Export Teaching Materials" PDF available in the Test tab.
+                    </p>
                   </div>
                 </div>
               )}
