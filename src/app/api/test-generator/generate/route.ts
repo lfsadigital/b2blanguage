@@ -227,26 +227,36 @@ async function getVideoTranscriptWithWhisper(url: string): Promise<string> {
 // Add this new helper function near the top of the file after the other imports
 async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
   try {
-    console.log(`Attempting direct YouTube transcript fetch for video ID: ${videoId}`);
+    console.log(`[DEBUG] Attempting direct YouTube transcript fetch for video ID: ${videoId}`);
     
     // Fetch the YouTube video page with proper headers
+    console.log(`[DEBUG] Fetching YouTube page with video ID: ${videoId}`);
     const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-        'Cookie': 'CONSENT=YES+; GPS=1'
-      }
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9,pt;q=0.8',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+        'Cookie': 'CONSENT=YES+; GPS=1; VISITOR_INFO1_LIVE=somevalue'
+      },
+      cache: 'no-store'
     });
     
     if (!response.ok) {
+      console.log(`[DEBUG] Failed to fetch YouTube page: ${response.status}`);
       throw new Error(`Failed to fetch YouTube page: ${response.status}`);
     }
     
     const html = await response.text();
-    console.log(`Received YouTube page HTML (${html.length} chars)`);
+    console.log(`[DEBUG] Received YouTube page HTML (${html.length} chars)`);
+    
+    // Save first 1000 and last 1000 chars for debugging
+    console.log(`[DEBUG] HTML start: ${html.substring(0, 1000)}`);
+    console.log(`[DEBUG] HTML end: ${html.substring(html.length - 1000)}`);
     
     // Try multiple approaches to find caption data
+    console.log(`[DEBUG] Starting caption URL extraction attempts`);
     
     // Approach 1: Check for timedtext in various formats
     let captionUrl = null;
@@ -260,18 +270,21 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
     ];
     
     for (const pattern of patterns) {
+      console.log(`[DEBUG] Trying caption pattern: ${pattern}`);
       const match = html.match(pattern);
       if (match) {
         captionUrl = match[1] || match[0];
         captionUrl = captionUrl.replace(/\\u0026/g, '&').replace(/\\/g, '');
-        console.log(`Found caption URL with pattern: ${captionUrl}`);
+        console.log(`[DEBUG] Found caption URL with pattern: ${captionUrl}`);
         break;
+      } else {
+        console.log(`[DEBUG] Pattern did not match`);
       }
     }
     
     // Approach 2: Check for inner JSON data
     if (!captionUrl) {
-      console.log('Trying to extract caption URL from embedded JSON data...');
+      console.log(`[DEBUG] Trying to extract caption URL from embedded JSON data...`);
       
       // Look for player_response or ytInitialPlayerResponse in the HTML
       const dataMatch = html.match(/ytInitialPlayerResponse\s*=\s*({.+?});/) || 
@@ -279,75 +292,197 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
                         html.match(/"player_response":"(.+?)"/);
                         
       if (dataMatch) {
+        console.log(`[DEBUG] Found data match: ${dataMatch[0].substring(0, 100)}...`);
         try {
           const jsonStr = dataMatch[1].replace(/\\(.)/g, "$1"); // Basic unescaping
+          console.log(`[DEBUG] Parsed JSON string length: ${jsonStr.length}`);
+          
           const data = JSON.parse(dataMatch[1].includes('{') ? dataMatch[1] : jsonStr);
+          console.log(`[DEBUG] Successfully parsed JSON data`);
+          
+          // Log available properties for debugging
+          console.log(`[DEBUG] Top-level properties in data: ${Object.keys(data).join(', ')}`);
+          
+          if (data.captions) {
+            console.log(`[DEBUG] Found captions object in data`);
+          } else {
+            console.log(`[DEBUG] No captions object found in data`);
+          }
+          
+          if (data.playerResponse) {
+            console.log(`[DEBUG] Found playerResponse object in data`);
+          }
+          
+          // Check if there's a captionTracks property anywhere in the data
+          const jsonString = JSON.stringify(data);
+          if (jsonString.includes('captionTracks')) {
+            console.log(`[DEBUG] Found captionTracks somewhere in the data`);
+            
+            // Find all occurrences of captionTracks
+            const captionTracksIndices = [];
+            let idx = jsonString.indexOf('captionTracks');
+            while (idx !== -1) {
+              captionTracksIndices.push(idx);
+              idx = jsonString.indexOf('captionTracks', idx + 1);
+            }
+            
+            console.log(`[DEBUG] Found captionTracks at indices: ${captionTracksIndices.join(', ')}`);
+            
+            // Extract snippets around these occurrences
+            for (let i = 0; i < captionTracksIndices.length; i++) {
+              const idx = captionTracksIndices[i];
+              const snippet = jsonString.substring(Math.max(0, idx - 50), Math.min(jsonString.length, idx + 200));
+              console.log(`[DEBUG] Caption context ${i}: ${snippet}`);
+            }
+          }
           
           // Extract caption info from the parsed data
           let captions = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks || 
                           data?.playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
           
+          // Log what we found
+          if (captions) {
+            console.log(`[DEBUG] Found captions array with ${captions.length} items`);
+          } else {
+            console.log(`[DEBUG] Captions not found in standard locations`);
+          }
+          
           // Look in alternate locations for captions data
           if (!captions && data?.playerConfig?.captions) {
+            console.log(`[DEBUG] Trying playerConfig.captions location`);
             captions = data.playerConfig.captions.playerCaptionsTracklistRenderer?.captionTracks;
+            if (captions) {
+              console.log(`[DEBUG] Found captions in playerConfig`);
+            }
           }
           
           // Try to find captions in the playerResponse
           if (!captions && data?.playerResponse) {
+            console.log(`[DEBUG] Trying to parse nested playerResponse`);
             try {
               const playerResponse = typeof data.playerResponse === 'string' 
                 ? JSON.parse(data.playerResponse) 
                 : data.playerResponse;
               
+              console.log(`[DEBUG] playerResponse properties: ${Object.keys(playerResponse).join(', ')}`);
+              
+              if (playerResponse.captions) {
+                console.log(`[DEBUG] Found captions in playerResponse`);
+              }
+              
               captions = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+              
+              if (captions) {
+                console.log(`[DEBUG] Successfully extracted captions from playerResponse`);
+              }
             } catch (e) {
-              console.log('Error parsing nested playerResponse:', e);
+              console.log(`[DEBUG] Error parsing nested playerResponse:`, e);
+            }
+          }
+          
+          // Additional search in playerConfig structure
+          if (!captions && data?.playerConfig?.audioConfig?.captionList) {
+            console.log(`[DEBUG] Trying audioConfig.captionList location`);
+            captions = data.playerConfig.audioConfig.captionList;
+            if (captions) {
+              console.log(`[DEBUG] Found captions in audioConfig`);
             }
           }
                           
           if (captions && captions.length > 0) {
+            console.log(`[DEBUG] Processing ${captions.length} caption tracks`);
+            
+            // Log all caption tracks for debugging
+            captions.forEach((track: any, index: number) => {
+              console.log(`[DEBUG] Caption track ${index}:`, 
+                `kind=${track.kind || 'N/A'}`, 
+                `name=${track.name?.simpleText || track.name || 'N/A'}`,
+                `baseUrl length=${track.baseUrl ? track.baseUrl.length : 0}`);
+            });
+            
             // First try to find auto-captions if they exist
             const autoCaption = captions.find((track: { kind: string, baseUrl: string }) => track.kind === 'asr');
             if (autoCaption) {
               captionUrl = autoCaption.baseUrl;
-              console.log(`Found auto-generated caption URL: ${captionUrl}`);
+              console.log(`[DEBUG] Found auto-generated caption URL: ${captionUrl}`);
             } else {
               // Fall back to first available caption
               captionUrl = captions[0].baseUrl;
-              console.log(`Found caption URL in JSON data: ${captionUrl}`);
+              console.log(`[DEBUG] Found caption URL in JSON data: ${captionUrl}`);
             }
           } else {
-            console.log('No caption tracks found in JSON data');
+            console.log(`[DEBUG] No caption tracks found in JSON data`);
           }
         } catch (jsonError) {
-          console.error('Error parsing JSON data from HTML:', jsonError);
+          console.error(`[DEBUG] Error parsing JSON data from HTML:`, jsonError);
+        }
+      } else {
+        console.log(`[DEBUG] No JSON data match found in HTML`);
+      }
+    }
+    
+    // Additional search for timedtext using simplified approach
+    if (!captionUrl) {
+      console.log(`[DEBUG] Trying simplified timedtext search`);
+      // Simply look for text matching timedtext with video ID
+      if (html.includes(`timedtext?v=${videoId}`)) {
+        console.log(`[DEBUG] Found basic timedtext reference for video ID`);
+        
+        // Extract minimal working URL
+        const basicUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`;
+        console.log(`[DEBUG] Generated basic caption URL: ${basicUrl}`);
+        
+        // Verify if this URL works by making a request
+        try {
+          const testResponse = await fetch(basicUrl);
+          if (testResponse.ok) {
+            console.log(`[DEBUG] Basic caption URL is valid`);
+            captionUrl = basicUrl;
+          } else {
+            console.log(`[DEBUG] Basic caption URL returned ${testResponse.status}`);
+          }
+        } catch (e) {
+          console.log(`[DEBUG] Error testing basic caption URL:`, e);
         }
       }
     }
     
     // If no caption URL found after all attempts
     if (!captionUrl) {
+      console.log(`[DEBUG] No caption URL found after all attempts`);
+      
+      // Search for specific indicators that captions exist but couldn't be accessed
+      const hasCaptionsIndicator = html.includes('"hasCaptions":true') || 
+                                html.includes('"hasClosedCaptions":true') ||
+                                html.includes('{"captionTracks":');
+                                
+      if (hasCaptionsIndicator) {
+        console.log(`[DEBUG] Found indicators that captions exist but couldn't be accessed`);
+      }
+      
       // Check for a specific indicator that captions are disabled
       if (html.includes('"playerCaptionsTracklistRenderer":{}') || 
           html.includes('"captionTracks":[]')) {
+        console.log(`[DEBUG] Found explicit indicators that captions are disabled`);
         throw new Error('Captions are disabled for this video');
       }
+      
       throw new Error('Could not find transcript URL in the YouTube page');
     }
     
     captionUrl = decodeURIComponent(captionUrl);
-    console.log(`Processing transcript URL: ${captionUrl}`);
+    console.log(`[DEBUG] Processing transcript URL: ${captionUrl}`);
     
     // Add parameters if they're not present (lang, format, etc.)
     if (!captionUrl.includes('&lang=')) {
       // Check if there's a tlang parameter already
       if (!captionUrl.includes('&tlang=')) {
-        // Try to detect user's language or fallback to multiple options
-        // First try with user's language if we can detect it
+        console.log(`[DEBUG] Adding lang parameter`);
         captionUrl += '&lang=en';
       }
     }
     if (!captionUrl.includes('&fmt=')) {
+      console.log(`[DEBUG] Adding fmt parameter`);
       captionUrl += '&fmt=json3';
     }
     
@@ -361,22 +496,31 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
         ? captionUrl.replace(/&fmt=[^&]+/, '&fmt=json3') 
         : captionUrl + '&fmt=json3';
         
-      console.log(`Trying JSON format: ${jsonUrl}`);
+      console.log(`[DEBUG] Trying JSON format: ${jsonUrl}`);
       const jsonResponse = await fetch(jsonUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
         }
       });
       
       if (jsonResponse.ok) {
+        console.log(`[DEBUG] JSON response OK, status: ${jsonResponse.status}`);
         const jsonData = await jsonResponse.json();
+        console.log(`[DEBUG] JSON data parsed successfully`);
+        
         if (jsonData.events && jsonData.events.length > 0) {
+          console.log(`[DEBUG] Found ${jsonData.events.length} JSON events`);
           transcriptData = jsonData;
           format = 'json';
+        } else {
+          console.log(`[DEBUG] JSON data doesn't contain events or is empty`);
         }
+      } else {
+        console.log(`[DEBUG] JSON response failed with status: ${jsonResponse.status}`);
       }
     } catch (jsonError) {
-      console.log('JSON format failed, falling back to XML:', jsonError);
+      console.log(`[DEBUG] JSON format failed with error:`, jsonError);
+      console.log(`[DEBUG] Falling back to XML format`);
     }
     
     // If JSON failed, try XML format
@@ -385,22 +529,102 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
         ? captionUrl.replace(/&fmt=[^&]+/, '&fmt=srv1') 
         : captionUrl + '&fmt=srv1';
         
-      console.log(`Trying XML format: ${xmlUrl}`);
+      console.log(`[DEBUG] Trying XML format: ${xmlUrl}`);
       const xmlResponse = await fetch(xmlUrl, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
         }
       });
       
       if (!xmlResponse.ok) {
+        console.log(`[DEBUG] XML response failed with status: ${xmlResponse.status}`);
         throw new Error(`Failed to fetch transcript: ${xmlResponse.status}`);
       }
       
       transcriptData = await xmlResponse.text();
+      console.log(`[DEBUG] XML data retrieved, length: ${transcriptData.length}`);
+    }
+    
+    // Try a direct YouTube API request if we still don't have data
+    if (!transcriptData) {
+      console.log(`[DEBUG] All caption format attempts failed, trying direct API request`);
+      
+      // Create a very basic YouTube API URL for captions
+      const directApiUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3&xorb=2&xobt=3&xovt=3`;
+      console.log(`[DEBUG] Making direct API request: ${directApiUrl}`);
+      
+      try {
+        const directResponse = await fetch(directApiUrl, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+            'Referer': `https://www.youtube.com/watch?v=${videoId}`,
+            'Origin': 'https://www.youtube.com'
+          }
+        });
+        
+        if (directResponse.ok) {
+          console.log(`[DEBUG] Direct API request successful`);
+          const directData = await directResponse.text();
+          
+          if (directData && directData.length > 100) {
+            console.log(`[DEBUG] Direct API data retrieved, length: ${directData.length}`);
+            transcriptData = directData;
+            format = 'xml'; // Assume XML format for this request
+          } else {
+            console.log(`[DEBUG] Direct API returned empty or too short data: ${directData}`);
+          }
+        } else {
+          console.log(`[DEBUG] Direct API request failed: ${directResponse.status}`);
+        }
+      } catch (directError) {
+        console.log(`[DEBUG] Direct API request error:`, directError);
+      }
+    }
+    
+    // If we still don't have data, try with some hardcoded language options
+    if (!transcriptData) {
+      console.log(`[DEBUG] Trying with specific language options`);
+      const languagesToTry = ['en', 'en-US', 'en-GB', 'pt', 'pt-BR', 'es', 'fr', ''];
+      
+      for (const lang of languagesToTry) {
+        try {
+          const langUrl = `https://www.youtube.com/api/timedtext?v=${videoId}${lang ? `&lang=${lang}` : ''}&fmt=json3`;
+          console.log(`[DEBUG] Trying language: ${lang || 'default'} with URL: ${langUrl}`);
+          
+          const langResponse = await fetch(langUrl, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+            }
+          });
+          
+          if (langResponse.ok) {
+            const langData = await langResponse.json();
+            if (langData.events && langData.events.length > 0) {
+              console.log(`[DEBUG] Found working language: ${lang || 'default'}`);
+              transcriptData = langData;
+              format = 'json';
+              break;
+            } else {
+              console.log(`[DEBUG] No events found for language: ${lang || 'default'}`);
+            }
+          } else {
+            console.log(`[DEBUG] Failed for language: ${lang || 'default'} with status: ${langResponse.status}`);
+          }
+        } catch (langError) {
+          console.log(`[DEBUG] Error trying language ${lang || 'default'}:`, langError);
+        }
+      }
+    }
+    
+    // If we still don't have transcript data after all attempts
+    if (!transcriptData) {
+      console.log(`[DEBUG] All caption retrieval methods failed`);
+      throw new Error('Could not retrieve caption data after multiple attempts');
     }
     
     // Parse based on the format we got
     const segments = [];
+    console.log(`[DEBUG] Parsing transcript data in ${format} format`);
     
     if (format === 'json') {
       // Parse JSON format
@@ -436,22 +660,25 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
     }
     
     if (segments.length === 0) {
+      console.log(`[DEBUG] No transcript segments found after parsing`);
       throw new Error('No transcript segments found');
     }
     
-    console.log(`Parsed ${segments.length} transcript segments`);
+    console.log(`[DEBUG] Parsed ${segments.length} transcript segments`);
     
     // Format the transcript with timestamps
     const formattedTranscript = segments.map(
       part => `[${formatTimestamp(part.start)}] ${part.text}`
     ).join(' ');
     
+    console.log(`[DEBUG] Final transcript length: ${formattedTranscript.length}`);
+    
     return { 
       transcript: formattedTranscript,
       isYouTubeTranscript: true
     };
   } catch (error) {
-    console.error('Error in direct YouTube transcript fetch:', error);
+    console.error(`[DEBUG] Error in direct YouTube transcript fetch:`, error);
     throw error;
   }
 }
