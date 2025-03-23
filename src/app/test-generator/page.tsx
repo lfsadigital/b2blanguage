@@ -68,13 +68,16 @@ export default function TestGeneratorPage() {
           },
           body: JSON.stringify({
             contentUrl: formData.contentUrl, 
-            studentLevel: formData.studentLevel
+            studentLevel: formData.studentLevel,
+            subject: data.subject
           }),
         });
 
         const convData = await convResponse.json();
         if (convResponse.ok) {
           setConversationQuestions(convData.conversationQuestions);
+        } else {
+          console.error('Error response from conversation API:', convData.error);
         }
       } catch (error) {
         console.error('Error generating conversation questions:', error);
@@ -89,13 +92,16 @@ export default function TestGeneratorPage() {
           },
           body: JSON.stringify({
             contentUrl: formData.contentUrl, 
-            studentLevel: formData.studentLevel
+            studentLevel: formData.studentLevel,
+            subject: data.subject
           }),
         });
 
         const tipsData = await tipsResponse.json();
         if (tipsResponse.ok) {
           setTeacherTips(tipsData.teacherTips);
+        } else {
+          console.error('Error response from teacher tips API:', tipsData.error);
         }
       } catch (error) {
         console.error('Error generating teacher tips:', error);

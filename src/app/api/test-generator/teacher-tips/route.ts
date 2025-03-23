@@ -18,15 +18,54 @@ export async function POST(request: Request) {
     }
 
     const { contentUrl, subject, studentLevel } = await request.json();
-
-    if (!subject) {
-      return NextResponse.json(
-        { error: 'Subject is required' },
-        { status: 400 }
-      );
+    
+    // If subject is not provided directly, extract it from the URL
+    let topicSubject = subject;
+    
+    if (!topicSubject && contentUrl) {
+      console.log('No subject provided, attempting to extract from URL for teacher tips...');
+      
+      try {
+        // Simple extraction from YouTube title or URL
+        if (contentUrl.includes('youtube.com') || contentUrl.includes('youtu.be')) {
+          // Try to extract from URL parameters
+          const urlObj = new URL(contentUrl);
+          const titleParam = urlObj.searchParams.get('title');
+          if (titleParam) {
+            topicSubject = decodeURIComponent(titleParam).replace(/\+/g, ' ');
+          } else {
+            // Extract video ID and use that for now
+            let videoId = '';
+            if (contentUrl.includes('youtube.com/watch')) {
+              videoId = urlObj.searchParams.get('v') || '';
+            } else if (contentUrl.includes('youtu.be/')) {
+              videoId = contentUrl.split('youtu.be/')[1].split('?')[0];
+            }
+            topicSubject = `English Lesson on Video ${videoId}`;
+          }
+        } else {
+          // Try to extract from article URL
+          const urlParts = new URL(contentUrl).pathname.split('/');
+          const lastUrlPart = urlParts[urlParts.length - 1];
+          topicSubject = lastUrlPart
+            .replace(/-/g, ' ')
+            .replace(/\.(html|php|aspx)$/, '')
+            .replace(/[0-9]/g, '')
+            .trim() || 'English Lesson';
+        }
+      } catch (error) {
+        console.error('Error extracting subject from URL:', error);
+        topicSubject = 'English Teaching Tips';
+      }
     }
 
-    const prompt = generateTeacherTipsPrompt(subject, studentLevel);
+    if (!topicSubject) {
+      topicSubject = 'English Teaching Tips';
+    }
+    
+    console.log(`Using subject: "${topicSubject}" for teacher tips`);
+
+    const prompt = generateTeacherTipsPrompt(topicSubject, studentLevel);
 
     console.log('Generating teacher tips...');
     const completion = await openai.chat.completions.create({
