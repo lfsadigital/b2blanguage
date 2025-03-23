@@ -7,6 +7,7 @@ import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import youtubeDl from 'youtube-dl-exec';
 import { generateSubjectExtractionPrompt } from '@/app/lib/prompts/test-generator/subject-extraction';
 import { generateTestPrompt } from '@/app/lib/prompts/test-generator/main-test';
 
@@ -47,15 +48,19 @@ async function getVideoTranscriptWithWhisper(url: string): Promise<string> {
     
     const outputFile = path.join(tmpDir, 'audio.mp3');
     
-    // Download audio from YouTube using yt-dlp (which needs to be installed)
-    console.log(`Downloading audio from ${url} using yt-dlp...`);
+    // Download audio from YouTube using youtube-dl-exec npm package
+    console.log(`Downloading audio from ${url} using youtube-dl-exec...`);
     
     try {
-      await execAsync(`yt-dlp -x --audio-format mp3 -o "${outputFile}" ${url}`);
+      // Use yt-dlp first if available through the package
+      await youtubeDl(url, {
+        extractAudio: true,
+        audioFormat: 'mp3',
+        output: outputFile
+      });
     } catch (error) {
-      console.error('Error with yt-dlp, trying alternative method...', error);
-      // Alternative using youtube-dl if available
-      await execAsync(`youtube-dl -x --audio-format mp3 -o "${outputFile}" ${url}`);
+      console.error('Error with youtube-dl-exec:', error);
+      throw new Error('Failed to download YouTube audio: ' + (error as Error).message);
     }
     
     // Check if file exists and has size
