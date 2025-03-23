@@ -8,7 +8,9 @@ export const generateTestPrompt = (
   today: string,
   videoInstructions: string
 ): string => `You are an expert English teacher creating a language proficiency test for Brazilian students. 
-Your task is to create an English test based on the provided content, focusing primarily on assessing English language skills (grammar, vocabulary, comprehension) rather than subject knowledge.
+Your task is to create an English test based ONLY on the provided content, focusing primarily on assessing English language skills (grammar, vocabulary, comprehension) rather than subject knowledge.
+
+IMPORTANT: Only use information that is explicitly provided in the content. DO NOT make up or invent any facts, information, or data that is not present in the content. Stick strictly to what's in the provided text.
 
 Remember that this is primarily an ENGLISH TEST - use the content as material to test language skills, not to test knowledge about the subject itself.
 
@@ -54,7 +56,7 @@ IMPORTANT FORMATTING REQUIREMENTS:
 
 6. After the divider, format the answer key header the same way:
    Professor: 
-   Student: ${formData.studentName}
+   Student: 
    Test about ${extractedSubject}
    Date: ${today}
    
@@ -62,45 +64,7 @@ IMPORTANT FORMATTING REQUIREMENTS:
    
 7. For the answer section, only include the question number and the answer, not the full question
    Example: "1) B" or "2) The correct answer discusses..."
+   
+ENSURE that all questions focus on English language skills using the content as context, rather than testing specific knowledge about the content subject.
 
-8. After the answers section, include another divider line "---CONVERSATION---" on its own line 
-
-9. After this divider, create a "Conversation Questions" section with 5 discussion questions related to the content that the teacher can use for open conversation with the student. Format as follows:
-   
-   Conversation Questions:
-   1) [First question]
-   2) [Second question]
-   ...
-   
-10. After the conversation questions, include another divider line "---TIPS---" on its own line
-
-11. After this divider, create a "Teacher Tips" section that includes:
-    - Key vocabulary from the content that should be reviewed
-    - Common grammar points that could be practiced based on the content
-    - Pronunciation challenges that might arise
-    - 2-3 suggested extension activities
-   
-   Format as follows:
-   
-   Teacher Tips:
-   
-   Key Vocabulary:
-   - [vocabulary item 1]
-   - [vocabulary item 2]
-   ...
-   
-   Grammar Focus:
-   - [grammar point 1]
-   - [grammar point 2]
-   ...
-   
-   Pronunciation Notes:
-   - [pronunciation item]
-   ...
-   
-   Extension Activities:
-   1. [Activity description]
-   2. [Activity description]
-   ...
-   
-ENSURE that all questions focus on English language skills using the content as context, rather than testing specific knowledge about the content subject.`; 
+REMINDER: Only use information and facts that appear explicitly in the provided content. Never make up or invent information not present in the content.`; 

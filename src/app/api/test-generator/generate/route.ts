@@ -121,21 +121,27 @@ async function getArticleContentFallback(url: string): Promise<string> {
       messages: [
         {
           role: "system",
-          content: "You are a helpful assistant that extracts the main content from article URLs."
+          content: "You are a precise content extractor that only extracts real content from web URLs. You MUST NEVER invent or make up content. If you cannot access the real content, clearly state that you cannot extract it rather than generating anything."
         },
         {
           role: "user",
-          content: `Visit this URL: ${url} and extract the main article content. Just return the extracted content without any introduction or explanation. Only return the article text itself.`
+          content: `Extract the main article content from this URL: ${url}
+
+VERY IMPORTANT: 
+1. If you cannot access the actual content, respond ONLY with: "CANNOT_ACCESS_CONTENT"
+2. DO NOT generate or make up ANY content
+3. Only return the extracted content if you can actually access it
+4. No introduction or explanation - only return the extracted content itself`
         }
       ],
-      temperature: 0.3,
+      temperature: 0.2,
       max_tokens: 1500,
     });
 
     const extractedContent = completion.choices[0].message.content?.trim();
     
-    if (!extractedContent || extractedContent.length < 100) {
-      throw new Error('Extracted content is too short or empty');
+    if (!extractedContent || extractedContent.includes("CANNOT_ACCESS_CONTENT") || extractedContent.length < 100) {
+      throw new Error('Unable to extract article content - AI could not access the content');
     }
     
     console.log(`Successfully extracted content using OpenAI: ${extractedContent.length} characters`);
@@ -218,46 +224,7 @@ async function getVideoTranscriptWithWhisper(url: string): Promise<string> {
   }
 }
 
-// Fallback to extract YouTube content when transcript methods fail
-async function getYouTubeContentFallback(url: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
-  if (!openai) {
-    throw new Error('OpenAI API key is not configured for fallback YouTube content');
-  }
-  
-  console.log(`Trying to extract YouTube video content using OpenAI: ${url}`);
-  
-  try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful assistant that extracts content from YouTube videos."
-        },
-        {
-          role: "user",
-          content: `Watch this YouTube video: ${url} and provide a detailed transcript-like summary of the video content. Include what was said and done in chronological order. Format the content similar to a transcript, with timestamps if possible. If you can't access the video directly, describe what the video is likely about based on the title, channel, and any other information you can gather from the URL.`
-        }
-      ],
-      temperature: 0.3,
-      max_tokens: 1500,
-    });
-
-    const extractedContent = completion.choices[0].message.content?.trim();
-    
-    if (!extractedContent || extractedContent.length < 100) {
-      throw new Error('Generated YouTube content is too short or empty');
-    }
-    
-    console.log(`Successfully generated content for YouTube video using OpenAI: ${extractedContent.length} characters`);
-    return { transcript: extractedContent, isYouTubeTranscript: false };
-  } catch (error) {
-    console.error('Error using OpenAI to generate YouTube content:', error);
-    throw new Error(`OpenAI YouTube content generation failed: ${(error as Error).message}`);
-  }
-}
-
-// Update the getVideoTranscript function with the OpenAI fallback
+// Update the getVideoTranscript function to remove the OpenAI fallback
 async function getVideoTranscript(url: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
   try {
     console.log(`Getting transcript for ${url}...`);
@@ -307,14 +274,8 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
         console.error('Whisper transcription also failed:', wError);
         whisperError = wError;
         
-        // Try OpenAI fallback as last resort
-        console.log('Both standard methods failed, trying OpenAI fallback...');
-        try {
-          return await getYouTubeContentFallback(url);
-        } catch (fallbackError: any) {
-          console.error('All transcript methods failed including OpenAI fallback:', fallbackError);
-          throw new Error(`All transcript methods failed. YouTube error: ${ytError.message}, Whisper error: ${whisperError.message}, Fallback error: ${fallbackError.message}`);
-        }
+        // No more fallbacks - all methods failed
+        throw new Error(`All transcript methods failed. YouTube error: ${ytError.message}, Whisper error: ${whisperError.message}`);
       }
     }
   } catch (error) {
@@ -392,54 +353,6 @@ async function extractSubject(url: string, content: string): Promise<string> {
   } catch (error) {
     console.error('Error extracting subject:', error);
     return 'Content Analysis';
-  }
-}
-
-// Add this function at the top level, near the other methods
-async function generateContentAboutURL(url: string): Promise<string> {
-  if (!openai) {
-    throw new Error('OpenAI API key is not configured for content generation');
-  }
-  
-  console.log(`All extraction methods failed. Using OpenAI to generate content about the URL topic: ${url}`);
-  
-  try {
-    // Extract last part of URL path for topic hint
-    const urlObj = new URL(url);
-    const pathParts = urlObj.pathname.split('/').filter(p => p);
-    const lastPath = pathParts.length > 0 ? pathParts[pathParts.length - 1] : '';
-    const topic = lastPath.replace(/-|_/g, ' ') || urlObj.hostname;
-    
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are a helpful assistant that generates content about topics."
-        },
-        {
-          role: "user",
-          content: `This URL ${url} appears to be about "${topic}". 
-          Please generate about 1500 words of factual content about this topic. 
-          Focus on what would likely be in an article with this URL.
-          Start immediately with the content, no introductions or notes.`
-        }
-      ],
-      temperature: 0.5,
-      max_tokens: 2000,
-    });
-
-    const generatedContent = completion.choices[0].message.content?.trim();
-    
-    if (!generatedContent || generatedContent.length < 200) {
-      throw new Error('Generated content is too short or empty');
-    }
-    
-    console.log(`Successfully generated content about the URL topic: ${generatedContent.length} characters`);
-    return generatedContent;
-  } catch (error) {
-    console.error('Error using OpenAI to generate content:', error);
-    throw new Error(`OpenAI content generation failed: ${(error as Error).message}`);
   }
 }
 
@@ -556,8 +469,9 @@ export async function POST(request: Request) {
           try {
             articleContent = await getArticleContentFallback(url);
           } catch (fallbackError) {
-            console.error('Fallback method also failed, generating content about the URL topic:', fallbackError);
-            articleContent = await generateContentAboutURL(url);
+            // Do not generate content about the URL - that's not acceptable
+            console.error('All extraction methods failed, we cannot process this URL:', fallbackError);
+            throw new Error('Unable to extract real content from this URL. Please try a different article URL or a YouTube video instead.');
           }
         }
         
