@@ -42,55 +42,63 @@ async function getVideoTranscriptWithWhisper(url: string): Promise<string> {
   }
   
   try {
-    // Create a temp directory
-    const tmpDir = path.join(os.tmpdir(), 'youtube-audio-' + Math.random().toString(36).substring(2, 15));
-    fs.mkdirSync(tmpDir, { recursive: true });
-    
-    const outputFile = path.join(tmpDir, 'audio.mp3');
-    
-    // Download audio from YouTube using youtube-dl-exec npm package
-    console.log(`Downloading audio from ${url} using youtube-dl-exec...`);
+    // Create a temp directory - use /tmp which is writable in Vercel
+    const tempDir = '/tmp';
+    const randomId = Math.random().toString(36).substring(2, 15);
+    const tmpDir = path.join(tempDir, `yt-${randomId}`);
     
     try {
-      // Use yt-dlp first if available through the package
+      fs.mkdirSync(tmpDir, { recursive: true });
+    } catch (error) {
+      console.error(`Error creating temp directory: ${error}`);
+    }
+    
+    console.log(`Created temp directory: ${tmpDir}`);
+    const outputFile = path.join(tmpDir, `audio_${randomId}.mp3`);
+    
+    // Download audio from YouTube using youtube-dl-exec with minimal options
+    console.log(`Downloading audio from ${url} using youtube-dl-exec (simpler config)...`);
+    
+    try {
+      // Use simpler options for better Vercel compatibility
       await youtubeDl(url, {
         extractAudio: true,
         audioFormat: 'mp3',
-        output: outputFile
+        output: outputFile,
+        noWarnings: true
       });
+      
+      console.log(`Checking for downloaded file at: ${outputFile}`);
+      
+      // Check if file exists and has size
+      if (!fs.existsSync(outputFile) || fs.statSync(outputFile).size === 0) {
+        throw new Error(`Downloaded audio file is empty or does not exist at path: ${outputFile}`);
+      }
+      
+      console.log(`Audio downloaded to ${outputFile}. Size: ${fs.statSync(outputFile).size} bytes`);
+      console.log('Transcribing with Whisper...');
+      
+      // Use OpenAI's Whisper API for transcription
+      const transcription = await openai.audio.transcriptions.create({
+        file: fs.createReadStream(outputFile),
+        model: "whisper-1",
+      });
+      
+      // Clean up temp files
+      try {
+        fs.unlinkSync(outputFile);
+        fs.rmdirSync(tmpDir);
+      } catch (e) {
+        console.error('Error cleaning up temp files:', e);
+      }
+      
+      console.log('Transcription completed successfully');
+      return transcription.text;
     } catch (error) {
-      console.error('Error with youtube-dl-exec:', error);
-      throw new Error('Failed to download YouTube audio: ' + (error as Error).message);
+      console.error('Detailed error info:', error);
+      // Try alternative YouTube transcript method
+      throw new Error(`Failed to download/process YouTube audio: ${(error as Error).message}`);
     }
-    
-    // Check if file exists and has size
-    if (!fs.existsSync(outputFile) || fs.statSync(outputFile).size === 0) {
-      throw new Error('Failed to download audio from YouTube');
-    }
-    
-    console.log('Audio downloaded. Transcribing with Whisper...');
-    
-    // Use OpenAI's Whisper API for transcription
-    const audioFile = fs.readFileSync(outputFile);
-    const audioBlob = new Blob([audioFile]);
-    const formData = new FormData();
-    formData.append('file', audioBlob, 'audio.mp3');
-    formData.append('model', 'whisper-1');
-    
-    const transcription = await openai.audio.transcriptions.create({
-      file: fs.createReadStream(outputFile),
-      model: "whisper-1",
-    });
-    
-    // Clean up temp files
-    try {
-      fs.unlinkSync(outputFile);
-      fs.rmdirSync(tmpDir);
-    } catch (e) {
-      console.error('Error cleaning up temp files:', e);
-    }
-    
-    return transcription.text;
   } catch (error) {
     console.error('Error transcribing with Whisper:', error);
     throw new Error('Failed to transcribe with Whisper: ' + (error as Error).message);

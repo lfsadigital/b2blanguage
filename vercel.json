@@ -4,5 +4,11 @@
       "src": "package.json",
       "use": "@vercel/next"
     }
-  ]
+  ],
+  "functions": {
+    "src/app/api/test-generator/generate/route.ts": {
+      "memory": 1024,
+      "maxDuration": 60
+    }
+  }
 } 
