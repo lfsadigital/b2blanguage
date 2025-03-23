@@ -123,22 +123,30 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
     
     console.log(`Video ID: ${videoId}`);
     try {
+      console.log('Attempting to get YouTube captions directly...');
       const transcript = await YoutubeTranscript.fetchTranscript(videoId);
       
       if (!transcript || transcript.length === 0) {
         throw new Error('No transcript available for this video');
       }
       
+      console.log('Successfully retrieved YouTube captions!');
       // Join all transcript parts with timestamps
       return { 
         transcript: transcript.map(part => `[${formatTimestamp(part.offset)}] ${part.text}`).join(' '),
         isYouTubeTranscript: true
       };
-    } catch (ytError) {
-      console.log('YouTube transcript failed, falling back to Whisper:', ytError);
+    } catch (ytError: any) {
+      console.log('YouTube transcript API failed with error:', ytError);
+      console.log('Falling back to Whisper transcription...');
       // Fallback to Whisper
-      const whisperTranscript = await getVideoTranscriptWithWhisper(url);
-      return { transcript: whisperTranscript, isYouTubeTranscript: false };
+      try {
+        const whisperTranscript = await getVideoTranscriptWithWhisper(url);
+        return { transcript: whisperTranscript, isYouTubeTranscript: false };
+      } catch (whisperError: any) {
+        console.error('Whisper transcription also failed:', whisperError);
+        throw new Error(`Both transcript methods failed. YouTube error: ${ytError.message}, Whisper error: ${whisperError.message}`);
+      }
     }
   } catch (error) {
     console.error('Error getting video transcript:', error);
@@ -372,4 +380,4 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
-} 
+}
