@@ -230,16 +230,33 @@ async function extractSubject(url: string, content: string): Promise<string> {
 }
 
 export async function POST(request: Request) {
+  // Version identifier for deployment verification
+  console.log("=== TEST GENERATOR API v1.2.1 (DEBUG BUILD) ===");
+  
   try {
     // Check if OpenAI client is available
     if (!openai) {
+      console.error("API ERROR: OpenAI API key is not configured");
       return NextResponse.json(
         { error: "OpenAI API key is not configured" },
         { status: 500 }
       );
     }
     
-    const formData: TestFormData = await request.json();
+    console.log("Starting test generation request processing...");
+    let formData: TestFormData;
+    
+    try {
+      formData = await request.json();
+      console.log(`Received form data with contentUrl: ${formData.contentUrl?.substring(0, 30)}...`);
+    } catch (parseError) {
+      console.error("Failed to parse request JSON:", parseError);
+      return NextResponse.json(
+        { error: "Invalid request data format" },
+        { status: 400 }
+      );
+    }
+    
     const url = formData.contentUrl;
     const today = new Date().toLocaleDateString('en-US', {
       year: 'numeric',
@@ -248,6 +265,7 @@ export async function POST(request: Request) {
     });
 
     if (!url) {
+      console.error("Missing contentUrl in request");
       return NextResponse.json(
         { error: 'Content URL is required' },
         { status: 400 }
