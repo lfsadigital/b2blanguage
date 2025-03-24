@@ -4,7 +4,7 @@
     "env": {}
   },
   "functions": {
-    "src/app/api/test-generator/teacher-tips/route.ts": {
+    "app/api/test-generator/teacher-tips/**": {
       "maxDuration": 30
     }
   }
