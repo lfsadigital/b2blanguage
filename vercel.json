@@ -2,5 +2,10 @@
   "env": {},
   "build": {
     "env": {}
+  },
+  "functions": {
+    "api/test-generator/teacher-tips/*.ts": {
+      "maxDuration": 30
+    }
   }
 } 

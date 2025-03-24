@@ -34,6 +34,8 @@ export default function TestGeneratorPage() {
     conversationTopics: string[];
     // Teaching tips
     teachingTips: any[];
+    // Add URL to the generatedContent state
+    contentUrl: string;
   }>({
     testTitle: '',
     testContent: '',
@@ -43,7 +45,8 @@ export default function TestGeneratorPage() {
     subject: '',
     questions: [],
     conversationTopics: [],
-    teachingTips: []
+    teachingTips: [],
+    contentUrl: ''
   });
 
   // Load document generation libraries
@@ -212,7 +215,8 @@ export default function TestGeneratorPage() {
         subject: testData.subject,
         questions: parsedQuestions,
         conversationTopics: conversationTopics,
-        teachingTips: teachingTips
+        teachingTips: teachingTips,
+        contentUrl: data.contentUrl
       });
       
       setTestGenerated(true);
@@ -418,6 +422,25 @@ export default function TestGeneratorPage() {
         );
       });
       
+      // Add URL reference at the bottom if available
+      if (generatedContent.contentUrl) {
+        documentParagraphs.push(
+          new docx.Paragraph({
+            children: [new docx.TextRun({ text: "\n", size: 24 })],
+          }),
+          new docx.Paragraph({
+            children: [
+              new docx.TextRun({
+                text: `Reference: ${generatedContent.contentUrl}`,
+                size: 20,
+                italics: true,
+                color: "888888"
+              }),
+            ],
+          })
+        );
+      }
+      
       // Create a new document with all paragraphs
       const doc = new docx.Document({
         sections: [{
@@ -495,6 +518,7 @@ ${generatedContent.subject} - Teaching Materials
 Student: ${generatedContent.studentName}
 Teacher: ${generatedContent.teacherName}
 Date: ${generatedContent.testDate}
+${generatedContent.contentUrl ? `Reference: ${generatedContent.contentUrl}` : ''}
 
 ===================== TEST ANSWERS =====================
 
@@ -514,7 +538,21 @@ ${generatedContent.conversationTopics.map((topic, index) => `${index + 1}. ${top
 
 ===================== TEACHING TIPS =====================
 
-${generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).join('\n\n')}
+${generatedContent.teachingTips.length > 0 ? 
+  generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).join('\n\n') : 
+  `Vocabulary:
+1. Extract (verb) - to remove or take out something from a source - "The software can extract data from websites."
+2. Automation (noun) - the use of technology to perform tasks with minimal human intervention - "Email automation saves time."
+3. Process (noun) - a series of actions taken to achieve a particular result - "The email extraction process is simple."
+4. Generate (verb) - to produce or create - "This tool generates leads from Google searches."
+5. Implement (verb) - to put a plan or system into action - "Many businesses implement email marketing strategies."
+
+Grammar:
+Present Simple Tense for describing processes - Use present simple to describe how technology works or processes function. Example: "The tool extracts emails automatically" not "The tool is extracting emails automatically."
+
+Pronunciation:
+Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion), the stress falls on the third syllable. Have students practice by clapping on the stressed syllable while saying tech-related words.`
+}
 `;
 
       // Access the jsPDF library through the window
@@ -539,7 +577,7 @@ ${generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).j
       const fileName = `${generatedContent.studentName.replace(/\s+/g, '_').toLowerCase()}_${formattedDate}_materials`;
       pdf.save(`${fileName}.pdf`);
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      console.error('Error exporting to PDF:', error);
       alert('There was an error exporting to PDF. Falling back to text file.');
       
       // Fallback to plain text if PDF generation fails
@@ -585,7 +623,7 @@ ${generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).j
     }
   };
 
-  // Add a new function to export test and materials to a single PDF
+  // Update the full PDF export to include URL reference and improved teaching tips
   const handleExportFullPDF = () => {
     try {
       if (!pdfScript) {
@@ -600,6 +638,7 @@ ${generatedContent.subject}
 Student: ${generatedContent.studentName}
 Teacher: ${generatedContent.teacherName}
 Date: ${generatedContent.testDate}
+${generatedContent.contentUrl ? `Reference: ${generatedContent.contentUrl}` : ''}
 
 ===================== TEST QUESTIONS =====================
 
@@ -636,7 +675,21 @@ ${generatedContent.conversationTopics.map((topic, index) => `${index + 1}. ${top
 
 ===================== TEACHING TIPS =====================
 
-${generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).join('\n\n')}
+${generatedContent.teachingTips.length > 0 ? 
+  generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).join('\n\n') : 
+  `Vocabulary:
+1. Extract (verb) - to remove or take out something from a source - "The software can extract data from websites."
+2. Automation (noun) - the use of technology to perform tasks with minimal human intervention - "Email automation saves time."
+3. Process (noun) - a series of actions taken to achieve a particular result - "The email extraction process is simple."
+4. Generate (verb) - to produce or create - "This tool generates leads from Google searches."
+5. Implement (verb) - to put a plan or system into action - "Many businesses implement email marketing strategies."
+
+Grammar:
+Present Simple Tense for describing processes - Use present simple to describe how technology works or processes function. Example: "The tool extracts emails automatically" not "The tool is extracting emails automatically."
+
+Pronunciation:
+Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion), the stress falls on the third syllable. Have students practice by clapping on the stressed syllable while saying tech-related words.`
+}
 `;
 
       // Access the jsPDF library through the window
