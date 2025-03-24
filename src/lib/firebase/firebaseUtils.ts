@@ -32,15 +32,28 @@ export const signInWithGoogle = async () => {
 };
 
 // Firestore functions
-export const addDocument = (collectionName: string, data: any) =>
-  addDoc(collection(db, collectionName), data);
+export const addDocument = async (collectionName: string, data: any) => {
+  try {
+    const docRef = await addDoc(collection(db, collectionName), data);
+    console.log(`Document written with ID: ${docRef.id}`);
+    return docRef;
+  } catch (error) {
+    console.error("Error adding document:", error);
+    throw error;
+  }
+};
 
 export const getDocuments = async (collectionName: string) => {
-  const querySnapshot = await getDocs(collection(db, collectionName));
-  return querySnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  }));
+  try {
+    const querySnapshot = await getDocs(collection(db, collectionName));
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error(`Error getting documents from ${collectionName}:`, error);
+    throw error;
+  }
 };
 
 export const updateDocument = (collectionName: string, id: string, data: any) =>
@@ -51,9 +64,18 @@ export const deleteDocument = (collectionName: string, id: string) =>
 
 // Storage functions
 export const uploadFile = async (file: File, path: string) => {
-  const storageRef = ref(storage, path);
-  await uploadBytes(storageRef, file);
-  return getDownloadURL(storageRef);
+  try {
+    console.log(`Starting upload for file ${file.name} to path ${path}`);
+    const storageRef = ref(storage, path);
+    const snapshot = await uploadBytes(storageRef, file);
+    console.log('Uploaded a blob or file!', snapshot);
+    const downloadUrl = await getDownloadURL(storageRef);
+    console.log('File download URL:', downloadUrl);
+    return downloadUrl;
+  } catch (error) {
+    console.error("Error uploading file:", error);
+    throw error;
+  }
 };
 
 // Interface for user data

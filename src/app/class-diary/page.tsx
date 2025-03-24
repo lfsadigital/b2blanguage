@@ -147,30 +147,44 @@ export default function ClassDiaryPage() {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Submit button clicked');
     
     // Check if user is authenticated
     if (!user) {
+      console.error('Authentication error: User not logged in');
       setUploadError('You must be logged in to upload files.');
       return;
     }
     
+    console.log('User authenticated:', user.email);
+    
     // Check if user is a Teacher
     if (userProfile !== 'Teacher') {
+      console.error('Authorization error: User is not a Teacher', userProfile);
       setUploadError('Only Teachers can upload test results.');
       return;
     }
     
+    console.log('User authorized as Teacher');
+    
     if (!selectedFile) {
+      console.error('Validation error: No file selected');
       setUploadError('Please select a file to upload');
       return;
     }
     
+    console.log('File selected:', selectedFile.name, 'size:', selectedFile.size);
+    
     try {
       setIsUploading(true);
+      console.log('Starting upload process...');
       
       // Get selected student and teacher data
       const selectedStudent = mockStudents.find(s => s.id === formData.studentId);
       const selectedTeacher = mockTeachers.find(t => t.id === formData.teacherId);
+      
+      console.log('Selected student:', selectedStudent);
+      console.log('Selected teacher:', selectedTeacher);
       
       if (!selectedStudent || !selectedTeacher) {
         throw new Error('Please select a valid student and teacher');
@@ -179,18 +193,28 @@ export default function ClassDiaryPage() {
       // Upload file to Firebase storage
       let fileUrl = '';
       
+      console.log('Preparing to upload file to Firebase Storage...');
       try {
         // Upload to Firebase Storage
         const fileName = `${Date.now()}_${selectedFile.name.replace(/\s+/g, '_')}`;
         const path = `test-results/${fileName}`;
+        console.log('Upload path:', path);
+        
+        // First check if the file is too large
+        const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+        if (selectedFile.size > MAX_FILE_SIZE) {
+          throw new Error(`File size exceeds maximum allowed (10MB). Current size: ${(selectedFile.size / (1024 * 1024)).toFixed(2)}MB`);
+        }
+        
         fileUrl = await uploadFile(selectedFile, path);
         console.log('File uploaded successfully:', fileUrl);
       } catch (uploadError: any) {
-        console.error('Error uploading file:', uploadError);
+        console.error('Error during file upload:', uploadError);
         throw new Error(`Failed to upload file to storage: ${uploadError.message || 'Unknown error'}`);
       }
       
       // Prepare test result data
+      console.log('Preparing test result data for Firestore...');
       const testResultData = {
         fileName: selectedFile.name,
         fileUrl,
@@ -210,37 +234,44 @@ export default function ClassDiaryPage() {
       };
       
       // Save data to Firebase Firestore
-      console.log('Saving to Firestore:', testResultData);
-      const docRef = await addDocument('testResults', testResultData);
-      console.log('Document saved with ID:', docRef.id);
-      
-      // Add the new upload to the local state with the Firestore document ID
-      const newUpload = {
-        id: docRef.id,
-        ...testResultData
-      };
-      
-      setRecentUploads(prev => [newUpload, ...prev]);
-      
-      // Reset form
-      setSelectedFile(null);
-      setFormData({
-        teacherId: userProfile === 'Teacher' ? mockTeachers[0].id : '',
-        studentId: '',
-        testDate: new Date().toISOString().split('T')[0],
-        testGrade: '',
-        gradeByTeacher: '',
-        forNextClass: '',
-        notes: ''
-      });
-      
-      setUploadSuccess(true);
-      setTimeout(() => setUploadSuccess(false), 3000);
+      console.log('Saving data to Firestore:', testResultData);
+      try {
+        const docRef = await addDocument('testResults', testResultData);
+        console.log('Document successfully saved with ID:', docRef.id);
+        
+        // Add the new upload to the local state with the Firestore document ID
+        const newUpload = {
+          id: docRef.id,
+          ...testResultData
+        };
+        
+        setRecentUploads(prev => [newUpload, ...prev]);
+        
+        // Reset form
+        setSelectedFile(null);
+        setFormData({
+          teacherId: userProfile === 'Teacher' ? mockTeachers[0].id : '',
+          studentId: '',
+          testDate: new Date().toISOString().split('T')[0],
+          testGrade: '',
+          gradeByTeacher: '',
+          forNextClass: '',
+          notes: ''
+        });
+        
+        setUploadSuccess(true);
+        setTimeout(() => setUploadSuccess(false), 3000);
+        console.log('Upload process completed successfully!');
+      } catch (firestoreError: any) {
+        console.error('Error saving to Firestore:', firestoreError);
+        throw new Error(`Failed to save test data: ${firestoreError.message || 'Unknown error'}`);
+      }
     } catch (error) {
       console.error('Error during upload process:', error);
       setUploadError(`Failed to upload: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsUploading(false);
+      console.log('Upload process ended (success or failure)');
     }
   };
 
