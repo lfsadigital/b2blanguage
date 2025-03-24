@@ -5,7 +5,7 @@ export const generateConversationPrompt = (
 
 Your task is to create 3-5 open-ended questions that a teacher can use to spark conversation with students at the beginning of a class.
 
-IMPORTANT: Focus ONLY on general topics and universal questions that are broadly related to the subject. DO NOT reference or make up any specific facts, data, or information that would require knowledge of a specific article or video. Your questions should be applicable regardless of what specific content the student has studied.
+IMPORTANT: Focus ONLY on general topics and universal questions that are broadly related to the subject. 
 
 These questions should:
 1. Relate to the general subject/topic: "${subject}"
@@ -25,4 +25,4 @@ Examples of good conversation starters on the topic of "LinkedIn's New Video Fea
 
 Please provide ONLY the questions, numbered 1-5, with no additional text, explanations, or headers.
 
-REMINDER: Your questions must be universal and NOT reference specific facts from any content. They should be broad discussion starters on the general topic that ANY student could answer.`; 
+REMINDER: Your questions must be universal. They should be broad discussion starters on the general topic that ANY student could answer.`; 

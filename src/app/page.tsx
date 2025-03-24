@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Image from "next/image";
 import { ArrowRightIcon } from '@heroicons/react/24/outline';
 import { CpuChipIcon, BookOpenIcon, ServerIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline';
-import SignInWithGoogle from '../components/SignInWithGoogle';
+import HomeSignInButton from '../components/HomeSignInButton';
 
 export default function Home() {
   const router = useRouter();
@@ -35,9 +35,7 @@ export default function Home() {
               >
                 Go to Dashboard
               </Link>
-              <div>
-                <SignInWithGoogle />
-              </div>
+              <HomeSignInButton />
             </div>
           </div>
         </div>
@@ -65,7 +63,12 @@ export default function Home() {
               <p className="text-gray-700 mb-4">
                 Track student progress, manage class notes, and monitor performance over time.
               </p>
-              <span className="text-gray-500 font-medium">Coming soon</span>
+              <Link 
+                href="/class-diary" 
+                className="text-[#8B4513] font-medium hover:text-[#A0522D]"
+              >
+                Try it now →
+              </Link>
             </div>
             <div className="p-6 bg-[#FFF8DC] rounded-lg border border-[#DEB887]">
               <h3 className="text-xl font-semibold text-[#8B4513] mb-3">Business Database</h3>
@@ -105,6 +108,7 @@ export default function Home() {
             <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-6">
               <Link href="/dashboard" className="text-gray-300 hover:text-white">Dashboard</Link>
               <Link href="/test-generator" className="text-gray-300 hover:text-white">Test Generator</Link>
+              <Link href="/class-diary" className="text-gray-300 hover:text-white">Class Diary</Link>
             </div>
           </div>
           <div className="mt-8 pt-8 border-t border-gray-700 text-center text-gray-400 text-sm">

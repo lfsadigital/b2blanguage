@@ -2,6 +2,8 @@ import "./globals.css";
 import Link from "next/link";
 import { Inter } from 'next/font/google';
 import { AuthProvider } from '../lib/contexts/AuthContext';
+import ProfileIndicator from "../components/ProfileIndicator";
+import SignInButton from "../components/SignInButton";
 
 const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600', '700'] });
 
@@ -37,15 +39,17 @@ export default function RootLayout({
                     >
                       Test Generator
                     </Link>
+                    <Link
+                      href="/class-diary"
+                      className="border-transparent text-[var(--subtle)] hover:text-[var(--primary)] hover:border-[var(--primary)] inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors"
+                    >
+                      Class Diary
+                    </Link>
                   </div>
                 </div>
-                <div className="hidden sm:flex items-center">
-                  <Link
-                    href="/"
-                    className="apple-button-secondary text-sm"
-                  >
-                    Try Free Demo
-                  </Link>
+                <div className="flex items-center space-x-4">
+                  <SignInButton />
+                  <ProfileIndicator />
                 </div>
               </div>
             </nav>
@@ -76,10 +80,12 @@ export default function RootLayout({
                       </Link>
                     </li>
                     <li>
-                      <span className="text-gray-600">Vocabulary Builder (Coming Soon)</span>
+                      <Link href="/class-diary" className="text-gray-400 hover:text-white transition-colors">
+                        Class Diary
+                      </Link>
                     </li>
                     <li>
-                      <span className="text-gray-600">Presentation Coach (Coming Soon)</span>
+                      <span className="text-gray-600">Vocabulary Builder (Coming Soon)</span>
                     </li>
                   </ul>
                 </div>

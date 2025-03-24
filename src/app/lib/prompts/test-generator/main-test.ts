@@ -18,6 +18,9 @@ For example, if the content is about soccer, focus on testing vocabulary used in
 
 DO NOT include any political or economic bias in your questions. Keep questions neutral and focused on language skills.
 
+At least one question should be directly based on a small excerpt (no longer than three paragraphs) from the content, asking students to interpret, summarize, or identify key information from it. However, avoid simply copying large portions of the text
+as part of the question—focus on testing understanding rather than memorization.
+
 Content URL: ${url}
 ${contentInfo}
 
@@ -65,6 +68,6 @@ IMPORTANT FORMATTING REQUIREMENTS:
 7. For the answer section, only include the question number and the answer, not the full question
    Example: "1) B" or "2) The correct answer discusses..."
    
-ENSURE that all questions focus on English language skills using the content as context, rather than testing specific knowledge about the content subject.
+ENSURE that all questions focus on English language skills using the content as context, rather than testing very specific knowledge about the content subject.
 
-REMINDER: Only use information and facts that appear explicitly in the provided content. Never make up or invent information not present in the content.`; 
+REMINDER: Never make up or invent information not present in the content.`; 

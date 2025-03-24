@@ -1,18 +1,45 @@
-# B2B Language
+# B2B Language - English Teaching Tools
 
-A Next.js application for business English teachers.
+A Next.js application for professional English language teaching resources targeted at business professionals.
 
 ## Features
 
-- Test Generator
-- More features coming soon
+- **Test Generator**: Create custom English language tests with various question types
+- **Class Diary**: Manage student records, track progress, and upload test results
+- **User Authentication**: Firebase authentication with profile types (Visitor, Owner, Manager, Teacher, Student)
+- **Profile Indicator**: Shows the current user's profile type in the top right corner of every page
 
-Last updated: May 2024
+## Test Features
 
-## Getting started
-To create a new project, you go to `/paths`, choose from our list of Paths, and then use Cursor's Composer feature to quickly scaffold your project!
+- Tests are generated with a grade input area in the top right corner
+- Tests can be printed or saved as PDFs
 
-You can also edit the Path's prompt template to be whatever you like!
+## Class Diary Features
+
+- Teacher can record class details and test results
+- Upload test files with grades
+- Track student progress over time
+- Input fields for teacher name, student name, date, and grades
+
+## Profile Types
+
+- **Visitor**: Default profile type for newly registered users
+- **Owner**: Site owner with full access
+- **Manager**: School manager with administrative rights
+- **Teacher**: Can create tests and manage student records
+- **Student**: Can view their own records and tests
+
+## Getting Started
+
+```bash
+# Install dependencies
+npm install
+
+# Run the development server
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 ## Technologies used
 This doesn't really matter, but is useful for the AI to understand more about this project. We are using the following technologies

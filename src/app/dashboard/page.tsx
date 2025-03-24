@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import DashboardShell from '@/components/ui/dashboard-shell';
+import DashboardShell from '../../components/ui/dashboard-shell';
 import { 
   ChartBarIcon, 
   DocumentTextIcon, 

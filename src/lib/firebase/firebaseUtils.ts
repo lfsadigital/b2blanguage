@@ -11,8 +11,11 @@ import {
   doc,
   updateDoc,
   deleteDoc,
+  setDoc,
+  getDoc,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { UserProfileType } from '../contexts/AuthContext';
 
 // Auth functions
 export const logoutUser = () => signOut(auth);
@@ -51,4 +54,87 @@ export const uploadFile = async (file: File, path: string) => {
   const storageRef = ref(storage, path);
   await uploadBytes(storageRef, file);
   return getDownloadURL(storageRef);
+};
+
+// Interface for user data
+interface UserData {
+  email: string;
+  displayName?: string;
+  profileType: UserProfileType;
+  createdAt: Date;
+  lastLogin: Date;
+}
+
+/**
+ * Create or update a user in Firestore
+ * @param email User's email
+ * @param data User data to store
+ */
+export const saveUserToFirestore = async (
+  email: string, 
+  data: Partial<UserData>
+): Promise<void> => {
+  try {
+    const userRef = doc(db, 'users', email);
+    const userSnap = await getDoc(userRef);
+    
+    if (userSnap.exists()) {
+      // Update existing user
+      await updateDoc(userRef, {
+        ...data,
+        lastLogin: new Date(),
+      });
+    } else {
+      // Create new user
+      await setDoc(userRef, {
+        email,
+        profileType: 'Visitor', // Default to Visitor for new users
+        createdAt: new Date(),
+        lastLogin: new Date(),
+        ...data,
+      });
+    }
+  } catch (error) {
+    console.error('Error saving user to Firestore:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get a user's profile from Firestore
+ * @param email User's email
+ * @returns User data
+ */
+export const getUserProfile = async (email: string): Promise<UserData | null> => {
+  try {
+    const userRef = doc(db, 'users', email);
+    const userSnap = await getDoc(userRef);
+    
+    if (userSnap.exists()) {
+      return userSnap.data() as UserData;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error getting user profile:', error);
+    return null;
+  }
+};
+
+/**
+ * Update a user's profile type
+ * @param email User's email
+ * @param profileType New profile type
+ */
+export const updateUserProfileType = async (
+  email: string, 
+  profileType: UserProfileType
+): Promise<void> => {
+  try {
+    const userRef = doc(db, 'users', email);
+    await updateDoc(userRef, { profileType });
+  } catch (error) {
+    console.error('Error updating user profile type:', error);
+    throw error;
+  }
 };
