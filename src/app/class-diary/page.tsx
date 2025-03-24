@@ -14,6 +14,8 @@ import {
   ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline';
 import { addDocument, getDocuments, uploadFile } from '../../lib/firebase/firebaseUtils';
+import { db } from '../../lib/firebase/firebase';
+import { collection, getDocs, setDoc, doc } from 'firebase/firestore';
 
 // Mock data for teachers
 const mockTeachers = [
@@ -195,19 +197,19 @@ export default function ClassDiaryPage() {
       
       console.log('Preparing to upload file to Firebase Storage...');
       try {
-        // Upload to Firebase Storage
-        const fileName = `${Date.now()}_${selectedFile.name.replace(/\s+/g, '_')}`;
-        const path = `test-results/${fileName}`;
-        console.log('Upload path:', path);
-        
         // First check if the file is too large
         const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
         if (selectedFile.size > MAX_FILE_SIZE) {
           throw new Error(`File size exceeds maximum allowed (10MB). Current size: ${(selectedFile.size / (1024 * 1024)).toFixed(2)}MB`);
         }
         
+        // Upload to Firebase Storage
+        const fileName = `${Date.now()}_${selectedFile.name.replace(/\s+/g, '_')}`;
+        const path = `test-results/${fileName}`;
+        console.log('Upload path:', path);
+        
         fileUrl = await uploadFile(selectedFile, path);
-        console.log('File uploaded successfully:', fileUrl);
+        console.log('File uploaded successfully to Firebase Storage:', fileUrl);
       } catch (uploadError: any) {
         console.error('Error during file upload:', uploadError);
         throw new Error(`Failed to upload file to storage: ${uploadError.message || 'Unknown error'}`);
@@ -233,15 +235,19 @@ export default function ClassDiaryPage() {
         uploadedBy: user.email
       };
       
-      // Save data to Firebase Firestore
-      console.log('Saving data to Firestore:', testResultData);
+      // Save data to Firestore directly without the helper function
+      console.log('Saving data to Firestore using direct approach:', testResultData);
       try {
-        const docRef = await addDocument('testResults', testResultData);
-        console.log('Document successfully saved with ID:', docRef.id);
+        // Create a unique ID
+        const resultId = `result_${Date.now()}`;
         
-        // Add the new upload to the local state with the Firestore document ID
+        // Add document with the generated ID
+        await setDoc(doc(db, 'testResults', resultId), testResultData);
+        console.log('Document successfully saved with ID:', resultId);
+        
+        // Add the new upload to the local state
         const newUpload = {
-          id: docRef.id,
+          id: resultId,
           ...testResultData
         };
         
