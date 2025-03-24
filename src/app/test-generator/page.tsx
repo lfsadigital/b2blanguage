@@ -181,7 +181,7 @@ export default function TestGeneratorPage() {
       
       // Update all generated content at once
       setGeneratedContent({
-        testTitle: `English Proficiency Test`,
+        testTitle: `${data.questionTypes.join(', ')} Test for ${data.studentLevel} Level`,
         testContent: `Test about ${testData.subject}`,
         studentName: data.studentName || '',
         teacherName: data.professorName || '',
@@ -279,12 +279,15 @@ export default function TestGeneratorPage() {
     try {
       // Create the content for Word export
       const docContent = `
-${generatedContent.subject}
+${generatedContent.testTitle}
 
 Student: ${generatedContent.studentName}
 Teacher: ${generatedContent.teacherName}
+Subject: ${generatedContent.subject}
 Date: ${generatedContent.testDate}
 Grade: _______________
+
+${generatedContent.testContent}
 
 Questions:
 ${generatedContent.questions.map((q, idx) => {
@@ -301,16 +304,14 @@ ${generatedContent.questions.map((q, idx) => {
 }).join('\n\n')}
 `;
 
-      // Create a Blob with text content type
-      const blob = new Blob([docContent], { type: 'text/plain' });
-      
-      // Create download link and trigger click
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `${generatedContent.subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_test.txt`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Create element to trigger download
+      const element = document.createElement('a');
+      const file = new Blob([docContent], {type: 'application/msword'});
+      element.href = URL.createObjectURL(file);
+      element.download = `${generatedContent.subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_test.doc`;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
     } catch (error) {
       console.error('Error exporting to Word:', error);
       alert('There was an error exporting the test. Please try again.');
@@ -319,7 +320,7 @@ ${generatedContent.questions.map((q, idx) => {
 
   const handleExportTeachingMaterials = () => {
     try {
-      // Create the content for PDF export
+      // Create the content for PDF export with test answers included
       const pdfContent = `
 ${generatedContent.subject} - Teaching Materials
 
@@ -327,23 +328,37 @@ Teacher: ${generatedContent.teacherName}
 Level: ${generatedContent.testTitle.split(' for ')[1] || 'Not specified'}
 Date: ${generatedContent.testDate}
 
-CONVERSATION TOPICS:
+===================== TEST ANSWERS =====================
+
+${generatedContent.questions.map((q, idx) => {
+  if (q.type === 'multiple-choice' && q.options) {
+    // Mock answer - in real app this would come from API
+    return `${idx + 1}) Answer: ${String.fromCharCode(65 + (q.correctAnswer !== undefined ? q.correctAnswer : 0))}`;
+  } else if (q.type === 'true-false') {
+    // Mock answer - in real app this would come from API
+    return `${idx + 1}) Answer: ${q.correctAnswer !== undefined ? (q.correctAnswer ? 'True' : 'False') : 'True'}`;
+  } else {
+    return `${idx + 1}) Sample answer: This is an open-ended question about ${q.question.substring(0, 30)}...`;
+  }
+}).join('\n')}
+
+===================== CONVERSATION TOPICS =====================
+
 ${generatedContent.conversationTopics.map((topic, index) => `${index + 1}. ${topic}`).join('\n')}
 
-TEACHING TIPS:
+===================== TEACHING TIPS =====================
+
 ${generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).join('\n\n')}
 `;
 
-      // Create a Blob with text content type
-      const blob = new Blob([pdfContent], { type: 'text/plain' });
-      
-      // Create download link and trigger click
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `${generatedContent.subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_teaching_materials.txt`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      // Create element to trigger download
+      const element = document.createElement('a');
+      const file = new Blob([pdfContent], {type: 'application/pdf'});
+      element.href = URL.createObjectURL(file);
+      element.download = `${generatedContent.subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_teaching_materials.pdf`;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
     } catch (error) {
       console.error('Error exporting teaching materials:', error);
       alert('There was an error exporting the teaching materials. Please try again.');

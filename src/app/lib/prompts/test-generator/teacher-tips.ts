@@ -5,35 +5,44 @@ export const generateTeacherTipsPrompt = (
 
 Your task is to create a helpful guide with teaching tips related to the general topic/subject: "${subject}".
 
-These tips should:
-1. Be appropriate for ${studentLevel} level students
-2. You might want to focus on common challenges Brazilian students face with English
-3. Only include sections that provide meaningful value for this specific topic
-4. Be practical and directly applicable in the classroom
-5. Be based on general teaching methodologies, not on specific content
+IMPORTANT: You must follow these exact constraints for the teaching tips:
+1. Vocabulary: Provide up to 5 key vocabulary items, but no more than 5
+2. Grammar: Include ONLY 1 grammar point that fits with the topic
+3. Pronunciation: Include ONLY 1 pronunciation tip related to the topic
 
-You can include ANY or ALL of these sections, but ONLY if they provide actual value for this topic and try to limit it to 3to5 sections.
+All tips should:
+- Be appropriate for ${studentLevel} level students
+- Focus on common challenges Brazilian students face with English
+- Be practical and directly applicable in the classroom
+- Be based on general teaching methodologies, not on specific content
+
+For each section:
 
 Vocabulary:
-- If the topic has valuable vocabulary to teach, include 5-7 key vocabulary items
-- Include only common, general vocabulary related to the broad topic area
+- Include up to 5 key vocabulary items related to the topic
 - For each word, provide a definition, example sentence, and any noteworthy usage notes
 - Consider including collocations or common phrases if relevant
 
 Grammar:
-- If there are grammar points that naturally fit with this topic, suggest 1-3 relevant ones
-- Only include grammar points that can be naturally taught using this topic's context
+- Include exactly ONE grammar point that naturally fits with this topic
 - Briefly explain the grammar point and provide example sentences related to the topic
 - Consider noting common mistakes students might make
 
 Pronunciation:
-- Only include if the topic contains words or sounds that present specific challenges
+- Include exactly ONE pronunciation feature that is relevant to the topic
 - Focus on pronunciation features that are most relevant to comprehension
 - Provide simple practice exercises or tips for mastering these sounds
-- You may include comparisons with Portuguese pronunciation when truly helpful, but this is not required
+- You may include comparisons with Portuguese pronunciation when truly helpful
 
-For example, with "LinkedIn's New Video Feature," you might only include vocabulary about professional networking and grammar points about discussing technology trends, but skip pronunciation if there aren't notable challenges.
+Format your response in clear sections with bullet points for easy readability. Each section should be separated by a blank line:
 
-Format your response in clear sections with bullet points for easy readability, including ONLY the sections that add meaningful value for teaching this specific topic.
+Vocabulary:
+[vocabulary content]
+
+Grammar:
+[grammar content]
+
+Pronunciation:
+[pronunciation content]
 
 REMINDER: Your teaching tips must be universal to the general topic area and NOT reference specific facts from any content. They should be helpful for teaching English related to this general topic without relying on specific content.`; 
