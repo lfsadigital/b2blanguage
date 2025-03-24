@@ -58,6 +58,14 @@ export default function TestGeneratorPage() {
         body: JSON.stringify(data)
       });
       
+      // Handle non-JSON responses properly
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const text = await response.text();
+        console.error('Non-JSON response:', text);
+        throw new Error(`API returned non-JSON response: ${text.substring(0, 100)}...`);
+      }
+      
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to generate test');
@@ -65,46 +73,94 @@ export default function TestGeneratorPage() {
       
       const testData = await response.json();
       
+      // In case no test data was returned
+      if (!testData || !testData.questions) {
+        throw new Error('No test content was generated. Please try again or use a different URL.');
+      }
+      
       // Extract questions from the generated test
       const parsedQuestions = parseQuestions(testData.questions);
       
-      // Now fetch conversation topics
-      const conversationResponse = await fetch('/api/test-generator/conversation', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          subject: testData.subject,
-          contentUrl: data.contentUrl,
-          studentLevel: data.studentLevel
-        })
-      });
+      // Instead of making multiple API calls that could fail, use mock data as fallback
+      let conversationTopics = [];
+      let teachingTips = [];
       
-      if (!conversationResponse.ok) {
-        throw new Error('Failed to generate conversation topics');
+      try {
+        // Try to fetch conversation topics
+        const conversationResponse = await fetch('/api/test-generator/conversation', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            subject: testData.subject,
+            contentUrl: data.contentUrl,
+            studentLevel: data.studentLevel
+          })
+        });
+        
+        if (conversationResponse.ok) {
+          const contentType = conversationResponse.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const conversationData = await conversationResponse.json();
+            if (conversationData && conversationData.topics) {
+              conversationTopics = conversationData.topics;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching conversation topics:', error);
+        // Fallback conversation topics
+        conversationTopics = [
+          "What are your thoughts on the main subject discussed in the content?",
+          "Can you relate to any part of this content from your professional experience?",
+          "What challenges might someone face when implementing these ideas?",
+          "How might these concepts be applied in different industries?",
+          "What skills would be necessary to succeed in this area?"
+        ];
       }
       
-      const conversationData = await conversationResponse.json();
-      
-      // And fetch teaching tips
-      const tipsResponse = await fetch('/api/test-generator/teacher-tips', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          subject: testData.subject,
-          contentUrl: data.contentUrl,
-          studentLevel: data.studentLevel
-        })
-      });
-      
-      if (!tipsResponse.ok) {
-        throw new Error('Failed to generate teaching tips');
+      try {
+        // Try to fetch teaching tips
+        const tipsResponse = await fetch('/api/test-generator/teacher-tips', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            subject: testData.subject,
+            contentUrl: data.contentUrl,
+            studentLevel: data.studentLevel
+          })
+        });
+        
+        if (tipsResponse.ok) {
+          const contentType = tipsResponse.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const tipsData = await tipsResponse.json();
+            if (tipsData && tipsData.tips) {
+              teachingTips = tipsData.tips;
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching teaching tips:', error);
+        // Fallback teaching tips
+        teachingTips = [
+          {
+            category: "Vocabulary",
+            content: "Identify key terminology from the content and create a pre-teaching vocabulary list. Consider creating flashcards or a matching exercise to help students learn these terms before discussing the content."
+          },
+          {
+            category: "Grammar Focus",
+            content: "Use examples from the content to highlight relevant grammar structures. For business content, pay attention to modal verbs, conditionals, and passive voice which are commonly used."
+          },
+          {
+            category: "Discussion Technique",
+            content: "Use a think-pair-share technique to encourage full participation. Give students time to think individually about the questions, discuss with a partner, then share with the larger group."
+          }
+        ];
       }
-      
-      const tipsData = await tipsResponse.json();
       
       // Update all generated content at once
       setGeneratedContent({
@@ -115,8 +171,8 @@ export default function TestGeneratorPage() {
         testDate: new Date().toLocaleDateString(),
         subject: testData.subject,
         questions: parsedQuestions,
-        conversationTopics: conversationData.topics,
-        teachingTips: tipsData.tips
+        conversationTopics: conversationTopics,
+        teachingTips: teachingTips
       });
       
       setTestGenerated(true);
@@ -203,111 +259,80 @@ export default function TestGeneratorPage() {
   };
 
   const handleExportToWord = () => {
-    // Create a new document and add content
-    const blob = new Blob([`
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <title>${generatedContent.subject} - Test</title>
-          <style>
-            body { font-family: 'Calibri', sans-serif; margin: 2cm; }
-            h1 { font-size: 16pt; text-align: center; margin-bottom: 20px; }
-            .header { margin-bottom: 20px; }
-            .question { margin-bottom: 15px; }
-            .options { margin-left: 20px; }
-          </style>
-        </head>
-        <body>
-          <h1>${generatedContent.testTitle}</h1>
-          <div class="header">
-            <p><strong>Student:</strong> ${generatedContent.studentName}</p>
-            <p><strong>Teacher:</strong> ${generatedContent.teacherName}</p>
-            <p><strong>Subject:</strong> ${generatedContent.subject}</p>
-            <p><strong>Date:</strong> ${generatedContent.testDate}</p>
-          </div>
-          <div>
-            <p>${generatedContent.testContent}</p>
-            <div class="questions">
-              ${generatedContent.questions.map((q, idx) => `
-                <div class="question">
-                  <p><strong>${idx + 1})</strong> ${q.question} ${q.reference ? `[Ref: ${q.reference}]` : ''}</p>
-                  ${q.type === 'multiple-choice' ? `
-                    <div class="options">
-                      ${q.options.map((option: string, optIdx: number) => 
-                        `<p>${String.fromCharCode(65 + optIdx)}) ${option}</p>`
-                      ).join('')}
-                    </div>
-                  ` : ''}
-                </div>
-              `).join('')}
-            </div>
-          </div>
-        </body>
-      </html>
-    `], { type: 'application/vnd.ms-word' });
-    
-    // Create download link and trigger click
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${generatedContent.subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_test.doc`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      // Create a plain text version for Word export
+      const textContent = `
+${generatedContent.testTitle}
+
+Student: ${generatedContent.studentName}
+Teacher: ${generatedContent.teacherName}
+Subject: ${generatedContent.subject}
+Date: ${generatedContent.testDate}
+
+${generatedContent.testContent}
+
+Questions:
+${generatedContent.questions.map((q, idx) => {
+  let questionText = `${idx + 1}) ${q.question}${q.reference ? ` [Ref: ${q.reference}]` : ''}`;
+  
+  if (q.type === 'multiple-choice' && q.options) {
+    const options = q.options.map((option: string, optIdx: number) => 
+      `   ${String.fromCharCode(65 + optIdx)}) ${option}`
+    ).join('\n');
+    return `${questionText}\n${options}`;
+  }
+  
+  return questionText;
+}).join('\n\n')}
+`;
+
+      // Create a Blob with the content
+      const blob = new Blob([textContent], { type: 'text/plain' });
+      
+      // Create download link and trigger click
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${generatedContent.subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_test.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exporting to Word:', error);
+      alert('There was an error exporting the test. Please try again.');
+    }
   };
 
   const handleExportTeachingMaterials = () => {
-    // Create a new document with teaching materials
-    const blob = new Blob([`
-      <html>
-        <head>
-          <meta charset="utf-8">
-          <title>${generatedContent.subject} - Teaching Materials</title>
-          <style>
-            body { font-family: 'Calibri', sans-serif; margin: 2cm; }
-            h1 { font-size: 16pt; text-align: center; margin-bottom: 20px; }
-            h2 { font-size: 14pt; margin-top: 30px; color: #333; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
-            .header { margin-bottom: 20px; }
-            .section { margin-bottom: 30px; }
-            .tip-category { font-weight: bold; margin-top: 15px; }
-          </style>
-        </head>
-        <body>
-          <h1>${generatedContent.subject} - Teaching Materials</h1>
-          <div class="header">
-            <p><strong>Teacher:</strong> ${generatedContent.teacherName}</p>
-            <p><strong>Level:</strong> ${generatedContent.testTitle.split(' for ')[1]}</p>
-            <p><strong>Date:</strong> ${generatedContent.testDate}</p>
-          </div>
-          
-          <h2>Conversation Topics</h2>
-          <div class="section">
-            <ol>
-              ${generatedContent.conversationTopics.map(topic => 
-                `<li>${topic}</li>`
-              ).join('')}
-            </ol>
-          </div>
-          
-          <h2>Teaching Tips</h2>
-          <div class="section">
-            ${generatedContent.teachingTips.map(tip => `
-              <div>
-                <p class="tip-category">${tip.category}</p>
-                <p>${tip.content}</p>
-              </div>
-            `).join('')}
-          </div>
-        </body>
-      </html>
-    `], { type: 'application/pdf' });
-    
-    // Create download link and trigger click
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `${generatedContent.subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_teaching_materials.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    try {
+      // Create a plain text version for PDF export
+      const textContent = `
+${generatedContent.subject} - Teaching Materials
+
+Teacher: ${generatedContent.teacherName}
+Level: ${generatedContent.testTitle.split(' for ')[1] || 'Not specified'}
+Date: ${generatedContent.testDate}
+
+CONVERSATION TOPICS:
+${generatedContent.conversationTopics.map((topic, index) => `${index + 1}. ${topic}`).join('\n')}
+
+TEACHING TIPS:
+${generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).join('\n\n')}
+`;
+
+      // Create a Blob with the content
+      const blob = new Blob([textContent], { type: 'text/plain' });
+      
+      // Create download link and trigger click
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${generatedContent.subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_teaching_materials.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exporting teaching materials:', error);
+      alert('There was an error exporting the teaching materials. Please try again.');
+    }
   };
 
   // Render test content
