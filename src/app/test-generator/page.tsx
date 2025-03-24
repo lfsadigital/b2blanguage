@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardShell from '../../components/ui/dashboard-shell';
 import TestGeneratorForm from '@/app/components/TestGeneratorForm';
 import TestTemplate from './TestTemplate';
@@ -17,6 +17,8 @@ export default function TestGeneratorPage() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [testGenerated, setTestGenerated] = useState(false);
   const [currentTab, setCurrentTab] = useState<'test' | 'conversation' | 'teacher-tips'>('test');
+  const [docxScript, setDocxScript] = useState<boolean>(false);
+  const [pdfScript, setPdfScript] = useState<boolean>(false);
 
   // Single state for all generated content
   const [generatedContent, setGeneratedContent] = useState<{
@@ -43,6 +45,27 @@ export default function TestGeneratorPage() {
     conversationTopics: [],
     teachingTips: []
   });
+
+  // Load document generation libraries
+  useEffect(() => {
+    // Load docx.js script
+    if (!docxScript) {
+      const docxScriptTag = document.createElement('script');
+      docxScriptTag.src = 'https://unpkg.com/docx@7.8.2/build/index.js';
+      docxScriptTag.async = true;
+      docxScriptTag.onload = () => setDocxScript(true);
+      document.body.appendChild(docxScriptTag);
+    }
+    
+    // Load jspdf script
+    if (!pdfScript) {
+      const pdfScriptTag = document.createElement('script');
+      pdfScriptTag.src = 'https://unpkg.com/jspdf@2.5.1/dist/jspdf.umd.min.js';
+      pdfScriptTag.async = true;
+      pdfScriptTag.onload = () => setPdfScript(true);
+      document.body.appendChild(pdfScriptTag);
+    }
+  }, [docxScript, pdfScript]);
 
   // This function handles the form submission and generates all content
   const handleSubmit = async (data: TestFormData) => {
@@ -277,7 +300,151 @@ export default function TestGeneratorPage() {
 
   const handleExportToWord = () => {
     try {
-      // Create the content for Word export
+      if (!docxScript) {
+        alert('Document generator is still loading. Please try again in a moment.');
+        return;
+      }
+      
+      // Access the docx library through the window
+      const docx = (window as any).docx;
+      
+      // Create a new document
+      const doc = new docx.Document({
+        sections: [{
+          properties: {},
+          children: [
+            new docx.Paragraph({
+              children: [
+                new docx.TextRun({
+                  text: `Student: ${generatedContent.studentName}`,
+                  size: 24,
+                }),
+              ],
+            }),
+            new docx.Paragraph({
+              children: [
+                new docx.TextRun({
+                  text: `Teacher: ${generatedContent.teacherName}`,
+                  size: 24,
+                }),
+              ],
+            }),
+            new docx.Paragraph({
+              children: [
+                new docx.TextRun({
+                  text: `Subject: ${generatedContent.subject}`,
+                  size: 24,
+                }),
+              ],
+            }),
+            new docx.Paragraph({
+              children: [
+                new docx.TextRun({
+                  text: `Date: ${generatedContent.testDate}`,
+                  size: 24,
+                }),
+              ],
+            }),
+            new docx.Paragraph({
+              children: [
+                new docx.TextRun({
+                  text: `Grade: _______________`,
+                  size: 24,
+                }),
+              ],
+            }),
+            new docx.Paragraph({
+              children: [new docx.TextRun({ text: " ", size: 24 })],
+            }),
+            // Test content
+            new docx.Paragraph({
+              children: [
+                new docx.TextRun({
+                  text: generatedContent.testContent,
+                  size: 24,
+                }),
+              ],
+            }),
+            new docx.Paragraph({
+              children: [new docx.TextRun({ text: " ", size: 24 })],
+            }),
+            // Questions title
+            new docx.Paragraph({
+              children: [
+                new docx.TextRun({
+                  text: "Questions:",
+                  size: 24,
+                  bold: true,
+                }),
+              ],
+            }),
+          ]
+        }],
+      });
+      
+      // Add questions to the document
+      generatedContent.questions.forEach((q, idx) => {
+        const questionParagraphs = [];
+        
+        // Add the question text
+        questionParagraphs.push(
+          new docx.Paragraph({
+            children: [
+              new docx.TextRun({
+                text: `${idx + 1}) ${q.question}${q.reference ? ` [Ref: ${q.reference}]` : ''}`,
+                size: 24,
+              }),
+            ],
+          })
+        );
+        
+        // Add options for multiple choice questions
+        if (q.type === 'multiple-choice' && q.options) {
+          q.options.forEach((option: string, optIdx: number) => {
+            questionParagraphs.push(
+              new docx.Paragraph({
+                children: [
+                  new docx.TextRun({
+                    text: `   ${String.fromCharCode(65 + optIdx)}) ${option}`,
+                    size: 24,
+                  }),
+                ],
+              })
+            );
+          });
+        }
+        
+        // Add a spacing paragraph after each question
+        questionParagraphs.push(
+          new docx.Paragraph({
+            children: [new docx.TextRun({ text: " ", size: 24 })],
+          })
+        );
+        
+        // Add these paragraphs to the document
+        doc.addSection({
+          properties: {},
+          children: questionParagraphs,
+        });
+      });
+
+      // Generate and download the document
+      docx.Packer.toBlob(doc).then((blob: Blob) => {
+        const url = URL.createObjectURL(blob);
+        const formattedDate = generatedContent.testDate.replace(/\//g, '-');
+        const fileName = `${generatedContent.studentName.replace(/\s+/g, '_').toLowerCase()}_${formattedDate}`;
+        
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${fileName}.docx`;
+        link.click();
+        URL.revokeObjectURL(url);
+      });
+    } catch (error) {
+      console.error('Error exporting to Word:', error);
+      alert('There was an error exporting to Word. Falling back to text file.');
+      
+      // Fallback to plain text if document generation fails
       const docContent = `
 Student: ${generatedContent.studentName}
 Teacher: ${generatedContent.teacherName}
@@ -302,28 +469,28 @@ ${generatedContent.questions.map((q, idx) => {
 }).join('\n\n')}
 `;
 
-      // Create text file for Word compatibility
       const element = document.createElement('a');
-      const file = new Blob([docContent], {type: 'text/plain'});
+      const file = new Blob([docContent], {type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
       element.href = URL.createObjectURL(file);
       
-      // Use student_date for the filename
       const formattedDate = generatedContent.testDate.replace(/\//g, '-');
       const fileName = `${generatedContent.studentName.replace(/\s+/g, '_').toLowerCase()}_${formattedDate}`;
-      element.download = `${fileName}.txt`;
+      element.download = `${fileName}.docx`;
       
       document.body.appendChild(element);
       element.click();
       document.body.removeChild(element);
-    } catch (error) {
-      console.error('Error exporting to Word:', error);
-      alert('There was an error exporting the test. Please try again.');
     }
   };
 
   const handleExportTeachingMaterials = () => {
     try {
-      // Create the content for PDF export with test answers included
+      if (!pdfScript) {
+        alert('PDF generator is still loading. Please try again in a moment.');
+        return;
+      }
+      
+      // Create PDF content
       const pdfContent = `
 ${generatedContent.subject} - Teaching Materials
 
@@ -334,10 +501,8 @@ Date: ${generatedContent.testDate}
 
 ${generatedContent.questions.map((q, idx) => {
   if (q.type === 'multiple-choice' && q.options) {
-    // Mock answer - in real app this would come from API
     return `${idx + 1}) Answer: ${String.fromCharCode(65 + (q.correctAnswer !== undefined ? q.correctAnswer : 0))}`;
   } else if (q.type === 'true-false') {
-    // Mock answer - in real app this would come from API
     return `${idx + 1}) Answer: ${q.correctAnswer !== undefined ? (q.correctAnswer ? 'True' : 'False') : 'True'}`;
   } else {
     return `${idx + 1}) Sample answer: This is an open-ended question about ${q.question.substring(0, 30)}...`;
@@ -353,22 +518,63 @@ ${generatedContent.conversationTopics.map((topic, index) => `${index + 1}. ${top
 ${generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).join('\n\n')}
 `;
 
-      // Create text file for simplicity
-      const element = document.createElement('a');
-      const file = new Blob([pdfContent], {type: 'text/plain'});
-      element.href = URL.createObjectURL(file);
+      // Access the jsPDF library through the window
+      const jsPDF = (window as any).jspdf.jsPDF;
       
-      // Use student_date for the filename
+      // Create a new PDF document
+      const pdf = new jsPDF();
+      
+      // Add content to the PDF
+      const splitText = pdf.splitTextToSize(pdfContent, 180);
+      pdf.text(splitText, 15, 15);
+      
+      // Generate and download the PDF
       const formattedDate = generatedContent.testDate.replace(/\//g, '-');
       const fileName = `${generatedContent.studentName.replace(/\s+/g, '_').toLowerCase()}_${formattedDate}_materials`;
-      element.download = `${fileName}.txt`;
+      pdf.save(`${fileName}.pdf`);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('There was an error exporting to PDF. Falling back to text file.');
+      
+      // Fallback to plain text if PDF generation fails
+      const pdfContent = `
+${generatedContent.subject} - Teaching Materials
+
+Teacher: ${generatedContent.teacherName}
+Date: ${generatedContent.testDate}
+
+===================== TEST ANSWERS =====================
+
+${generatedContent.questions.map((q, idx) => {
+  if (q.type === 'multiple-choice' && q.options) {
+    return `${idx + 1}) Answer: ${String.fromCharCode(65 + (q.correctAnswer !== undefined ? q.correctAnswer : 0))}`;
+  } else if (q.type === 'true-false') {
+    return `${idx + 1}) Answer: ${q.correctAnswer !== undefined ? (q.correctAnswer ? 'True' : 'False') : 'True'}`;
+  } else {
+    return `${idx + 1}) Sample answer: This is an open-ended question about ${q.question.substring(0, 30)}...`;
+  }
+}).join('\n')}
+
+===================== CONVERSATION TOPICS =====================
+
+${generatedContent.conversationTopics.map((topic, index) => `${index + 1}. ${topic}`).join('\n')}
+
+===================== TEACHING TIPS =====================
+
+${generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).join('\n\n')}
+`;
+
+      const element = document.createElement('a');
+      const file = new Blob([pdfContent], {type: 'application/pdf'});
+      element.href = URL.createObjectURL(file);
+      
+      const formattedDate = generatedContent.testDate.replace(/\//g, '-');
+      const fileName = `${generatedContent.studentName.replace(/\s+/g, '_').toLowerCase()}_${formattedDate}_materials`;
+      element.download = `${fileName}.pdf`;
       
       document.body.appendChild(element);
       element.click();
       document.body.removeChild(element);
-    } catch (error) {
-      console.error('Error exporting teaching materials:', error);
-      alert('There was an error exporting the teaching materials. Please try again.');
     }
   };
 
