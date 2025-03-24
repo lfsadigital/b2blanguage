@@ -13,6 +13,7 @@ import {
   XCircleIcon,
   ArrowUpTrayIcon,
 } from '@heroicons/react/24/outline';
+import { addDocument, getDocuments, uploadFile } from '../../lib/firebase/firebaseUtils';
 
 // Mock data for teachers
 const mockTeachers = [
@@ -28,35 +29,39 @@ const mockStudents = [
   { id: '3', name: 'Michael Brown', level: 'Beginner' },
   { id: '4', name: 'Sarah Wilson', level: 'Intermediate' },
   { id: '5', name: 'David Lee', level: 'Advanced' },
+  { id: '6', name: 'Luiz', level: 'Advanced' },
 ];
 
-// Mock data for recent uploads
-const mockRecentUploads = [
-  { 
-    id: '1', 
-    fileName: 'business_vocab_test.pdf', 
-    studentName: 'John Smith', 
-    teacherName: 'Rafael', 
-    uploadDate: '2023-03-24',
-    testDate: '2023-03-22',
-  },
-  { 
-    id: '2', 
-    fileName: 'email_writing_test.pdf', 
-    studentName: 'Emma Johnson', 
-    teacherName: 'Rafael', 
-    uploadDate: '2023-03-20',
-    testDate: '2023-03-18',
-  },
-  { 
-    id: '3', 
-    fileName: 'presentation_skills.pdf', 
-    studentName: 'Michael Brown', 
-    teacherName: 'Sersun', 
-    uploadDate: '2023-03-15',
-    testDate: '2023-03-14',
-  },
-];
+// Define interfaces for our data
+interface Teacher {
+  id: string;
+  name: string;
+  languages: string[];
+}
+
+interface Student {
+  id: string;
+  name: string;
+  level: string;
+}
+
+interface TestResult {
+  id: string;
+  fileName: string;
+  fileUrl: string;
+  studentName: string;
+  studentId: string;
+  studentLevel: string;
+  teacherName: string;
+  teacherId: string;
+  testDate: string;
+  testGrade: string;
+  gradeByTeacher: string;
+  forNextClass: string;
+  notes: string;
+  uploadDate: string;
+  timestamp: number;
+}
 
 export default function ClassDiaryPage() {
   const { userProfile } = useAuth();
@@ -64,7 +69,8 @@ export default function ClassDiaryPage() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [uploadError, setUploadError] = useState('');
-  const [recentUploads, setRecentUploads] = useState(mockRecentUploads);
+  const [recentUploads, setRecentUploads] = useState<TestResult[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -72,8 +78,49 @@ export default function ClassDiaryPage() {
     studentId: '',
     testDate: new Date().toISOString().split('T')[0], // Today's date
     testGrade: '',
+    gradeByTeacher: '',
+    forNextClass: '',
     notes: ''
   });
+
+  // Fetch recent uploads on component mount
+  useEffect(() => {
+    async function fetchRecentUploads() {
+      try {
+        setIsLoading(true);
+        // Get test results from Firebase
+        const results = await getDocuments('testResults');
+        
+        // Cast results to proper type and then sort
+        const typedResults = results as unknown as TestResult[];
+        
+        // Sort by upload date (newest first)
+        const sortedResults = typedResults.sort((a, b) => {
+          // Convert dates to timestamps for comparison
+          const dateA = new Date(a.uploadDate || '').getTime();
+          const dateB = new Date(b.uploadDate || '').getTime();
+          
+          // If timestamps are available, use those instead
+          if (a.timestamp && b.timestamp) {
+            return b.timestamp - a.timestamp;
+          }
+          
+          // Fallback to date comparison
+          return dateB - dateA;
+        });
+        
+        setRecentUploads(sortedResults);
+      } catch (error) {
+        console.error('Error fetching test results:', error);
+        // Fallback to empty array if fetch fails
+        setRecentUploads([]);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchRecentUploads();
+  }, []);
   
   // Handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -104,17 +151,52 @@ export default function ClassDiaryPage() {
     try {
       setIsUploading(true);
       
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Get selected student and teacher data
+      const selectedStudent = mockStudents.find(s => s.id === formData.studentId);
+      const selectedTeacher = mockTeachers.find(t => t.id === formData.teacherId);
       
-      // Add to recent uploads
-      const newUpload = {
-        id: Date.now().toString(),
+      if (!selectedStudent || !selectedTeacher) {
+        throw new Error('Please select a valid student and teacher');
+      }
+      
+      // Upload file to Firebase storage
+      let fileUrl = '';
+      
+      try {
+        // Upload to Firebase Storage
+        const fileName = `${Date.now()}_${selectedFile.name.replace(/\s+/g, '_')}`;
+        const path = `test-results/${fileName}`;
+        fileUrl = await uploadFile(selectedFile, path);
+      } catch (uploadError) {
+        console.error('Error uploading file:', uploadError);
+        throw new Error('Failed to upload file to storage');
+      }
+      
+      // Prepare test result data
+      const testResultData = {
         fileName: selectedFile.name,
-        studentName: mockStudents.find(s => s.id === formData.studentId)?.name || 'Unknown Student',
-        teacherName: mockTeachers.find(t => t.id === formData.teacherId)?.name || 'Unknown Teacher',
+        fileUrl,
+        studentName: selectedStudent.name,
+        studentId: selectedStudent.id,
+        studentLevel: selectedStudent.level,
+        teacherName: selectedTeacher.name,
+        teacherId: selectedTeacher.id,
+        testDate: formData.testDate,
+        testGrade: formData.testGrade,
+        gradeByTeacher: formData.gradeByTeacher,
+        forNextClass: formData.forNextClass,
+        notes: formData.notes,
         uploadDate: new Date().toISOString().split('T')[0],
-        testDate: formData.testDate
+        timestamp: new Date().getTime()
+      };
+      
+      // Save data to Firebase Firestore
+      const docRef = await addDocument('testResults', testResultData);
+      
+      // Add the new upload to the local state with the Firestore document ID
+      const newUpload = {
+        id: docRef.id,
+        ...testResultData
       };
       
       setRecentUploads(prev => [newUpload, ...prev]);
@@ -126,6 +208,8 @@ export default function ClassDiaryPage() {
         studentId: '',
         testDate: new Date().toISOString().split('T')[0],
         testGrade: '',
+        gradeByTeacher: '',
+        forNextClass: '',
         notes: ''
       });
       
@@ -133,7 +217,7 @@ export default function ClassDiaryPage() {
       setTimeout(() => setUploadSuccess(false), 3000);
     } catch (error) {
       console.error('Error uploading file:', error);
-      setUploadError('Failed to upload file. Please try again.');
+      setUploadError(`Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsUploading(false);
     }
@@ -208,7 +292,7 @@ export default function ClassDiaryPage() {
                       <option value="">Select Student</option>
                       {mockStudents.map(student => (
                         <option key={student.id} value={student.id}>
-                          {student.name} ({student.level})
+                          {student.name}
                         </option>
                       ))}
                     </select>
@@ -243,6 +327,39 @@ export default function ClassDiaryPage() {
                       placeholder="e.g., 85/100 or A"
                       className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
                       value={formData.testGrade}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                </div>
+                
+                {/* Grade by Teacher and For Next Class */}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label htmlFor="gradeByTeacher" className="block text-sm font-medium text-gray-700">
+                      Grade by Teacher
+                    </label>
+                    <input
+                      type="text"
+                      id="gradeByTeacher"
+                      name="gradeByTeacher"
+                      placeholder="e.g., 90/100 or A+"
+                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
+                      value={formData.gradeByTeacher}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="forNextClass" className="block text-sm font-medium text-gray-700">
+                      For Next Class
+                    </label>
+                    <input
+                      type="text"
+                      id="forNextClass"
+                      name="forNextClass"
+                      placeholder="e.g., Review past tense"
+                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
+                      value={formData.forNextClass}
                       onChange={handleInputChange}
                     />
                   </div>
@@ -329,25 +446,62 @@ export default function ClassDiaryPage() {
             <div className="p-6">
               <h2 className="text-lg font-medium text-gray-900 mb-4">Recent Uploads</h2>
               
-              {recentUploads.length > 0 ? (
+              {isLoading ? (
+                <div className="text-center py-6 text-gray-500">
+                  <p>Loading recent uploads...</p>
+                </div>
+              ) : recentUploads.length > 0 ? (
                 <div className="space-y-4">
                   {recentUploads.map(upload => (
                     <div key={upload.id} className="border border-gray-200 rounded-md p-4 hover:bg-gray-50">
                       <div className="flex items-start">
                         <DocumentTextIcon className="h-6 w-6 text-[#8B4513] mr-3 flex-shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
-                            {upload.fileName}
-                          </p>
-                          <div className="mt-1 flex flex-col sm:flex-row sm:items-center sm:space-x-2 text-xs text-gray-500">
+                          <div className="flex justify-between">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {upload.fileName}
+                            </p>
+                            {upload.fileUrl && (
+                              <a 
+                                href={upload.fileUrl} 
+                                target="_blank" 
+                                rel="noreferrer" 
+                                className="text-xs text-[#8B4513] hover:underline ml-2"
+                              >
+                                View PDF
+                              </a>
+                            )}
+                          </div>
+                          
+                          <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-500">
                             <p className="flex items-center">
                               <UserCircleIcon className="mr-1 h-4 w-4" />
-                              Student: {upload.studentName}
+                              <span className="font-medium">Student:</span> {upload.studentName}
                             </p>
-                            <p className="flex items-center mt-1 sm:mt-0">
+                            <p className="flex items-center">
+                              <UserCircleIcon className="mr-1 h-4 w-4" />
+                              <span className="font-medium">Teacher:</span> {upload.teacherName}
+                            </p>
+                            <p className="flex items-center">
                               <CalendarIcon className="mr-1 h-4 w-4" />
-                              Test Date: {upload.testDate}
+                              <span className="font-medium">Test Date:</span> {upload.testDate}
                             </p>
+                            <p className="flex items-center">
+                              <DocumentTextIcon className="mr-1 h-4 w-4" />
+                              <span className="font-medium">Test Grade:</span> {upload.testGrade}
+                            </p>
+                            {upload.gradeByTeacher && (
+                              <p className="flex items-center">
+                                <DocumentTextIcon className="mr-1 h-4 w-4" />
+                                <span className="font-medium">Grade by Teacher:</span> {upload.gradeByTeacher}
+                              </p>
+                            )}
+                            {upload.forNextClass && (
+                              <p className="flex items-center col-span-1 sm:col-span-2">
+                                <ClockIcon className="mr-1 h-4 w-4" />
+                                <span className="font-medium">For Next Class:</span> {upload.forNextClass}
+                              </p>
+                            )}
                           </div>
                         </div>
                       </div>
