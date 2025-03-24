@@ -3,7 +3,7 @@
 import React from 'react';
 
 interface TestTemplateProps {
-  title: string;
+  title?: string; // Making this optional since we're not displaying it
   studentName: string;
   teacherName: string;
   date: string;
@@ -12,7 +12,6 @@ interface TestTemplateProps {
 }
 
 const TestTemplate: React.FC<TestTemplateProps> = ({
-  title,
   studentName,
   teacherName,
   date,
@@ -21,24 +20,14 @@ const TestTemplate: React.FC<TestTemplateProps> = ({
 }) => {
   return (
     <div className="font-serif max-w-[8.5in] mx-auto bg-white p-8 shadow-md print:shadow-none">
-      {/* Header with grade box */}
-      <div className="flex justify-between items-start mb-8">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
-          <div className="mt-2 text-sm">
-            <p className="mb-1"><span className="font-semibold text-gray-700">Student:</span> <span className="text-gray-900">{studentName}</span></p>
-            <p className="mb-1"><span className="font-semibold text-gray-700">Teacher:</span> <span className="text-gray-900">{teacherName}</span></p>
-            <p className="mb-1"><span className="font-semibold text-gray-700">Subject:</span> <span className="text-gray-900">{subject}</span></p>
-            <p><span className="font-semibold text-gray-700">Date:</span> <span className="text-gray-900">{date}</span></p>
-          </div>
-        </div>
-        
-        {/* Grade box in top right corner */}
-        <div className="border-2 border-black p-4 text-center w-24 bg-white">
-          <p className="text-sm font-semibold mb-1 text-gray-900">GRADE</p>
-          <div className="text-3xl h-12 flex items-center justify-center text-gray-900">
-            ___
-          </div>
+      {/* Header with simple grade line */}
+      <div className="mb-8">
+        <div className="text-sm">
+          <p className="mb-1"><span className="font-semibold text-gray-700">Student:</span> <span className="text-gray-900">{studentName}</span></p>
+          <p className="mb-1"><span className="font-semibold text-gray-700">Teacher:</span> <span className="text-gray-900">{teacherName}</span></p>
+          <p className="mb-1"><span className="font-semibold text-gray-700">Subject:</span> <span className="text-gray-900">{subject}</span></p>
+          <p className="mb-1"><span className="font-semibold text-gray-700">Date:</span> <span className="text-gray-900">{date}</span></p>
+          <p className="mb-1"><span className="font-semibold text-gray-700">Grade:</span> <span className="text-gray-900">_______________</span></p>
         </div>
       </div>
       

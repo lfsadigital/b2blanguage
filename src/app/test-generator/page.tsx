@@ -279,8 +279,6 @@ export default function TestGeneratorPage() {
     try {
       // Create the content for Word export
       const docContent = `
-${generatedContent.testTitle}
-
 Student: ${generatedContent.studentName}
 Teacher: ${generatedContent.teacherName}
 Subject: ${generatedContent.subject}
@@ -304,11 +302,16 @@ ${generatedContent.questions.map((q, idx) => {
 }).join('\n\n')}
 `;
 
-      // Create element to trigger download
+      // Create text file for Word compatibility
       const element = document.createElement('a');
-      const file = new Blob([docContent], {type: 'application/msword'});
+      const file = new Blob([docContent], {type: 'text/plain'});
       element.href = URL.createObjectURL(file);
-      element.download = `${generatedContent.subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_test.doc`;
+      
+      // Use student_date for the filename
+      const formattedDate = generatedContent.testDate.replace(/\//g, '-');
+      const fileName = `${generatedContent.studentName.replace(/\s+/g, '_').toLowerCase()}_${formattedDate}`;
+      element.download = `${fileName}.txt`;
+      
       document.body.appendChild(element);
       element.click();
       document.body.removeChild(element);
@@ -325,7 +328,6 @@ ${generatedContent.questions.map((q, idx) => {
 ${generatedContent.subject} - Teaching Materials
 
 Teacher: ${generatedContent.teacherName}
-Level: ${generatedContent.testTitle.split(' for ')[1] || 'Not specified'}
 Date: ${generatedContent.testDate}
 
 ===================== TEST ANSWERS =====================
@@ -351,11 +353,16 @@ ${generatedContent.conversationTopics.map((topic, index) => `${index + 1}. ${top
 ${generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).join('\n\n')}
 `;
 
-      // Create element to trigger download
+      // Create text file for simplicity
       const element = document.createElement('a');
-      const file = new Blob([pdfContent], {type: 'application/pdf'});
+      const file = new Blob([pdfContent], {type: 'text/plain'});
       element.href = URL.createObjectURL(file);
-      element.download = `${generatedContent.subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_teaching_materials.pdf`;
+      
+      // Use student_date for the filename
+      const formattedDate = generatedContent.testDate.replace(/\//g, '-');
+      const fileName = `${generatedContent.studentName.replace(/\s+/g, '_').toLowerCase()}_${formattedDate}_materials`;
+      element.download = `${fileName}.txt`;
+      
       document.body.appendChild(element);
       element.click();
       document.body.removeChild(element);
