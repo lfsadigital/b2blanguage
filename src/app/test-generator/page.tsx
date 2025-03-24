@@ -55,7 +55,13 @@ export default function TestGeneratorPage() {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(data)
+        body: JSON.stringify({
+          ...data,
+          // Ensure these parameters are explicitly passed
+          studentLevel: data.studentLevel,
+          questionTypes: data.questionTypes,
+          questionCount: data.numberOfQuestions
+        })
       });
       
       // Handle non-JSON responses properly
@@ -77,6 +83,8 @@ export default function TestGeneratorPage() {
       if (!testData || !testData.questions) {
         throw new Error('No test content was generated. Please try again or use a different URL.');
       }
+      
+      console.log('API response data:', testData);
       
       // Extract questions from the generated test
       const parsedQuestions = parseQuestions(testData.questions);
@@ -293,13 +301,13 @@ ${generatedContent.questions.map((q, idx) => {
 }).join('\n\n')}
 `;
 
-      // Create a Blob with Word document content type
-      const blob = new Blob([docContent], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      // Create a Blob with text content type
+      const blob = new Blob([docContent], { type: 'text/plain' });
       
       // Create download link and trigger click
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `${generatedContent.subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_test.docx`;
+      link.download = `${generatedContent.subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_test.txt`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -326,13 +334,13 @@ TEACHING TIPS:
 ${generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).join('\n\n')}
 `;
 
-      // Create a Blob with PDF content type
-      const blob = new Blob([pdfContent], { type: 'application/pdf' });
+      // Create a Blob with text content type
+      const blob = new Blob([pdfContent], { type: 'text/plain' });
       
       // Create download link and trigger click
       const link = document.createElement('a');
       link.href = URL.createObjectURL(blob);
-      link.download = `${generatedContent.subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_teaching_materials.pdf`;
+      link.download = `${generatedContent.subject.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_teaching_materials.txt`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
