@@ -64,7 +64,7 @@ interface TestResult {
 }
 
 export default function ClassDiaryPage() {
-  const { userProfile } = useAuth();
+  const { userProfile, user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
@@ -119,8 +119,13 @@ export default function ClassDiaryPage() {
       }
     }
 
-    fetchRecentUploads();
-  }, []);
+    // Only fetch results if the user is authenticated and is a Teacher
+    if (user && userProfile === 'Teacher') {
+      fetchRecentUploads();
+    } else {
+      setIsLoading(false);
+    }
+  }, [user, userProfile]);
   
   // Handle file selection
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -142,6 +147,18 @@ export default function ClassDiaryPage() {
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Check if user is authenticated
+    if (!user) {
+      setUploadError('You must be logged in to upload files.');
+      return;
+    }
+    
+    // Check if user is a Teacher
+    if (userProfile !== 'Teacher') {
+      setUploadError('Only Teachers can upload test results.');
+      return;
+    }
     
     if (!selectedFile) {
       setUploadError('Please select a file to upload');
@@ -167,9 +184,10 @@ export default function ClassDiaryPage() {
         const fileName = `${Date.now()}_${selectedFile.name.replace(/\s+/g, '_')}`;
         const path = `test-results/${fileName}`;
         fileUrl = await uploadFile(selectedFile, path);
-      } catch (uploadError) {
+        console.log('File uploaded successfully:', fileUrl);
+      } catch (uploadError: any) {
         console.error('Error uploading file:', uploadError);
-        throw new Error('Failed to upload file to storage');
+        throw new Error(`Failed to upload file to storage: ${uploadError.message || 'Unknown error'}`);
       }
       
       // Prepare test result data
@@ -187,11 +205,14 @@ export default function ClassDiaryPage() {
         forNextClass: formData.forNextClass,
         notes: formData.notes,
         uploadDate: new Date().toISOString().split('T')[0],
-        timestamp: new Date().getTime()
+        timestamp: new Date().getTime(),
+        uploadedBy: user.email
       };
       
       // Save data to Firebase Firestore
+      console.log('Saving to Firestore:', testResultData);
       const docRef = await addDocument('testResults', testResultData);
+      console.log('Document saved with ID:', docRef.id);
       
       // Add the new upload to the local state with the Firestore document ID
       const newUpload = {
@@ -216,8 +237,8 @@ export default function ClassDiaryPage() {
       setUploadSuccess(true);
       setTimeout(() => setUploadSuccess(false), 3000);
     } catch (error) {
-      console.error('Error uploading file:', error);
-      setUploadError(`Failed to upload file: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Error during upload process:', error);
+      setUploadError(`Failed to upload: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsUploading(false);
     }
@@ -232,291 +253,318 @@ export default function ClassDiaryPage() {
         </p>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Upload Form */}
-        <div className="md:col-span-2">
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            <div className="p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">Upload Test Result</h2>
-              
-              {uploadSuccess && (
-                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-md flex items-center text-green-800">
-                  <CheckCircleIcon className="h-5 w-5 mr-2" />
-                  Test uploaded successfully!
-                </div>
-              )}
-              
-              {uploadError && (
-                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md flex items-center text-red-800">
-                  <XCircleIcon className="h-5 w-5 mr-2" />
-                  {uploadError}
-                </div>
-              )}
-              
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Teacher and Student Selection */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label htmlFor="teacherId" className="block text-sm font-medium text-gray-700">
-                      Teacher
-                    </label>
-                    <select
-                      id="teacherId"
-                      name="teacherId"
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
-                      value={formData.teacherId}
-                      onChange={handleInputChange}
-                      required
-                    >
-                      <option value="">Select Teacher</option>
-                      {mockTeachers.map(teacher => (
-                        <option key={teacher.id} value={teacher.id}>
-                          {teacher.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="studentId" className="block text-sm font-medium text-gray-700">
-                      Student
-                    </label>
-                    <select
-                      id="studentId"
-                      name="studentId"
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
-                      value={formData.studentId}
-                      onChange={handleInputChange}
-                      required
-                    >
-                      <option value="">Select Student</option>
-                      {mockStudents.map(student => (
-                        <option key={student.id} value={student.id}>
-                          {student.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                
-                {/* Test Date and Grade */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label htmlFor="testDate" className="block text-sm font-medium text-gray-700">
-                      Test Date
-                    </label>
-                    <input
-                      type="date"
-                      id="testDate"
-                      name="testDate"
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
-                      value={formData.testDate}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="testGrade" className="block text-sm font-medium text-gray-700">
-                      Test Grade
-                    </label>
-                    <input
-                      type="text"
-                      id="testGrade"
-                      name="testGrade"
-                      placeholder="e.g., 85/100 or A"
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
-                      value={formData.testGrade}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                </div>
-                
-                {/* Grade by Teacher and For Next Class */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label htmlFor="gradeByTeacher" className="block text-sm font-medium text-gray-700">
-                      Grade by Teacher
-                    </label>
-                    <input
-                      type="text"
-                      id="gradeByTeacher"
-                      name="gradeByTeacher"
-                      placeholder="e.g., 90/100 or A+"
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
-                      value={formData.gradeByTeacher}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="forNextClass" className="block text-sm font-medium text-gray-700">
-                      For Next Class
-                    </label>
-                    <input
-                      type="text"
-                      id="forNextClass"
-                      name="forNextClass"
-                      placeholder="e.g., Review past tense"
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
-                      value={formData.forNextClass}
-                      onChange={handleInputChange}
-                    />
-                  </div>
-                </div>
-                
-                {/* File Upload */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Test Document (PDF)
-                  </label>
-                  <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-                    <div className="space-y-1 text-center">
-                      <div className="flex flex-col items-center">
-                        {!selectedFile ? (
-                          <PaperClipIcon className="mx-auto h-12 w-12 text-gray-400" />
-                        ) : (
-                          <DocumentTextIcon className="mx-auto h-12 w-12 text-green-500" />
-                        )}
-                      </div>
-                      
-                      <div className="flex text-sm text-gray-600">
-                        <label
-                          htmlFor="file-upload"
-                          className="relative cursor-pointer bg-white rounded-md font-medium text-[#8B4513] hover:text-[#A0522D] focus-within:outline-none"
-                        >
-                          <span>Upload a file</span>
-                          <input
-                            id="file-upload"
-                            name="file-upload"
-                            type="file"
-                            className="sr-only"
-                            accept=".pdf"
-                            onChange={handleFileChange}
-                          />
-                        </label>
-                        <p className="pl-1">or drag and drop</p>
-                      </div>
-                      <p className="text-xs text-gray-500">PDF up to 10MB</p>
-                      
-                      {selectedFile && (
-                        <p className="text-sm text-green-600 font-medium mt-2">
-                          {selectedFile.name} ({Math.round(selectedFile.size / 1024)} KB)
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Notes */}
-                <div>
-                  <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
-                    Notes
-                  </label>
-                  <textarea
-                    id="notes"
-                    name="notes"
-                    rows={3}
-                    className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
-                    placeholder="Add any notes about the test or student's performance"
-                    value={formData.notes}
-                    onChange={handleInputChange}
-                  />
-                </div>
-                
-                {/* Submit Button */}
-                <div className="flex justify-end">
-                  <button
-                    type="submit"
-                    disabled={isUploading}
-                    className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#8B4513] hover:bg-[#A0522D] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513] ${isUploading ? 'opacity-75 cursor-not-allowed' : ''}`}
-                  >
-                    {isUploading ? 'Uploading...' : 'Upload Test'}
-                    {!isUploading && <ArrowUpTrayIcon className="ml-2 h-4 w-4" />}
-                  </button>
-                </div>
-              </form>
-            </div>
+      {!user ? (
+        // Not logged in
+        <div className="bg-white shadow rounded-lg p-6">
+          <p className="text-center text-gray-700">Please sign in to access the Class Diary.</p>
+          <div className="mt-4 flex justify-center">
+            <a 
+              href="/"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#8B4513] hover:bg-[#A0522D]"
+            >
+              Go to Sign In
+            </a>
           </div>
         </div>
-        
-        {/* Recent Uploads */}
-        <div>
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            <div className="p-6">
-              <h2 className="text-lg font-medium text-gray-900 mb-4">Recent Uploads</h2>
-              
-              {isLoading ? (
-                <div className="text-center py-6 text-gray-500">
-                  <p>Loading recent uploads...</p>
-                </div>
-              ) : recentUploads.length > 0 ? (
-                <div className="space-y-4">
-                  {recentUploads.map(upload => (
-                    <div key={upload.id} className="border border-gray-200 rounded-md p-4 hover:bg-gray-50">
-                      <div className="flex items-start">
-                        <DocumentTextIcon className="h-6 w-6 text-[#8B4513] mr-3 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between">
-                            <p className="text-sm font-medium text-gray-900 truncate">
-                              {upload.fileName}
-                            </p>
-                            {upload.fileUrl && (
-                              <a 
-                                href={upload.fileUrl} 
-                                target="_blank" 
-                                rel="noreferrer" 
-                                className="text-xs text-[#8B4513] hover:underline ml-2"
-                              >
-                                View PDF
-                              </a>
-                            )}
-                          </div>
-                          
-                          <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-500">
-                            <p className="flex items-center">
-                              <UserCircleIcon className="mr-1 h-4 w-4" />
-                              <span className="font-medium">Student:</span> {upload.studentName}
-                            </p>
-                            <p className="flex items-center">
-                              <UserCircleIcon className="mr-1 h-4 w-4" />
-                              <span className="font-medium">Teacher:</span> {upload.teacherName}
-                            </p>
-                            <p className="flex items-center">
-                              <CalendarIcon className="mr-1 h-4 w-4" />
-                              <span className="font-medium">Test Date:</span> {upload.testDate}
-                            </p>
-                            <p className="flex items-center">
-                              <DocumentTextIcon className="mr-1 h-4 w-4" />
-                              <span className="font-medium">Test Grade:</span> {upload.testGrade}
-                            </p>
-                            {upload.gradeByTeacher && (
+      ) : userProfile !== 'Teacher' ? (
+        // Logged in but not a Teacher
+        <div className="bg-white shadow rounded-lg p-6">
+          <div className="text-center">
+            <XCircleIcon className="mx-auto h-12 w-12 text-red-500 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900">Access Restricted</h3>
+            <p className="mt-2 text-gray-600">
+              The Class Diary is only available to users with Teacher access. Please contact your administrator if you need access.
+            </p>
+          </div>
+        </div>
+      ) : (
+        // Logged in as a Teacher
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Upload Form */}
+          <div className="md:col-span-2">
+            <div className="bg-white shadow rounded-lg overflow-hidden">
+              <div className="p-6">
+                <h2 className="text-lg font-medium text-gray-900 mb-4">Upload Test Result</h2>
+                
+                {uploadSuccess && (
+                  <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-md flex items-center text-green-800">
+                    <CheckCircleIcon className="h-5 w-5 mr-2" />
+                    Test uploaded successfully!
+                  </div>
+                )}
+                
+                {uploadError && (
+                  <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md flex items-center text-red-800">
+                    <XCircleIcon className="h-5 w-5 mr-2" />
+                    {uploadError}
+                  </div>
+                )}
+                
+                <form onSubmit={handleSubmit} className="space-y-5">
+                  {/* Teacher and Student Selection */}
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <label htmlFor="teacherId" className="block text-sm font-medium text-gray-700">
+                        Teacher
+                      </label>
+                      <select
+                        id="teacherId"
+                        name="teacherId"
+                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
+                        value={formData.teacherId}
+                        onChange={handleInputChange}
+                        required
+                      >
+                        <option value="">Select Teacher</option>
+                        {mockTeachers.map(teacher => (
+                          <option key={teacher.id} value={teacher.id}>
+                            {teacher.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="studentId" className="block text-sm font-medium text-gray-700">
+                        Student
+                      </label>
+                      <select
+                        id="studentId"
+                        name="studentId"
+                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
+                        value={formData.studentId}
+                        onChange={handleInputChange}
+                        required
+                      >
+                        <option value="">Select Student</option>
+                        {mockStudents.map(student => (
+                          <option key={student.id} value={student.id}>
+                            {student.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {/* Test Date and Grade */}
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <label htmlFor="testDate" className="block text-sm font-medium text-gray-700">
+                        Test Date
+                      </label>
+                      <input
+                        type="date"
+                        id="testDate"
+                        name="testDate"
+                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
+                        value={formData.testDate}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="testGrade" className="block text-sm font-medium text-gray-700">
+                        Test Grade
+                      </label>
+                      <input
+                        type="text"
+                        id="testGrade"
+                        name="testGrade"
+                        placeholder="e.g., 85/100 or A"
+                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
+                        value={formData.testGrade}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Grade by Teacher and For Next Class */}
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <label htmlFor="gradeByTeacher" className="block text-sm font-medium text-gray-700">
+                        Grade by Teacher
+                      </label>
+                      <input
+                        type="text"
+                        id="gradeByTeacher"
+                        name="gradeByTeacher"
+                        placeholder="e.g., 90/100 or A+"
+                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
+                        value={formData.gradeByTeacher}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="forNextClass" className="block text-sm font-medium text-gray-700">
+                        For Next Class
+                      </label>
+                      <input
+                        type="text"
+                        id="forNextClass"
+                        name="forNextClass"
+                        placeholder="e.g., Review past tense"
+                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
+                        value={formData.forNextClass}
+                        onChange={handleInputChange}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* File Upload */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      Test Document (PDF)
+                    </label>
+                    <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                      <div className="space-y-1 text-center">
+                        <div className="flex flex-col items-center">
+                          {!selectedFile ? (
+                            <PaperClipIcon className="mx-auto h-12 w-12 text-gray-400" />
+                          ) : (
+                            <DocumentTextIcon className="mx-auto h-12 w-12 text-green-500" />
+                          )}
+                        </div>
+                        
+                        <div className="flex text-sm text-gray-600">
+                          <label
+                            htmlFor="file-upload"
+                            className="relative cursor-pointer bg-white rounded-md font-medium text-[#8B4513] hover:text-[#A0522D] focus-within:outline-none"
+                          >
+                            <span>Upload a file</span>
+                            <input
+                              id="file-upload"
+                              name="file-upload"
+                              type="file"
+                              className="sr-only"
+                              accept=".pdf"
+                              onChange={handleFileChange}
+                            />
+                          </label>
+                          <p className="pl-1">or drag and drop</p>
+                        </div>
+                        <p className="text-xs text-gray-500">PDF up to 10MB</p>
+                        
+                        {selectedFile && (
+                          <p className="text-sm text-green-600 font-medium mt-2">
+                            {selectedFile.name} ({Math.round(selectedFile.size / 1024)} KB)
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Notes */}
+                  <div>
+                    <label htmlFor="notes" className="block text-sm font-medium text-gray-700">
+                      Notes
+                    </label>
+                    <textarea
+                      id="notes"
+                      name="notes"
+                      rows={3}
+                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
+                      placeholder="Add any notes about the test or student's performance"
+                      value={formData.notes}
+                      onChange={handleInputChange}
+                    />
+                  </div>
+                  
+                  {/* Submit Button */}
+                  <div className="flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isUploading}
+                      className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#8B4513] hover:bg-[#A0522D] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513] ${isUploading ? 'opacity-75 cursor-not-allowed' : ''}`}
+                    >
+                      {isUploading ? 'Uploading...' : 'Upload Test'}
+                      {!isUploading && <ArrowUpTrayIcon className="ml-2 h-4 w-4" />}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+          
+          {/* Recent Uploads */}
+          <div>
+            <div className="bg-white shadow rounded-lg overflow-hidden">
+              <div className="p-6">
+                <h2 className="text-lg font-medium text-gray-900 mb-4">Recent Uploads</h2>
+                
+                {isLoading ? (
+                  <div className="text-center py-6 text-gray-500">
+                    <p>Loading recent uploads...</p>
+                  </div>
+                ) : recentUploads.length > 0 ? (
+                  <div className="space-y-4">
+                    {recentUploads.map(upload => (
+                      <div key={upload.id} className="border border-gray-200 rounded-md p-4 hover:bg-gray-50">
+                        <div className="flex items-start">
+                          <DocumentTextIcon className="h-6 w-6 text-[#8B4513] mr-3 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex justify-between">
+                              <p className="text-sm font-medium text-gray-900 truncate">
+                                {upload.fileName}
+                              </p>
+                              {upload.fileUrl && (
+                                <a 
+                                  href={upload.fileUrl} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className="text-xs text-[#8B4513] hover:underline ml-2"
+                                >
+                                  View PDF
+                                </a>
+                              )}
+                            </div>
+                            
+                            <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-500">
+                              <p className="flex items-center">
+                                <UserCircleIcon className="mr-1 h-4 w-4" />
+                                <span className="font-medium">Student:</span> {upload.studentName}
+                              </p>
+                              <p className="flex items-center">
+                                <UserCircleIcon className="mr-1 h-4 w-4" />
+                                <span className="font-medium">Teacher:</span> {upload.teacherName}
+                              </p>
+                              <p className="flex items-center">
+                                <CalendarIcon className="mr-1 h-4 w-4" />
+                                <span className="font-medium">Test Date:</span> {upload.testDate}
+                              </p>
                               <p className="flex items-center">
                                 <DocumentTextIcon className="mr-1 h-4 w-4" />
-                                <span className="font-medium">Grade by Teacher:</span> {upload.gradeByTeacher}
+                                <span className="font-medium">Test Grade:</span> {upload.testGrade}
                               </p>
-                            )}
-                            {upload.forNextClass && (
-                              <p className="flex items-center col-span-1 sm:col-span-2">
-                                <ClockIcon className="mr-1 h-4 w-4" />
-                                <span className="font-medium">For Next Class:</span> {upload.forNextClass}
-                              </p>
-                            )}
+                              {upload.gradeByTeacher && (
+                                <p className="flex items-center">
+                                  <DocumentTextIcon className="mr-1 h-4 w-4" />
+                                  <span className="font-medium">Grade by Teacher:</span> {upload.gradeByTeacher}
+                                </p>
+                              )}
+                              {upload.forNextClass && (
+                                <p className="flex items-center col-span-1 sm:col-span-2">
+                                  <ClockIcon className="mr-1 h-4 w-4" />
+                                  <span className="font-medium">For Next Class:</span> {upload.forNextClass}
+                                </p>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6 text-gray-500">
-                  <p>No test uploads yet</p>
-                </div>
-              )}
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-gray-500">
+                    <p>No test uploads yet</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </DashboardShell>
   );
 } 
