@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import DashboardShell from '@/components/ui/dashboard-shell';
+import DashboardShell from '../../components/ui/dashboard-shell';
 import TestGeneratorForm from '@/app/components/TestGeneratorForm';
 import { TestFormData } from '@/app/lib/types';
 import { 

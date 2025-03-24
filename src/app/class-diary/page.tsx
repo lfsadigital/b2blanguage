@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import DashboardShell from '@/components/ui/dashboard-shell';
+import DashboardShell from '../../components/ui/dashboard-shell';
 import { 
   PlusIcon, 
   MagnifyingGlassIcon,

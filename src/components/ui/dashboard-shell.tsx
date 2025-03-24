@@ -14,6 +14,8 @@ import {
   ArrowRightOnRectangleIcon,
   UserCircleIcon
 } from '@heroicons/react/24/outline';
+import { useAuth } from '../../lib/hooks/useAuth';
+import SignInWithGoogle from '../../components/SignInWithGoogle';
 
 interface DashboardShellProps {
   children: React.ReactNode;
@@ -21,6 +23,7 @@ interface DashboardShellProps {
 
 export default function DashboardShell({ children }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { signOut, user } = useAuth();
 
   return (
     <div className="h-screen flex overflow-hidden bg-gray-100">
@@ -36,7 +39,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
             leaveFrom="opacity-100"
             leaveTo="opacity-0"
           >
-            <Dialog.Overlay className="fixed inset-0 bg-gray-600 bg-opacity-75" />
+            <div className="fixed inset-0 bg-gray-600 bg-opacity-75" />
           </Transition.Child>
           <Transition.Child
             as={Fragment}
@@ -157,11 +160,12 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 }
 
 function SidebarItems() {
+  const { signOut, user } = useAuth();
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, current: true },
     { name: 'Test Generator', href: '/test-generator', icon: DocumentTextIcon, current: false },
-    { name: 'Class Diary', href: '#', icon: BookOpenIcon, current: false },
-    { name: 'Database', href: '#', icon: UserGroupIcon, current: false },
+    { name: 'Class Diary', href: '/class-diary', icon: BookOpenIcon, current: false },
+    { name: 'Database', href: '/database', icon: UserGroupIcon, current: false },
     { name: 'Experiments', href: '#', icon: BeakerIcon, current: false },
   ];
 
@@ -195,13 +199,19 @@ function SidebarItems() {
       <div className="pt-4 pb-3">
         <div className="border-t border-gray-200" />
       </div>
-      <a
-        href="#"
-        className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-red-600 hover:bg-red-50"
-      >
-        <ArrowRightOnRectangleIcon className="mr-3 h-6 w-6 text-red-400 group-hover:text-red-500" aria-hidden="true" />
-        Logout
-      </a>
+      {user ? (
+        <button
+          onClick={signOut}
+          className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-red-600 hover:bg-red-50"
+        >
+          <ArrowRightOnRectangleIcon className="mr-3 h-6 w-6 text-red-400 group-hover:text-red-500" aria-hidden="true" />
+          Logout
+        </button>
+      ) : (
+        <div className="px-2 py-2">
+          <SignInWithGoogle />
+        </div>
+      )}
     </>
   );
 } 

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from "next/image";
 import { ArrowRightIcon } from '@heroicons/react/24/outline';
 import { CpuChipIcon, BookOpenIcon, ServerIcon, BuildingOfficeIcon } from '@heroicons/react/24/outline';
+import SignInWithGoogle from '../components/SignInWithGoogle';
 
 export default function Home() {
   const router = useRouter();
@@ -16,22 +17,31 @@ export default function Home() {
   // }, [router]);
 
   return (
-    <main className="flex min-h-screen flex-col">
-      {/* Hero Section */}
-      <section className="bg-[#8B4513] text-white">
-        <div className="container mx-auto px-6 py-16 text-center">
-          <h1 className="text-4xl font-bold mb-4 sm:text-5xl">B2B Language</h1>
-          <p className="text-xl mb-8 max-w-3xl mx-auto">
-            Professional English teaching tools for business language education
-          </p>
-          <Link 
-            href="/dashboard" 
-            className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-[#8B4513] bg-white hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-white"
-          >
-            Go to Dashboard
-          </Link>
+    <div className="flex-1">
+      {/* Hero section */}
+      <div className="bg-[#FFF8DC] py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <h1 className="text-4xl tracking-tight font-extrabold text-[#8B4513] sm:text-5xl md:text-6xl">
+              B2B Language
+            </h1>
+            <p className="mt-3 max-w-md mx-auto text-base text-[#A0522D] sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
+              Professional teaching tools for business English instructors
+            </p>
+            <div className="mt-8 flex justify-center space-x-4">
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center px-5 py-3 border border-transparent text-base font-medium rounded-md text-white bg-[#8B4513] hover:bg-[#A0522D] transition"
+              >
+                Go to Dashboard
+              </Link>
+              <div>
+                <SignInWithGoogle />
+              </div>
+            </div>
+          </div>
         </div>
-      </section>
+      </div>
 
       {/* Features */}
       <section className="py-12 bg-white">
@@ -102,6 +112,6 @@ export default function Home() {
           </div>
         </div>
       </footer>
-    </main>
+    </div>
   );
 }
