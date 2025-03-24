@@ -20,7 +20,7 @@ DO NOT include any political or economic bias in your questions. Keep questions 
 
 At least one question should be directly based on a small excerpt (no longer than three paragraphs) from the content, asking students to interpret, summarize, or identify key information from it. However, avoid simply copying large portions of the text
 as part of the question—focus on testing understanding rather than memorization.
-
+If you do not receive content to use it for the test, do not create the test. You are not to make up any information, nor any input.
 Content URL: ${url}
 ${contentInfo}
 
@@ -51,6 +51,7 @@ IMPORTANT FORMATTING REQUIREMENTS:
 3. For multiple choice questions:
    - Provide options as A), B), C), and D)
    - Only provide one correct answer
+   - Include an appropriate reference timestamp for video content when possible
 
 4. For open-ended questions:
    - Make clear what type of answer is expected (short answer, complete sentence, etc.)
