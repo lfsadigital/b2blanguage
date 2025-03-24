@@ -308,86 +308,82 @@ export default function TestGeneratorPage() {
       // Access the docx library through the window
       const docx = (window as any).docx;
       
-      // Create a new document
-      const doc = new docx.Document({
-        sections: [{
-          properties: {},
+      // Create paragraphs for the document
+      const documentParagraphs = [
+        // Header information
+        new docx.Paragraph({
           children: [
-            new docx.Paragraph({
-              children: [
-                new docx.TextRun({
-                  text: `Student: ${generatedContent.studentName}`,
-                  size: 24,
-                }),
-              ],
+            new docx.TextRun({
+              text: `Student: ${generatedContent.studentName}`,
+              size: 24,
             }),
-            new docx.Paragraph({
-              children: [
-                new docx.TextRun({
-                  text: `Teacher: ${generatedContent.teacherName}`,
-                  size: 24,
-                }),
-              ],
+          ],
+        }),
+        new docx.Paragraph({
+          children: [
+            new docx.TextRun({
+              text: `Teacher: ${generatedContent.teacherName}`,
+              size: 24,
             }),
-            new docx.Paragraph({
-              children: [
-                new docx.TextRun({
-                  text: `Subject: ${generatedContent.subject}`,
-                  size: 24,
-                }),
-              ],
+          ],
+        }),
+        new docx.Paragraph({
+          children: [
+            new docx.TextRun({
+              text: `Subject: ${generatedContent.subject}`,
+              size: 24,
             }),
-            new docx.Paragraph({
-              children: [
-                new docx.TextRun({
-                  text: `Date: ${generatedContent.testDate}`,
-                  size: 24,
-                }),
-              ],
+          ],
+        }),
+        new docx.Paragraph({
+          children: [
+            new docx.TextRun({
+              text: `Date: ${generatedContent.testDate}`,
+              size: 24,
             }),
-            new docx.Paragraph({
-              children: [
-                new docx.TextRun({
-                  text: `Grade: _______________`,
-                  size: 24,
-                }),
-              ],
+          ],
+        }),
+        new docx.Paragraph({
+          children: [
+            new docx.TextRun({
+              text: `Grade: _______________`,
+              size: 24,
             }),
-            new docx.Paragraph({
-              children: [new docx.TextRun({ text: " ", size: 24 })],
+          ],
+        }),
+        // Spacer
+        new docx.Paragraph({
+          children: [new docx.TextRun({ text: " ", size: 24 })],
+        }),
+        // Test content
+        new docx.Paragraph({
+          children: [
+            new docx.TextRun({
+              text: generatedContent.testContent,
+              size: 24,
             }),
-            // Test content
-            new docx.Paragraph({
-              children: [
-                new docx.TextRun({
-                  text: generatedContent.testContent,
-                  size: 24,
-                }),
-              ],
+          ],
+        }),
+        // Spacer
+        new docx.Paragraph({
+          children: [new docx.TextRun({ text: " ", size: 24 })],
+        }),
+        // Questions header
+        new docx.Paragraph({
+          children: [
+            new docx.TextRun({
+              text: "Questions:",
+              size: 24,
+              bold: true,
             }),
-            new docx.Paragraph({
-              children: [new docx.TextRun({ text: " ", size: 24 })],
-            }),
-            // Questions title
-            new docx.Paragraph({
-              children: [
-                new docx.TextRun({
-                  text: "Questions:",
-                  size: 24,
-                  bold: true,
-                }),
-              ],
-            }),
-          ]
-        }],
-      });
+          ],
+        }),
+      ];
       
-      // Add questions to the document
+      // Add all questions to the documentParagraphs array
       generatedContent.questions.forEach((q, idx) => {
-        const questionParagraphs = [];
-        
         // Add the question text
-        questionParagraphs.push(
+        documentParagraphs.push(
           new docx.Paragraph({
             children: [
               new docx.TextRun({
@@ -401,7 +397,7 @@ export default function TestGeneratorPage() {
         // Add options for multiple choice questions
         if (q.type === 'multiple-choice' && q.options) {
           q.options.forEach((option: string, optIdx: number) => {
-            questionParagraphs.push(
+            documentParagraphs.push(
               new docx.Paragraph({
                 children: [
                   new docx.TextRun({
@@ -415,17 +411,19 @@ export default function TestGeneratorPage() {
         }
         
         // Add a spacing paragraph after each question
-        questionParagraphs.push(
+        documentParagraphs.push(
           new docx.Paragraph({
             children: [new docx.TextRun({ text: " ", size: 24 })],
           })
         );
-        
-        // Add these paragraphs to the document
-        doc.addSection({
+      });
+      
+      // Create a new document with all paragraphs
+      const doc = new docx.Document({
+        sections: [{
           properties: {},
-          children: questionParagraphs,
-        });
+          children: documentParagraphs
+        }],
       });
 
       // Generate and download the document
@@ -490,10 +488,11 @@ ${generatedContent.questions.map((q, idx) => {
         return;
       }
       
-      // Create PDF content
+      // Create PDF content with student name included
       const pdfContent = `
 ${generatedContent.subject} - Teaching Materials
 
+Student: ${generatedContent.studentName}
 Teacher: ${generatedContent.teacherName}
 Date: ${generatedContent.testDate}
 
@@ -521,12 +520,19 @@ ${generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).j
       // Access the jsPDF library through the window
       const jsPDF = (window as any).jspdf.jsPDF;
       
-      // Create a new PDF document
-      const pdf = new jsPDF();
+      // Create a new PDF document with smaller margins to fit more content
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
       
-      // Add content to the PDF
-      const splitText = pdf.splitTextToSize(pdfContent, 180);
-      pdf.text(splitText, 15, 15);
+      // Use smaller font size and margins for more content
+      pdf.setFontSize(10);
+      
+      // Add content to the PDF with smaller margins
+      const splitText = pdf.splitTextToSize(pdfContent, 190); // Wider text area
+      pdf.text(splitText, 10, 10); // Smaller margins
       
       // Generate and download the PDF
       const formattedDate = generatedContent.testDate.replace(/\//g, '-');
@@ -540,6 +546,7 @@ ${generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).j
       const pdfContent = `
 ${generatedContent.subject} - Teaching Materials
 
+Student: ${generatedContent.studentName}
 Teacher: ${generatedContent.teacherName}
 Date: ${generatedContent.testDate}
 
@@ -578,6 +585,87 @@ ${generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).j
     }
   };
 
+  // Add a new function to export test and materials to a single PDF
+  const handleExportFullPDF = () => {
+    try {
+      if (!pdfScript) {
+        alert('PDF generator is still loading. Please try again in a moment.');
+        return;
+      }
+      
+      // Create PDF content with both test questions and materials
+      const pdfContent = `
+${generatedContent.subject}
+
+Student: ${generatedContent.studentName}
+Teacher: ${generatedContent.teacherName}
+Date: ${generatedContent.testDate}
+
+===================== TEST QUESTIONS =====================
+
+${generatedContent.testContent}
+
+${generatedContent.questions.map((q, idx) => {
+  let questionText = `${idx + 1}) ${q.question}${q.reference ? ` [Ref: ${q.reference}]` : ''}`;
+  
+  if (q.type === 'multiple-choice' && q.options) {
+    const options = q.options.map((option: string, optIdx: number) => 
+      `   ${String.fromCharCode(65 + optIdx)}) ${option}`
+    ).join('\n');
+    return `${questionText}\n${options}`;
+  }
+  
+  return questionText;
+}).join('\n\n')}
+
+===================== TEST ANSWERS =====================
+
+${generatedContent.questions.map((q, idx) => {
+  if (q.type === 'multiple-choice' && q.options) {
+    return `${idx + 1}) Answer: ${String.fromCharCode(65 + (q.correctAnswer !== undefined ? q.correctAnswer : 0))}`;
+  } else if (q.type === 'true-false') {
+    return `${idx + 1}) Answer: ${q.correctAnswer !== undefined ? (q.correctAnswer ? 'True' : 'False') : 'True'}`;
+  } else {
+    return `${idx + 1}) Sample answer: This is an open-ended question about ${q.question.substring(0, 30)}...`;
+  }
+}).join('\n')}
+
+===================== CONVERSATION TOPICS =====================
+
+${generatedContent.conversationTopics.map((topic, index) => `${index + 1}. ${topic}`).join('\n')}
+
+===================== TEACHING TIPS =====================
+
+${generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).join('\n\n')}
+`;
+
+      // Access the jsPDF library through the window
+      const jsPDF = (window as any).jspdf.jsPDF;
+      
+      // Create a new PDF document with smaller margins for more content
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      // Use smaller font size for more content
+      pdf.setFontSize(10);
+      
+      // Add content to the PDF with smaller margins
+      const splitText = pdf.splitTextToSize(pdfContent, 190); // Wider text area
+      pdf.text(splitText, 10, 10); // Smaller margins
+      
+      // Generate and download the PDF
+      const formattedDate = generatedContent.testDate.replace(/\//g, '-');
+      const fileName = `${generatedContent.studentName.replace(/\s+/g, '_').toLowerCase()}_${formattedDate}_full`;
+      pdf.save(`${fileName}.pdf`);
+    } catch (error) {
+      console.error('Error generating full PDF:', error);
+      alert('There was an error exporting to PDF. Please try the separate exports instead.');
+    }
+  };
+
   // Render test content
   const renderTestContent = () => {
     return (
@@ -607,6 +695,13 @@ ${generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).j
                 >
                   <DocumentDuplicateIcon className="-ml-1 mr-2 h-5 w-5" />
                   Export Teaching Materials (PDF)
+                </button>
+                <button
+                  onClick={handleExportFullPDF}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#8B0000] hover:bg-[#A52A2A]"
+                >
+                  <DocumentDuplicateIcon className="-ml-1 mr-2 h-5 w-5" />
+                  Export Full PDF
                 </button>
                 <button
                   onClick={handlePrint}
