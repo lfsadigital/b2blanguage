@@ -370,20 +370,25 @@ export default function ClassDiaryPage() {
   // If not authorized, display access restricted message
   if (!isAuthorized) {
     return (
-      <DashboardShell>
-        <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
-          <div className="text-red-500 mb-6">
-            <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-            </svg>
-          </div>
-          <h2 className="text-2xl font-bold text-black mb-2">Access Restricted</h2>
-          <p className="text-black mb-6 max-w-md">
-            The Class Diary is only available to Teachers, Managers, and Owners.
-            Please contact your administrator if you need access.
-          </p>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-red-800 text-white text-center px-4">
+        <div className="text-red-200 mb-6">
+          <svg className="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
         </div>
-      </DashboardShell>
+        <h2 className="text-2xl font-bold text-white mb-2">Access Restricted</h2>
+        <p className="text-white mb-6 max-w-md">
+          The Class Diary is only available to Teachers, Managers, and Owners.
+          Please contact your administrator if you need access.
+        </p>
+        <a href="/dashboard">
+          <button 
+            className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition-colors"
+          >
+            Go to Dashboard
+          </button>
+        </a>
+      </div>
     );
   }
 
