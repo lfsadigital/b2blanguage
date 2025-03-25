@@ -14,11 +14,15 @@ const RoleBasedRoute = ({ children }: RoleBasedRouteProps) => {
   useEffect(() => {
     // Only make authorization decision after loading is complete
     if (!loading) {
-      const authorized = !!user && ['Teacher', 'Owner', 'Manager'].includes(userProfile || '');
+      console.log('Current user:', user?.email);
+      console.log('User profile:', userProfile);
+      const authorized = !!user && ['Teacher', 'Owner', 'Manager'].includes(userProfile);
+      console.log('Is authorized:', authorized);
       setIsAuthorized(authorized);
       
       if (!authorized) {
         // Redirect to home page if not authorized
+        console.log('Not authorized, redirecting to home');
         router.push('/');
       }
     }
