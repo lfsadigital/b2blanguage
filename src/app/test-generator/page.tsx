@@ -920,7 +920,10 @@ Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion),
   };
 
   return (
-    <RoleBasedRoute requiredRoles={['Teacher', 'Manager', 'Owner']}>
+    <RoleBasedRoute 
+      requiredRoles={['Teacher', 'Manager', 'Owner']}
+      key="test-generator-route"
+    >
       <DashboardShell>
         <div className="container mx-auto px-4 py-8">
           <div className="mb-6">

@@ -197,7 +197,10 @@ export default function DatabasePage() {
     : profiles;
 
   return (
-    <RoleBasedRoute>
+    <RoleBasedRoute 
+      requiredRoles={['Owner', 'Manager']}
+      key="database-route"
+    >
       <DashboardShell>
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-black">User Database</h1>

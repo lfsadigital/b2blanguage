@@ -346,7 +346,10 @@ export default function ClassDiaryPage() {
   };
 
   return (
-    <RoleBasedRoute requiredRoles={['Teacher', 'Manager', 'Owner']}>
+    <RoleBasedRoute 
+      requiredRoles={['Teacher', 'Manager', 'Owner']}
+      key="class-diary-route"
+    >
       <DashboardShell>
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-gray-900">Class Diary</h1>
