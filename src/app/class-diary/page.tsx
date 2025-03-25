@@ -70,7 +70,7 @@ export default function ClassDiaryPage() {
   
   // Form state initialization
   const [formData, setFormData] = useState({
-    teacherId: currentTeacher?.id || '',
+    teacherId: '',
     studentId: '',
     testDate: new Date().toISOString().split('T')[0], // Today's date
     testGrade: '',
@@ -129,19 +129,29 @@ export default function ClassDiaryPage() {
     }
   }, [user]);
 
-  // Update teacher ID when user changes
+  // Update teacher ID when user and teachers data change
   useEffect(() => {
     if (user?.email && teachers.length > 0) {
-      const teacher = teachers.find(t => t.email === user.email);
-      if (teacher) {
+      const currentTeacherFound = teachers.find(t => t.email === user.email);
+      
+      // If user is a teacher, always set their own ID
+      if (userProfile === 'Teacher' && currentTeacherFound) {
         setFormData(prev => ({
           ...prev,
-          teacherId: teacher.id
+          teacherId: currentTeacherFound.id
         }));
-        console.log("Set current teacher to:", teacher);
+        console.log("Set current teacher to:", currentTeacherFound);
+      } 
+      // For Owners/Managers, only set the current teacher if form is empty
+      else if ((userProfile === 'Owner' || userProfile === 'Manager') && formData.teacherId === '' && currentTeacherFound) {
+        setFormData(prev => ({
+          ...prev,
+          teacherId: currentTeacherFound.id
+        }));
+        console.log("Pre-filled teacher for Owner/Manager:", currentTeacherFound);
       }
     }
-  }, [user, teachers]);
+  }, [user, teachers, userProfile, formData.teacherId]);
 
   // Fetch recent uploads on component mount
   useEffect(() => {
@@ -331,9 +341,9 @@ export default function ClassDiaryPage() {
 
   // Reset form after successful upload
   const resetForm = () => {
-    // Keep the current teacher ID but reset other fields
+    // Keep the current teacher ID if user is a Teacher, otherwise reset it
     setFormData({
-      teacherId: currentTeacher?.id || '',
+      teacherId: userProfile === 'Teacher' && currentTeacher ? currentTeacher.id : '',
       studentId: '',
       testDate: new Date().toISOString().split('T')[0],
       testGrade: '',
@@ -362,18 +372,18 @@ export default function ClassDiaryPage() {
       requiredRoles={['Teacher', 'Manager', 'Owner']}
       key="class-diary-route"
     >
-      <DashboardShell>
-        <div className="mb-6">
+    <DashboardShell>
+      <div className="mb-6">
           <h1 className="text-2xl font-semibold text-black">Class Diary</h1>
           <p className="mt-1 text-sm text-black">
             Upload test results and track student progress
-          </p>
-        </div>
-        
+        </p>
+      </div>
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Upload Form */}
           <div className="md:col-span-2">
-            <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="bg-white shadow rounded-lg overflow-hidden">
               <div className="p-6">
                 <h2 className="text-lg font-medium text-gray-900 mb-4">Upload Test Result</h2>
                 
@@ -381,7 +391,7 @@ export default function ClassDiaryPage() {
                   <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-md flex items-center text-green-800">
                     <CheckCircleIcon className="h-5 w-5 mr-2" />
                     Test uploaded successfully!
-                  </div>
+          </div>
                 )}
                 
                 {uploadError && (
@@ -402,13 +412,15 @@ export default function ClassDiaryPage() {
                         <select
                           id="teacherId"
                           name="teacherId"
-                          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 bg-gray-100 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md cursor-not-allowed"
+                          className={`mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md ${
+                            userProfile === 'Teacher' ? 'bg-gray-100 cursor-not-allowed' : ''
+                          }`}
                           value={formData.teacherId}
                           onChange={handleInputChange}
-                          disabled={true}
+                          disabled={userProfile === 'Teacher'}
                           required
                         >
-                          {currentTeacher ? (
+                          {userProfile === 'Teacher' && currentTeacher ? (
                             <option value={currentTeacher.id}>{currentTeacher.displayName}</option>
                           ) : (
                             <>
@@ -421,18 +433,18 @@ export default function ClassDiaryPage() {
                             </>
                           )}
                         </select>
-                        {currentTeacher && (
+                        {userProfile === 'Teacher' && currentTeacher && (
                           <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                             <UserCircleIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
                           </div>
                         )}
                       </div>
-                      {currentTeacher && (
+                      {userProfile === 'Teacher' && currentTeacher && (
                         <p className="mt-1 text-xs text-gray-500">Using your profile as the teacher</p>
                       )}
                     </div>
                     
-                    <div>
+                  <div>
                       <label htmlFor="studentId" className="block text-sm font-medium text-gray-700">
                         Student
                       </label>
@@ -502,9 +514,9 @@ export default function ClassDiaryPage() {
                         value={formData.gradeByTeacher}
                         onChange={handleInputChange}
                       />
-                    </div>
-                    
-                    <div>
+                  </div>
+                  
+                  <div>
                       <label htmlFor="forNextClass" className="block text-sm font-medium text-gray-700">
                         For Next Class
                       </label>
@@ -594,7 +606,7 @@ export default function ClassDiaryPage() {
               </div>
             </div>
           </div>
-          
+
           {/* Recent Uploads */}
           <div>
             <div className="bg-white shadow rounded-lg overflow-hidden">
@@ -604,7 +616,7 @@ export default function ClassDiaryPage() {
                 {isLoading ? (
                   <div className="text-center py-6 text-gray-500">
                     <p>Loading recent uploads...</p>
-                  </div>
+                      </div>
                 ) : recentUploads.length > 0 ? (
                   <div className="space-y-4">
                     {recentUploads.map(upload => (
@@ -625,8 +637,8 @@ export default function ClassDiaryPage() {
                                 >
                                   View PDF
                                 </a>
-                              )}
-                            </div>
+                        )}
+                      </div>
                             
                             <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-500">
                               <p className="flex items-center">
@@ -656,8 +668,8 @@ export default function ClassDiaryPage() {
                                   <ClockIcon className="mr-1 h-4 w-4" />
                                   <span className="font-medium">For Next Class:</span> {upload.forNextClass}
                                 </p>
-                              )}
-                            </div>
+                        )}
+                      </div>
                           </div>
                         </div>
                       </div>
@@ -666,13 +678,13 @@ export default function ClassDiaryPage() {
                 ) : (
                   <div className="text-center py-6 text-gray-500">
                     <p>No test uploads yet</p>
-                  </div>
+            </div>
                 )}
               </div>
             </div>
           </div>
         </div>
-      </DashboardShell>
+    </DashboardShell>
     </RoleBasedRoute>
   );
 } 
