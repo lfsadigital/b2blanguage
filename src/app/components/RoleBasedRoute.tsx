@@ -15,11 +15,16 @@ const RoleBasedRoute = ({ children }: RoleBasedRouteProps) => {
 
   useEffect(() => {
     const checkAuthorization = async () => {
-      // Debug logging
-      console.log('Current Auth State:', {
+      // Clear console and add a prominent header
+      console.clear();
+      console.log('%c🔐 B2B AUTH CHECK 🔐', 'background: #222; color: #bada55; font-size: 20px; padding: 10px;');
+
+      // Debug logging with styled console logs
+      console.log('%cCurrent Auth State:', 'color: #ff6b6b; font-weight: bold; font-size: 16px');
+      console.table({
         loading,
         hasUser: !!user,
-        email: user?.email,
+        email: user?.email || 'No email',
         userProfile,
         initialLoadComplete: initialLoadComplete.current,
         redirectAttempted: redirectAttempted.current
@@ -27,17 +32,17 @@ const RoleBasedRoute = ({ children }: RoleBasedRouteProps) => {
 
       // Don't do anything while loading
       if (loading) {
-        console.log('Still loading auth state...');
+        console.log('%c⌛ Still loading auth state...', 'color: #4ecdc4; font-size: 14px');
         return;
       }
 
       // Wait for the initial profile load
       if (!initialLoadComplete.current) {
         if (user && userProfile === 'Visitor') {
-          console.log('Initial load - waiting for profile update...');
+          console.log('%c⏳ Initial load - waiting for profile update...', 'color: #f7d794; font-size: 14px');
           return;
         }
-        console.log('Initial load complete');
+        console.log('%c✅ Initial load complete', 'color: #2ecc71; font-size: 14px');
         initialLoadComplete.current = true;
       }
 
@@ -45,10 +50,11 @@ const RoleBasedRoute = ({ children }: RoleBasedRouteProps) => {
       const allowedRoles = ['Teacher', 'Owner', 'Manager'];
       const authorized = !!user && allowedRoles.includes(userProfile);
 
-      console.log('Authorization result:', {
+      console.log('%cAuthorization Check:', 'color: #ff6b6b; font-weight: bold; font-size: 16px');
+      console.table({
         authorized,
         userProfile,
-        allowedRoles
+        allowedRoles: allowedRoles.join(', ')
       });
 
       setIsAuthorized(authorized);
@@ -58,7 +64,7 @@ const RoleBasedRoute = ({ children }: RoleBasedRouteProps) => {
       // 2. We haven't tried redirecting before
       // 3. User is definitely not authorized
       if (initialLoadComplete.current && !redirectAttempted.current && !authorized) {
-        console.log('Redirecting to home - unauthorized access');
+        console.log('%c🚫 Redirecting to home - unauthorized access', 'color: #ff4757; font-size: 16px; font-weight: bold');
         redirectAttempted.current = true;
         router.push('/');
       }
