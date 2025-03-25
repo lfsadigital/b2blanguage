@@ -16,44 +16,22 @@ import {
 } from '@heroicons/react/24/outline';
 import { addDocument, getDocuments, uploadFile } from '../../lib/firebase/firebaseUtils';
 import { db } from '../../lib/firebase/firebase';
-import { collection, getDocs, setDoc, doc } from 'firebase/firestore';
-
-// Mock data for teachers - add more name variations
-const mockTeachers = [
-  { id: '1', name: 'Rafael', languages: ['EN', 'ES'] },
-  { id: '2', name: 'Ortiz', languages: ['ES'] },
-  { id: '3', name: 'Sersun', languages: ['EN'] },
-  { id: '4', name: 'Luiz Almeida', languages: ['EN'] },
-  // Add common variations of the name that might match
-  { id: '5', name: 'Luiz', languages: ['EN'] },
-  // Add explicit match for your Gmail address in case displayName is empty
-  { id: '6', name: 'lfsalmeida92@gmail.com', languages: ['EN'] },
-  { id: '7', name: 'Luiz Fellipe', languages: ['EN'] },
-  { id: '8', name: 'Fellipe', languages: ['EN'] },
-  { id: '9', name: 'Almeida', languages: ['EN'] }
-];
-
-// Mock data for students
-const mockStudents = [
-  { id: '1', name: 'John Smith', level: 'Advanced' },
-  { id: '2', name: 'Emma Johnson', level: 'Intermediate' },
-  { id: '3', name: 'Michael Brown', level: 'Beginner' },
-  { id: '4', name: 'Sarah Wilson', level: 'Intermediate' },
-  { id: '5', name: 'David Lee', level: 'Advanced' },
-  { id: '6', name: 'Luiz', level: 'Advanced' },
-];
+import { collection, getDocs, setDoc, doc, query, where } from 'firebase/firestore';
 
 // Define interfaces for our data
 interface Teacher {
   id: string;
-  name: string;
-  languages: string[];
+  displayName: string;
+  email: string;
+  profileType: string;
 }
 
 interface Student {
   id: string;
-  name: string;
-  level: string;
+  displayName: string;
+  email: string;
+  profileType: string;
+  level?: string;
 }
 
 interface TestResult {
@@ -82,62 +60,14 @@ export default function ClassDiaryPage() {
   const [uploadError, setUploadError] = useState('');
   const [recentUploads, setRecentUploads] = useState<TestResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   
-  // Add detailed debugging to see user info
-  console.log("======= USER DEBUG INFO =======");
-  console.log("User object:", user);
-  console.log("User email:", user?.email);
-  console.log("User display name:", user?.displayName);
-  console.log("User profile type:", userProfile);
-  console.log("==============================");
+  // Find the current teacher from the teachers array
+  const currentTeacher = user?.email 
+    ? teachers.find(t => t.email === user.email)
+    : null;
   
-  // Find the teacher based on user info - try multiple approaches
-  let currentTeacher = null;
-  
-  if (user) {
-    // Try exact displayName match first - this is the most important case
-    if (user.displayName) {
-      // Exact match is highest priority
-      currentTeacher = mockTeachers.find(t => t.name === user.displayName);
-      console.log("Lookup by exact displayName:", currentTeacher);
-    }
-    
-    // If no exact match by display name, try email
-    if (!currentTeacher && user.email) {
-      currentTeacher = mockTeachers.find(t => t.name === user.email);
-      console.log("Lookup by email:", currentTeacher);
-    }
-    
-    // Only if we still have no match, try partial match
-    if (!currentTeacher && user.displayName) {
-      // For partial matches, prefer longer matches (more specific)
-      const matches = mockTeachers.filter(t => 
-        user.displayName!.includes(t.name) || 
-        t.name.includes(user.displayName!)
-      );
-      
-      if (matches.length > 0) {
-        // Sort by name length (descending) to get the most specific match
-        matches.sort((a, b) => b.name.length - a.name.length);
-        currentTeacher = matches[0];
-        console.log("Lookup by partial displayName (sorted by specificity):", currentTeacher);
-      }
-    }
-    
-    // If still no match, create a default teacher
-    if (!currentTeacher) {
-      // Create a temporary teacher using displayName or email as fallback
-      currentTeacher = { 
-        id: 'auto', 
-        name: user.displayName || user.email || 'Current User', 
-        languages: ['EN'] 
-      };
-      console.log("Created auto teacher:", currentTeacher);
-    }
-  }
-  
-  console.log("Final teacher selection:", currentTeacher);
-
   // Form state initialization
   const [formData, setFormData] = useState({
     teacherId: currentTeacher?.id || '',
@@ -149,37 +79,69 @@ export default function ClassDiaryPage() {
     notes: ''
   });
 
-  // Update teacher ID when user changes - more robust matching
+  // Fetch teachers and students from Firestore
   useEffect(() => {
-    if (user?.displayName) {
-      const displayName = user.displayName; // Store in a const to avoid TypeScript errors
-      console.log("Updating teacher based on display name:", displayName);
-      
-      // Try exact match first
-      let teacher = mockTeachers.find(t => t.name === displayName);
-      
-      // Then try partial match
-      if (!teacher) {
-        teacher = mockTeachers.find(t => 
-          displayName.includes(t.name) || 
-          t.name.includes(displayName)
+    const fetchUsers = async () => {
+      try {
+        // Get teachers from Firestore
+        const teachersQuery = query(
+          collection(db, 'users'), 
+          where('profileType', '==', 'Teacher')
         );
+        const teachersSnapshot = await getDocs(teachersQuery);
+        const teachersList = teachersSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return { 
+            id: doc.id, 
+            displayName: data.displayName || '', 
+            email: data.email || '',
+            profileType: data.profileType || 'Teacher'
+          };
+        });
+        setTeachers(teachersList);
+        console.log("Fetched teachers:", teachersList);
+        
+        // Get students from Firestore
+        const studentsQuery = query(
+          collection(db, 'users'), 
+          where('profileType', '==', 'Student')
+        );
+        const studentsSnapshot = await getDocs(studentsQuery);
+        const studentsList = studentsSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return { 
+            id: doc.id, 
+            displayName: data.displayName || '', 
+            email: data.email || '',
+            profileType: data.profileType || 'Student',
+            level: data.level || 'Intermediate'  // Default level if not specified
+          };
+        });
+        setStudents(studentsList);
+        console.log("Fetched students:", studentsList);
+      } catch (error) {
+        console.error('Error fetching users:', error);
       }
-      
-      // If still no match, create a default one
-      if (!teacher) {
-        console.log("No matching teacher found, using display name directly");
-        teacher = { id: 'auto', name: displayName, languages: ['EN'] };
-      }
-      
-      console.log("Setting teacher to:", teacher);
-      
-      setFormData(prev => ({
-        ...prev,
-        teacherId: teacher.id
-      }));
+    };
+
+    if (user) {
+      fetchUsers();
     }
   }, [user]);
+
+  // Update teacher ID when user changes
+  useEffect(() => {
+    if (user?.email && teachers.length > 0) {
+      const teacher = teachers.find(t => t.email === user.email);
+      if (teacher) {
+        setFormData(prev => ({
+          ...prev,
+          teacherId: teacher.id
+        }));
+        console.log("Set current teacher to:", teacher);
+      }
+    }
+  }, [user, teachers]);
 
   // Fetch recent uploads on component mount
   useEffect(() => {
@@ -278,8 +240,8 @@ export default function ClassDiaryPage() {
       console.log('Starting upload process...');
       
       // Get selected student and teacher data
-      const selectedStudent = mockStudents.find(s => s.id === formData.studentId);
-      const selectedTeacher = mockTeachers.find(t => t.id === formData.teacherId);
+      const selectedStudent = students.find(s => s.id === formData.studentId);
+      const selectedTeacher = teachers.find(t => t.id === formData.teacherId);
       
       console.log('Selected student:', selectedStudent);
       console.log('Selected teacher:', selectedTeacher);
@@ -316,10 +278,10 @@ export default function ClassDiaryPage() {
       const testResultData = {
         fileName: selectedFile.name,
         fileUrl,
-        studentName: selectedStudent.name,
+        studentName: selectedStudent.displayName,
         studentId: selectedStudent.id,
-        studentLevel: selectedStudent.level,
-        teacherName: selectedTeacher.name,
+        studentLevel: selectedStudent.level || 'Intermediate',
+        teacherName: selectedTeacher.displayName,
         teacherId: selectedTeacher.id,
         testDate: formData.testDate,
         testGrade: formData.testGrade,
@@ -458,13 +420,13 @@ export default function ClassDiaryPage() {
                             required
                           >
                             {currentTeacher ? (
-                              <option value={currentTeacher.id}>{currentTeacher.name}</option>
+                              <option value={currentTeacher.id}>{currentTeacher.displayName}</option>
                             ) : (
                               <>
                                 <option value="">Select Teacher</option>
-                                {mockTeachers.map(teacher => (
+                                {teachers.map(teacher => (
                                   <option key={teacher.id} value={teacher.id}>
-                                    {teacher.name}
+                                    {teacher.displayName}
                                   </option>
                                 ))}
                               </>
@@ -494,9 +456,9 @@ export default function ClassDiaryPage() {
                           required
                         >
                           <option value="">Select Student</option>
-                          {mockStudents.map(student => (
+                          {students.map(student => (
                             <option key={student.id} value={student.id}>
-                              {student.name}
+                              {student.displayName}
                             </option>
                           ))}
                         </select>

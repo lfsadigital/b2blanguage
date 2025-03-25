@@ -45,6 +45,12 @@ export default function RootLayout({
                     >
                       Class Diary
                     </Link>
+                    <Link
+                      href="/database"
+                      className="border-transparent text-[var(--subtle)] hover:text-[var(--primary)] hover:border-[var(--primary)] inline-flex items-center px-1 pt-1 border-b-2 text-sm font-medium transition-colors"
+                    >
+                      User Database
+                    </Link>
                   </div>
                 </div>
                 <div className="flex items-center space-x-4">
@@ -85,7 +91,9 @@ export default function RootLayout({
                       </Link>
                     </li>
                     <li>
-                      <span className="text-gray-600">Vocabulary Builder (Coming Soon)</span>
+                      <Link href="/database" className="text-gray-400 hover:text-white transition-colors">
+                        User Database
+                      </Link>
                     </li>
                   </ul>
                 </div>

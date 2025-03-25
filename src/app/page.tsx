@@ -71,11 +71,16 @@ export default function Home() {
               </Link>
             </div>
             <div className="p-6 bg-[#FFF8DC] rounded-lg border border-[#DEB887]">
-              <h3 className="text-xl font-semibold text-[#8B4513] mb-3">Business Database</h3>
+              <h3 className="text-xl font-semibold text-[#8B4513] mb-3">User Database</h3>
               <p className="text-gray-700 mb-4">
-                Access a curated library of business articles, case studies, and vocabulary resources.
+                Manage teachers, students, and user profiles in your system with role-based access control.
               </p>
-              <span className="text-gray-500 font-medium">Coming soon</span>
+              <Link 
+                href="/database" 
+                className="text-[#8B4513] font-medium hover:text-[#A0522D]"
+              >
+                Try it now →
+              </Link>
             </div>
           </div>
         </div>

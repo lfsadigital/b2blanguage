@@ -1,452 +1,430 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/lib/hooks/useAuth';
 import DashboardShell from '../../components/ui/dashboard-shell';
+import RoleBasedRoute from '@/app/components/RoleBasedRoute';
 import { 
+  UserCircleIcon,
+  UserPlusIcon,
+  PencilSquareIcon,
+  TrashIcon,
   MagnifyingGlassIcon,
-  DocumentTextIcon,
-  VideoCameraIcon,
-  ChartBarIcon,
-  BookmarkIcon,
-  ArrowDownTrayIcon,
-  ShareIcon,
-  TagIcon,
-  StarIcon,
-  FunnelIcon,
-  Squares2X2Icon,
-  ListBulletIcon
+  CheckCircleIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline';
+import { db } from '../../lib/firebase/firebase';
+import { collection, getDocs, addDoc, doc, deleteDoc, updateDoc, query, where, orderBy } from 'firebase/firestore';
 
-// Mock data for the business content database
-const mockResources = [
-  {
-    id: '1',
-    title: 'How Digital Transformation is Reshaping Business Models',
-    type: 'article',
-    source: 'Harvard Business Review',
-    date: '2023-02-15',
-    level: 'Advanced',
-    topics: ['digital transformation', 'business strategy', 'innovation'],
-    saved: true,
-    image: 'https://source.unsplash.com/random/300x200?digital'
-  },
-  {
-    id: '2',
-    title: 'Effective Business Communication in Virtual Environments',
-    type: 'video',
-    source: 'TED Talks',
-    date: '2023-01-20',
-    level: 'Intermediate',
-    topics: ['communication', 'remote work', 'team management'],
-    saved: false,
-    image: 'https://source.unsplash.com/random/300x200?communication'
-  },
-  {
-    id: '3',
-    title: 'Financial Planning for Small Businesses: A Beginner\'s Guide',
-    type: 'article',
-    source: 'Entrepreneur',
-    date: '2023-02-28',
-    level: 'Beginner',
-    topics: ['finance', 'small business', 'planning'],
-    saved: true,
-    image: 'https://source.unsplash.com/random/300x200?finance'
-  },
-  {
-    id: '4',
-    title: 'The Impact of Artificial Intelligence on Customer Service',
-    type: 'video',
-    source: 'YouTube',
-    date: '2023-01-05',
-    level: 'Intermediate',
-    topics: ['AI', 'customer service', 'technology'],
-    saved: false,
-    image: 'https://source.unsplash.com/random/300x200?ai'
-  },
-  {
-    id: '5',
-    title: 'Understanding Global Market Trends',
-    type: 'presentation',
-    source: 'McKinsey & Company',
-    date: '2023-02-01',
-    level: 'Advanced',
-    topics: ['market trends', 'global business', 'analytics'],
-    saved: false,
-    image: 'https://source.unsplash.com/random/300x200?market'
-  },
-  {
-    id: '6',
-    title: 'Building Resilient Supply Chains in Uncertain Times',
-    type: 'article',
-    source: 'Forbes',
-    date: '2023-03-01',
-    level: 'Intermediate',
-    topics: ['supply chain', 'risk management', 'logistics'],
-    saved: true,
-    image: 'https://source.unsplash.com/random/300x200?supply'
-  }
-];
+// Define available user profile types
+type UserProfileType = 'Visitor' | 'Owner' | 'Manager' | 'Teacher' | 'Student';
+
+interface UserProfile {
+  id: string;
+  displayName: string;
+  email: string;
+  profileType: UserProfileType;
+  lastLogin?: string;
+  createdAt?: string;
+}
 
 export default function DatabasePage() {
-  const [resources, setResources] = useState(mockResources);
+  const { user, userProfile } = useAuth();
+  const [profiles, setProfiles] = useState<UserProfile[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [activeFilters, setActiveFilters] = useState<{
-    types: string[];
-    levels: string[];
-    topics: string[];
-  }>({
-    types: [],
-    levels: [],
-    topics: []
-  });
-  const [showFilters, setShowFilters] = useState(false);
-
-  // Handle search
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchTerm(e.target.value);
-  };
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingProfile, setEditingProfile] = useState<UserProfile | null>(null);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   
-  // Filter resources based on search term and active filters
-  const filteredResources = resources.filter(resource => {
-    // Search term filter
-    const matchesSearch = 
-      resource.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      resource.source.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      resource.topics.some(topic => topic.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-    // Type filter
-    const matchesType = activeFilters.types.length === 0 || 
-      activeFilters.types.includes(resource.type);
-    
-    // Level filter
-    const matchesLevel = activeFilters.levels.length === 0 || 
-      activeFilters.levels.includes(resource.level);
-    
-    // Topic filter
-    const matchesTopic = activeFilters.topics.length === 0 || 
-      resource.topics.some(topic => activeFilters.topics.includes(topic));
-    
-    return matchesSearch && matchesType && matchesLevel && matchesTopic;
+  // Form state
+  const [formData, setFormData] = useState({
+    displayName: '',
+    email: '',
+    profileType: 'Student' as UserProfileType
   });
 
-  // Toggle filter
-  const toggleFilter = (filterType: 'types' | 'levels' | 'topics', value: string) => {
-    setActiveFilters(prev => {
-      const currentFilters = [...prev[filterType]];
-      const index = currentFilters.indexOf(value);
-      
-      if (index === -1) {
-        currentFilters.push(value);
+  // Fetch profiles from Firestore
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      try {
+        setIsLoading(true);
+        const usersCollection = collection(db, 'users');
+        const usersSnapshot = await getDocs(usersCollection);
+        const usersList = usersSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return { 
+            id: doc.id, 
+            displayName: data.displayName || '', 
+            email: data.email || '',
+            profileType: data.profileType || 'Visitor',
+            lastLogin: data.lastLogin ? new Date(data.lastLogin.toDate()).toLocaleString() : undefined,
+            createdAt: data.createdAt ? new Date(data.createdAt.toDate()).toLocaleString() : undefined
+          } as UserProfile;
+        });
+        
+        setProfiles(usersList);
+      } catch (error) {
+        console.error('Error fetching user profiles:', error);
+        setErrorMessage('Failed to load user profiles');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (user) {
+      fetchProfiles();
+    }
+  }, [user]);
+
+  // Handle form input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // Clear messages after 3 seconds
+  useEffect(() => {
+    if (successMessage || errorMessage) {
+      const timer = setTimeout(() => {
+        setSuccessMessage('');
+        setErrorMessage('');
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [successMessage, errorMessage]);
+
+  // Handle form submission for adding/editing a profile
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    try {
+      if (editingProfile) {
+        // Update existing profile
+        const userRef = doc(db, 'users', editingProfile.id);
+        await updateDoc(userRef, {
+          displayName: formData.displayName,
+          profileType: formData.profileType,
+        });
+        
+        // Update local state
+        setProfiles(prev => prev.map(profile => 
+          profile.id === editingProfile.id 
+            ? { ...profile, displayName: formData.displayName, profileType: formData.profileType } 
+            : profile
+        ));
+        
+        setSuccessMessage(`Updated ${formData.displayName}'s profile`);
+        setEditingProfile(null);
       } else {
-        currentFilters.splice(index, 1);
+        // Check if email already exists
+        const q = query(collection(db, 'users'), where('email', '==', formData.email));
+        const querySnapshot = await getDocs(q);
+        
+        if (!querySnapshot.empty) {
+          setErrorMessage('A user with this email already exists');
+          return;
+        }
+        
+        // Add new profile
+        const newProfile = {
+          displayName: formData.displayName,
+          email: formData.email,
+          profileType: formData.profileType,
+          createdAt: new Date()
+        };
+        
+        const docRef = await addDoc(collection(db, 'users'), newProfile);
+        
+        // Update local state
+        setProfiles(prev => [...prev, { 
+          id: docRef.id, 
+          ...newProfile, 
+          createdAt: new Date().toLocaleString()
+        }]);
+        
+        setSuccessMessage(`Added ${formData.displayName} as ${formData.profileType}`);
       }
       
-      return {
-        ...prev,
-        [filterType]: currentFilters
-      };
+      // Reset form
+      setFormData({
+        displayName: '',
+        email: '',
+        profileType: 'Student'
+      });
+      
+      setShowAddForm(false);
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      setErrorMessage('Failed to save profile. Please try again.');
+    }
+  };
+
+  // Handle profile deletion
+  const handleDeleteProfile = async (profileId: string, profileName: string) => {
+    if (!confirm(`Are you sure you want to delete ${profileName}'s profile?`)) {
+      return;
+    }
+    
+    try {
+      await deleteDoc(doc(db, 'users', profileId));
+      setProfiles(prev => prev.filter(profile => profile.id !== profileId));
+      setSuccessMessage(`Deleted ${profileName}'s profile`);
+    } catch (error) {
+      console.error('Error deleting profile:', error);
+      setErrorMessage('Failed to delete profile. Please try again.');
+    }
+  };
+
+  // Handle profile editing
+  const handleEditProfile = (profile: UserProfile) => {
+    setEditingProfile(profile);
+    setFormData({
+      displayName: profile.displayName,
+      email: profile.email,
+      profileType: profile.profileType
     });
+    setShowAddForm(true);
   };
 
-  // Clear all filters
-  const clearFilters = () => {
-    setActiveFilters({
-      types: [],
-      levels: [],
-      topics: []
-    });
-    setSearchTerm('');
-  };
-
-  // Toggle bookmark/save
-  const toggleSaved = (id: string) => {
-    setResources(prev => 
-      prev.map(resource => 
-        resource.id === id 
-          ? {...resource, saved: !resource.saved} 
-          : resource
-      )
-    );
-  };
-
-  // Get all unique values for filter options
-  const allTypes = Array.from(new Set(resources.map(r => r.type)));
-  const allLevels = Array.from(new Set(resources.map(r => r.level)));
-  const allTopics = Array.from(
-    new Set(resources.flatMap(r => r.topics))
-  );
+  // Filter profiles based on search term
+  const filteredProfiles = searchTerm
+    ? profiles.filter(profile => 
+        profile.displayName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        profile.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        profile.profileType.toLowerCase().includes(searchTerm.toLowerCase()))
+    : profiles;
 
   return (
-    <DashboardShell>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Business Content Database</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Access business articles, videos, and resources for your English lessons
-        </p>
-      </div>
-
-      {/* Search and filters */}
-      <div className="mb-6 bg-white shadow rounded-lg p-4">
-        <div className="flex flex-col sm:flex-row gap-4 items-center mb-4">
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
-            </div>
-            <input
-              type="search"
-              placeholder="Search articles, videos, and topics..."
-              className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm"
-              value={searchTerm}
-              onChange={handleSearch}
-            />
-          </div>
-          
-          <div className="flex items-center">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
-            >
-              <FunnelIcon className="-ml-0.5 mr-2 h-4 w-4" />
-              Filters {activeFilters.types.length > 0 || activeFilters.levels.length > 0 || activeFilters.topics.length > 0 ? `(${activeFilters.types.length + activeFilters.levels.length + activeFilters.topics.length})` : ''}
-            </button>
-            
-            <div className="ml-4 border-l pl-4 border-gray-300">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-1.5 rounded ${viewMode === 'grid' ? 'bg-gray-100 text-[#8B4513]' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                <Squares2X2Icon className="h-5 w-5" />
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-1.5 rounded ml-2 ${viewMode === 'list' ? 'bg-gray-100 text-[#8B4513]' : 'text-gray-500 hover:text-gray-700'}`}
-              >
-                <ListBulletIcon className="h-5 w-5" />
-              </button>
-            </div>
-          </div>
+    <RoleBasedRoute>
+      <DashboardShell>
+        <div className="mb-6">
+          <h1 className="text-2xl font-semibold text-gray-900">User Database</h1>
+          <p className="mt-1 text-sm text-gray-600">
+            Manage teachers, students, and managers in the system
+          </p>
         </div>
         
-        {/* Filter panels */}
-        {showFilters && (
-          <div className="border-t border-gray-200 pt-4 mt-2">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Content Type Filter */}
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Content Type</h3>
-                <div className="space-y-2">
-                  {allTypes.map(type => (
-                    <label key={type} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 text-[#8B4513] focus:ring-[#8B4513] border-gray-300 rounded"
-                        checked={activeFilters.types.includes(type)}
-                        onChange={() => toggleFilter('types', type)}
-                      />
-                      <span className="ml-2 text-sm text-gray-700 capitalize">{type}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Level Filter */}
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Level</h3>
-                <div className="space-y-2">
-                  {allLevels.map(level => (
-                    <label key={level} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 text-[#8B4513] focus:ring-[#8B4513] border-gray-300 rounded"
-                        checked={activeFilters.levels.includes(level)}
-                        onChange={() => toggleFilter('levels', level)}
-                      />
-                      <span className="ml-2 text-sm text-gray-700">{level}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Topics Filter */}
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Topics</h3>
-                <div className="grid grid-cols-2 gap-2">
-                  {allTopics.slice(0, 6).map(topic => (
-                    <label key={topic} className="flex items-center">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 text-[#8B4513] focus:ring-[#8B4513] border-gray-300 rounded"
-                        checked={activeFilters.topics.includes(topic)}
-                        onChange={() => toggleFilter('topics', topic)}
-                      />
-                      <span className="ml-2 text-sm text-gray-700 capitalize">{topic}</span>
-                    </label>
-                  ))}
-                </div>
-                {allTopics.length > 6 && (
-                  <button className="text-xs text-[#8B4513] mt-2 hover:underline">
-                    Show more topics ({allTopics.length - 6})
-                  </button>
-                )}
-              </div>
-            </div>
-            
-            <div className="mt-4 flex justify-end">
-              <button
-                onClick={clearFilters}
-                className="text-sm text-gray-500 hover:text-gray-700"
-              >
-                Clear all filters
-              </button>
-            </div>
+        {/* Success and Error Messages */}
+        {successMessage && (
+          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-md flex items-center text-green-800">
+            <CheckCircleIcon className="h-5 w-5 mr-2" />
+            {successMessage}
           </div>
         )}
-      </div>
-
-      {/* Content grid/list */}
-      {filteredResources.length > 0 ? (
-        viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredResources.map(resource => (
-              <div key={resource.id} className="bg-white rounded-lg shadow overflow-hidden hover:shadow-md transition-shadow">
-                <div className="h-40 bg-gray-200 relative">
-                  <img
-                    src={resource.image}
-                    alt={resource.title}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute top-2 right-2">
-                    <button
-                      onClick={() => toggleSaved(resource.id)}
-                      className={`p-1.5 rounded-full ${resource.saved ? 'bg-[#8B4513] text-white' : 'bg-white/80 text-gray-700 hover:bg-white'}`}
-                    >
-                      <BookmarkIcon className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <div className="flex items-center mb-2">
-                    <span className={`px-2 py-1 text-xs rounded-md ${
-                      resource.type === 'article' ? 'bg-blue-100 text-blue-800' : 
-                      resource.type === 'video' ? 'bg-red-100 text-red-800' : 
-                      'bg-purple-100 text-purple-800'
-                    } flex items-center`}>
-                      {resource.type === 'article' && <DocumentTextIcon className="h-3 w-3 mr-1" />}
-                      {resource.type === 'video' && <VideoCameraIcon className="h-3 w-3 mr-1" />}
-                      {resource.type === 'presentation' && <ChartBarIcon className="h-3 w-3 mr-1" />}
-                      {resource.type}
-                    </span>
-                    <span className="ml-2 text-xs text-gray-500">{resource.date}</span>
-                  </div>
-                  <h3 className="text-base font-medium text-gray-900 line-clamp-2 mb-1">{resource.title}</h3>
-                  <p className="text-sm text-gray-500 mb-2">{resource.source}</p>
-                  <div className="flex flex-wrap gap-1 mb-3">
-                    {resource.topics.slice(0, 2).map(topic => (
-                      <span key={topic} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#FFF8DC] text-[#8B4513]">
-                        <TagIcon className="h-3 w-3 mr-1" />
-                        {topic}
-                      </span>
-                    ))}
-                    {resource.topics.length > 2 && (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800">
-                        +{resource.topics.length - 2}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className={`text-xs font-medium ${
-                      resource.level === 'Beginner' ? 'text-green-600' : 
-                      resource.level === 'Intermediate' ? 'text-yellow-600' : 
-                      'text-blue-600'
-                    }`}>
-                      {resource.level}
-                    </span>
-                    <div className="space-x-2">
-                      <button className="p-1 text-gray-400 hover:text-[#8B4513]">
-                        <ArrowDownTrayIcon className="h-4 w-4" />
-                      </button>
-                      <button className="p-1 text-gray-400 hover:text-[#8B4513]">
-                        <ShareIcon className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+        
+        {errorMessage && (
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md flex items-center text-red-800">
+            <XCircleIcon className="h-5 w-5 mr-2" />
+            {errorMessage}
           </div>
-        ) : (
-          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-            <ul className="divide-y divide-gray-200">
-              {filteredResources.map(resource => (
-                <li key={resource.id} className="px-4 py-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2">
-                        <span className={`px-2 py-1 text-xs rounded-md ${
-                          resource.type === 'article' ? 'bg-blue-100 text-blue-800' : 
-                          resource.type === 'video' ? 'bg-red-100 text-red-800' : 
-                          'bg-purple-100 text-purple-800'
-                        } flex items-center`}>
-                          {resource.type === 'article' && <DocumentTextIcon className="h-3 w-3 mr-1" />}
-                          {resource.type === 'video' && <VideoCameraIcon className="h-3 w-3 mr-1" />}
-                          {resource.type === 'presentation' && <ChartBarIcon className="h-3 w-3 mr-1" />}
-                          {resource.type}
-                        </span>
-                        <span className="text-xs text-gray-500">{resource.date}</span>
-                        <span className={`text-xs font-medium ${
-                          resource.level === 'Beginner' ? 'text-green-600' : 
-                          resource.level === 'Intermediate' ? 'text-yellow-600' : 
-                          'text-blue-600'
-                        }`}>
-                          {resource.level}
-                        </span>
-                      </div>
-                      <h3 className="mt-1 text-base font-medium text-gray-900">{resource.title}</h3>
-                      <p className="text-sm text-gray-500">{resource.source}</p>
-                      
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {resource.topics.map(topic => (
-                          <span key={topic} className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#FFF8DC] text-[#8B4513]">
-                            {topic}
-                          </span>
-                        ))}
-                      </div>
+        )}
+        
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="p-6">
+            {/* Search and Add buttons */}
+            <div className="flex flex-col sm:flex-row justify-between space-y-4 sm:space-y-0 mb-6">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search users..."
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513]"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              
+              <button
+                onClick={() => {
+                  setEditingProfile(null);
+                  setFormData({
+                    displayName: '',
+                    email: '',
+                    profileType: 'Student'
+                  });
+                  setShowAddForm(!showAddForm);
+                }}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#8B4513] hover:bg-[#A0522D] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
+              >
+                <UserPlusIcon className="h-5 w-5 mr-2" />
+                {showAddForm ? 'Cancel' : 'Add New User'}
+              </button>
+            </div>
+            
+            {/* Add/Edit Form */}
+            {showAddForm && (
+              <div className="mb-8 p-6 bg-gray-50 rounded-lg">
+                <h3 className="text-lg font-medium mb-4">
+                  {editingProfile ? 'Edit User Profile' : 'Add New User'}
+                </h3>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label htmlFor="displayName" className="block text-sm font-medium text-gray-700">
+                        Full Name
+                      </label>
+                      <input
+                        id="displayName"
+                        name="displayName"
+                        type="text"
+                        required
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513]"
+                        value={formData.displayName}
+                        onChange={handleInputChange}
+                      />
                     </div>
                     
-                    <div className="flex items-start ml-4 space-x-2">
-                      <button
-                        onClick={() => toggleSaved(resource.id)}
-                        className={`p-1.5 rounded-full ${resource.saved ? 'text-[#8B4513]' : 'text-gray-400 hover:text-[#8B4513]'}`}
-                      >
-                        <BookmarkIcon className="h-5 w-5" />
-                      </button>
-                      <button className="p-1.5 rounded-full text-gray-400 hover:text-[#8B4513]">
-                        <ArrowDownTrayIcon className="h-5 w-5" />
-                      </button>
-                      <button className="p-1.5 rounded-full text-gray-400 hover:text-[#8B4513]">
-                        <ShareIcon className="h-5 w-5" />
-                      </button>
+                    <div>
+                      <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                        Email
+                      </label>
+                      <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        required
+                        disabled={!!editingProfile} // Can't change email for existing profiles
+                        className={`mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] ${
+                          editingProfile ? 'bg-gray-100' : ''
+                        }`}
+                        value={formData.email}
+                        onChange={handleInputChange}
+                      />
+                      {editingProfile && (
+                        <p className="mt-1 text-xs text-gray-500">Email cannot be changed</p>
+                      )}
                     </div>
                   </div>
-                </li>
-              ))}
-            </ul>
+                  
+                  <div>
+                    <label htmlFor="profileType" className="block text-sm font-medium text-gray-700">
+                      Profile Type
+                    </label>
+                    <select
+                      id="profileType"
+                      name="profileType"
+                      required
+                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
+                      value={formData.profileType}
+                      onChange={handleInputChange}
+                    >
+                      <option value="Student">Student</option>
+                      <option value="Teacher">Teacher</option>
+                      <option value="Manager">Manager</option>
+                      {userProfile === 'Owner' && (
+                        <option value="Owner">Owner</option>
+                      )}
+                    </select>
+                  </div>
+                  
+                  <div className="flex justify-end space-x-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => setShowAddForm(false)}
+                      className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#8B4513] hover:bg-[#A0522D] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
+                    >
+                      {editingProfile ? 'Update User' : 'Add User'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            )}
+            
+            {/* Profiles List */}
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#8B4513]"></div>
+              </div>
+            ) : filteredProfiles.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Name
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Email
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Type
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredProfiles.map((profile) => (
+                      <tr key={profile.id}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center">
+                              <UserCircleIcon className="h-6 w-6 text-gray-400" />
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">{profile.displayName}</div>
+                              {profile.lastLogin && (
+                                <div className="text-xs text-gray-500">Last login: {profile.lastLogin}</div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm text-gray-900">{profile.email}</div>
+                          {profile.createdAt && (
+                            <div className="text-xs text-gray-500">Created: {profile.createdAt}</div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                            ${profile.profileType === 'Teacher' ? 'bg-green-100 text-green-800' : 
+                              profile.profileType === 'Student' ? 'bg-blue-100 text-blue-800' : 
+                              profile.profileType === 'Manager' ? 'bg-purple-100 text-purple-800' : 
+                              profile.profileType === 'Owner' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-gray-100 text-gray-800'}`}>
+                            {profile.profileType}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <button
+                            onClick={() => handleEditProfile(profile)}
+                            className="text-[#8B4513] hover:text-[#A0522D] mr-4"
+                            title="Edit User"
+                          >
+                            <PencilSquareIcon className="h-5 w-5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProfile(profile.id, profile.displayName)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Delete User"
+                          >
+                            <TrashIcon className="h-5 w-5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                {searchTerm ? 'No users match your search.' : 'No users found. Add some using the button above.'}
+              </div>
+            )}
           </div>
-        )
-      ) : (
-        <div className="text-center py-12 bg-white rounded-lg shadow">
-          <DocumentTextIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No resources found</h3>
-          <p className="text-gray-500 mb-6">Try adjusting your search or filters to find what you're looking for.</p>
-          <button
-            onClick={clearFilters}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-[#8B4513] hover:bg-[#A0522D] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
-          >
-            Clear all filters
-          </button>
         </div>
-      )}
-    </DashboardShell>
+      </DashboardShell>
+    </RoleBasedRoute>
   );
 } 
