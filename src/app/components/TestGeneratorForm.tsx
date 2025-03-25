@@ -1,16 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TestFormData, StudentLevel, QuestionType } from '@/app/lib/types';
 
 interface TestGeneratorFormProps {
   onSubmit: (data: TestFormData) => Promise<void>;
   isGenerating: boolean;
+  defaultTeacherName?: string;
 }
 
-export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGeneratorFormProps) {
+export default function TestGeneratorForm({ onSubmit, isGenerating, defaultTeacherName }: TestGeneratorFormProps) {
   const [formData, setFormData] = useState<TestFormData>({
-    professorName: '',
+    professorName: defaultTeacherName || '',
     studentName: '',
     contentUrl: '',
     studentLevel: 'Beginner',
@@ -18,6 +19,16 @@ export default function TestGeneratorForm({ onSubmit, isGenerating }: TestGenera
     numberOfQuestions: 5,
     additionalNotes: '',
   });
+
+  // Update professor name when defaultTeacherName changes
+  useEffect(() => {
+    if (defaultTeacherName) {
+      setFormData(prev => ({
+        ...prev,
+        professorName: defaultTeacherName
+      }));
+    }
+  }, [defaultTeacherName]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

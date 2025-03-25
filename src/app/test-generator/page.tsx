@@ -5,6 +5,8 @@ import DashboardShell from '../../components/ui/dashboard-shell';
 import TestGeneratorForm from '@/app/components/TestGeneratorForm';
 import TestTemplate from './TestTemplate';
 import { TestFormData } from '@/app/lib/types';
+import { useAuth } from '@/lib/hooks/useAuth';
+import RoleBasedRoute from '@/app/components/RoleBasedRoute';
 import { 
   DocumentTextIcon,
   LightBulbIcon,
@@ -14,6 +16,7 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function TestGeneratorPage() {
+  const { user } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
   const [testGenerated, setTestGenerated] = useState(false);
   const [currentTab, setCurrentTab] = useState<'test' | 'conversation' | 'teacher-tips'>('test');
@@ -40,7 +43,7 @@ export default function TestGeneratorPage() {
     testTitle: '',
     testContent: '',
     studentName: '',
-    teacherName: '',
+    teacherName: user?.displayName || '',
     testDate: new Date().toLocaleDateString(),
     subject: '',
     questions: [],
@@ -48,6 +51,16 @@ export default function TestGeneratorPage() {
     teachingTips: [],
     contentUrl: ''
   });
+
+  // Update teacher name when user changes
+  useEffect(() => {
+    if (user?.displayName) {
+      setGeneratedContent(prev => ({
+        ...prev,
+        teacherName: user.displayName || ''
+      }));
+    }
+  }, [user]);
 
   // Load document generation libraries
   useEffect(() => {
@@ -817,7 +830,7 @@ Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion),
             />
           </div>
         ) : (
-          <TestGeneratorForm onSubmit={handleSubmit} isGenerating={isGenerating} />
+          <TestGeneratorForm onSubmit={handleSubmit} isGenerating={isGenerating} defaultTeacherName={user?.displayName || ''} />
         )}
       </div>
     );
@@ -907,61 +920,65 @@ Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion),
   };
 
   return (
-    <DashboardShell>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-gray-900">Test & Class Generator</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Create custom tests, conversation topics, and teaching tips based on business content
-        </p>
-      </div>
+    <RoleBasedRoute>
+      <DashboardShell>
+        <div className="container mx-auto px-4 py-8">
+          <div className="mb-6">
+            <h1 className="text-2xl font-semibold text-gray-900">Test & Class Generator</h1>
+            <p className="mt-1 text-sm text-gray-600">
+              Create custom tests, conversation topics, and teaching tips based on business content
+            </p>
+          </div>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-          <button
-            onClick={() => setCurrentTab('test')}
-            className={`${
-              currentTab === 'test'
-                ? 'border-[#8B4513] text-[#8B4513]'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
-          >
-            <DocumentTextIcon className="mr-2 h-5 w-5" />
-            Test
-          </button>
-          
-          <button
-            onClick={() => setCurrentTab('conversation')}
-            className={`${
-              currentTab === 'conversation'
-                ? 'border-[#8B4513] text-[#8B4513]'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
-          >
-            <ChatBubbleLeftRightIcon className="mr-2 h-5 w-5" />
-            Conversation Questions
-          </button>
-          
-          <button
-            onClick={() => setCurrentTab('teacher-tips')}
-            className={`${
-              currentTab === 'teacher-tips'
-                ? 'border-[#8B4513] text-[#8B4513]'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
-          >
-            <LightBulbIcon className="mr-2 h-5 w-5" />
-            Teacher Tips
-          </button>
-        </nav>
-      </div>
+          {/* Tabs */}
+          <div className="border-b border-gray-200 mb-6">
+            <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+              <button
+                onClick={() => setCurrentTab('test')}
+                className={`${
+                  currentTab === 'test'
+                    ? 'border-[#8B4513] text-[#8B4513]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
+              >
+                <DocumentTextIcon className="mr-2 h-5 w-5" />
+                Test
+              </button>
+              
+              <button
+                onClick={() => setCurrentTab('conversation')}
+                className={`${
+                  currentTab === 'conversation'
+                    ? 'border-[#8B4513] text-[#8B4513]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
+              >
+                <ChatBubbleLeftRightIcon className="mr-2 h-5 w-5" />
+                Conversation Questions
+              </button>
+              
+              <button
+                onClick={() => setCurrentTab('teacher-tips')}
+                className={`${
+                  currentTab === 'teacher-tips'
+                    ? 'border-[#8B4513] text-[#8B4513]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
+              >
+                <LightBulbIcon className="mr-2 h-5 w-5" />
+                Teacher Tips
+              </button>
+            </nav>
+          </div>
 
-      {/* Tab content */}
-      <div>
-        {currentTab === 'test' && renderTestContent()}
-        {currentTab === 'conversation' && renderConversationContent()}
-        {currentTab === 'teacher-tips' && renderTeachingTipsContent()}
-      </div>
-    </DashboardShell>
+          {/* Tab content */}
+          <div>
+            {currentTab === 'test' && renderTestContent()}
+            {currentTab === 'conversation' && renderConversationContent()}
+            {currentTab === 'teacher-tips' && renderTeachingTipsContent()}
+          </div>
+        </div>
+      </DashboardShell>
+    </RoleBasedRoute>
   );
 } 
