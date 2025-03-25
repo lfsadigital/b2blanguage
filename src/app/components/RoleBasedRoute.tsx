@@ -7,14 +7,14 @@ interface RoleBasedRouteProps {
 }
 
 const RoleBasedRoute = ({ children }: RoleBasedRouteProps) => {
-  const { user, loading } = useAuth();
+  const { user, loading, userProfile } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && (!user || !['Teacher', 'Owner', 'Manager'].includes(user.role))) {
+    if (!loading && (!user || !['Teacher', 'Owner', 'Manager'].includes(userProfile || ''))) {
       router.push('/');
     }
-  }, [user, loading, router]);
+  }, [user, loading, router, userProfile]);
 
   if (loading) {
     return <div className="flex items-center justify-center min-h-screen">
@@ -22,7 +22,7 @@ const RoleBasedRoute = ({ children }: RoleBasedRouteProps) => {
     </div>;
   }
 
-  if (!user || !['Teacher', 'Owner', 'Manager'].includes(user.role)) {
+  if (!user || !['Teacher', 'Owner', 'Manager'].includes(userProfile || '')) {
     return null;
   }
 
