@@ -28,6 +28,21 @@ interface UserProfile {
   createdAt?: string;
 }
 
+// Adding a style block to ensure all text is black with !important
+const tableStyles = {
+  headerText: {
+    color: 'black !important',
+    fontWeight: 'bold !important',
+  },
+  cellText: {
+    color: 'black !important',
+  },
+  badgeText: {
+    color: 'black !important',
+    fontWeight: 'bold !important',
+  }
+};
+
 export default function DatabasePage() {
   const { user, userProfile } = useAuth();
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
@@ -353,16 +368,32 @@ export default function DatabasePage() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-[#F0E6D2]">
                     <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                      <th 
+                        scope="col" 
+                        className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider"
+                        style={tableStyles.headerText}
+                      >
                         Name
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                      <th 
+                        scope="col" 
+                        className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider"
+                        style={tableStyles.headerText}
+                      >
                         Email
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
+                      <th 
+                        scope="col" 
+                        className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider"
+                        style={tableStyles.headerText}
+                      >
                         Type
                       </th>
-                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-black uppercase tracking-wider">
+                      <th 
+                        scope="col" 
+                        className="px-6 py-3 text-right text-xs font-medium text-black uppercase tracking-wider"
+                        style={tableStyles.headerText}
+                      >
                         Actions
                       </th>
                     </tr>
@@ -376,26 +407,29 @@ export default function DatabasePage() {
                               <UserCircleIcon className="h-6 w-6 text-[#8B4513]" />
                             </div>
                             <div className="ml-4">
-                              <div className="text-sm font-medium text-black">{profile.displayName}</div>
+                              <div className="text-sm font-medium text-black" style={tableStyles.cellText}>{profile.displayName}</div>
                               {profile.lastLogin && (
-                                <div className="text-xs text-black">Last login: {profile.lastLogin}</div>
+                                <div className="text-xs text-black" style={tableStyles.cellText}>Last login: {profile.lastLogin}</div>
                               )}
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-black">{profile.email}</div>
+                          <div className="text-sm text-black" style={tableStyles.cellText}>{profile.email}</div>
                           {profile.createdAt && (
-                            <div className="text-xs text-black">Created: {profile.createdAt}</div>
+                            <div className="text-xs text-black" style={tableStyles.cellText}>Created: {profile.createdAt}</div>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                            ${profile.profileType === 'Teacher' ? 'bg-green-100 text-black' : 
-                              profile.profileType === 'Student' ? 'bg-blue-100 text-black' : 
-                              profile.profileType === 'Manager' ? 'bg-purple-100 text-black' : 
-                              profile.profileType === 'Owner' ? 'bg-yellow-100 text-black' :
-                              'bg-gray-100 text-black'}`}>
+                          <span 
+                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
+                              ${profile.profileType === 'Teacher' ? 'bg-green-100 text-black' : 
+                                profile.profileType === 'Student' ? 'bg-blue-100 text-black' : 
+                                profile.profileType === 'Manager' ? 'bg-purple-100 text-black' : 
+                                profile.profileType === 'Owner' ? 'bg-yellow-100 text-black' :
+                                'bg-gray-100 text-black'}`}
+                            style={tableStyles.badgeText}
+                          >
                             {profile.profileType}
                           </span>
                         </td>
