@@ -18,14 +18,19 @@ import { addDocument, getDocuments, uploadFile } from '../../lib/firebase/fireba
 import { db } from '../../lib/firebase/firebase';
 import { collection, getDocs, setDoc, doc } from 'firebase/firestore';
 
-// Mock data for teachers - add the logged-in user's display name
+// Mock data for teachers - add more name variations
 const mockTeachers = [
   { id: '1', name: 'Rafael', languages: ['EN', 'ES'] },
   { id: '2', name: 'Ortiz', languages: ['ES'] },
   { id: '3', name: 'Sersun', languages: ['EN'] },
   { id: '4', name: 'Luiz Fellipe Almeida', languages: ['EN'] },
   // Add common variations of the name that might match
-  { id: '5', name: 'Luiz', languages: ['EN'] }
+  { id: '5', name: 'Luiz', languages: ['EN'] },
+  // Add explicit match for your Gmail address in case displayName is empty
+  { id: '6', name: 'lfsalmeida92@gmail.com', languages: ['EN'] },
+  { id: '7', name: 'Luiz Fellipe', languages: ['EN'] },
+  { id: '8', name: 'Fellipe', languages: ['EN'] },
+  { id: '9', name: 'Almeida', languages: ['EN'] }
 ];
 
 // Mock data for students
@@ -78,23 +83,54 @@ export default function ClassDiaryPage() {
   const [recentUploads, setRecentUploads] = useState<TestResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Add debugging to see user display name
-  console.log("Current user display name:", user?.displayName);
+  // Add detailed debugging to see user info
+  console.log("======= USER DEBUG INFO =======");
+  console.log("User object:", user);
+  console.log("User email:", user?.email);
+  console.log("User display name:", user?.displayName);
+  console.log("User profile type:", userProfile);
+  console.log("==============================");
   
-  // Find the teacher info based on the user's display name
-  // First try exact match, then try includes/partial match
-  const currentTeacher = user?.displayName 
-    ? (mockTeachers.find(t => t.name === user.displayName) ||
-       mockTeachers.find(t => 
-         user.displayName && 
-         (user.displayName.includes(t.name) || t.name.includes(user.displayName))
-       ) ||
-       { id: 'auto', name: user.displayName || 'Current User', languages: ['EN'] }) // Create a teacher if none found
-    : null;
+  // Find the teacher based on user info - try multiple approaches
+  let currentTeacher = null;
+  
+  if (user) {
+    // Try displayName first
+    if (user.displayName) {
+      currentTeacher = mockTeachers.find(t => t.name === user.displayName);
+      console.log("Lookup by exact displayName:", currentTeacher);
+    }
     
-  console.log("Found teacher:", currentTeacher);
+    // If no match by display name, try partial match
+    if (!currentTeacher && user.displayName) {
+      currentTeacher = mockTeachers.find(t => 
+        user.displayName!.includes(t.name) || 
+        t.name.includes(user.displayName!)
+      );
+      console.log("Lookup by partial displayName:", currentTeacher);
+    }
+    
+    // If still no match, try email
+    if (!currentTeacher && user.email) {
+      currentTeacher = mockTeachers.find(t => t.name === user.email);
+      console.log("Lookup by email:", currentTeacher);
+    }
+    
+    // If still no match, create a default teacher
+    if (!currentTeacher) {
+      // Create a temporary teacher using displayName or email as fallback
+      currentTeacher = { 
+        id: 'auto', 
+        name: user.displayName || user.email || 'Current User', 
+        languages: ['EN'] 
+      };
+      console.log("Created auto teacher:", currentTeacher);
+    }
+  }
   
-  // Form state
+  console.log("Final teacher selection:", currentTeacher);
+
+  // Form state initialization
   const [formData, setFormData] = useState({
     teacherId: currentTeacher?.id || '',
     studentId: '',
