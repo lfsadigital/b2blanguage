@@ -137,10 +137,10 @@ const RoleBasedRoute = ({ children, requiredRoles }: RoleBasedRouteProps) => {
           {" "}Please contact your administrator if you need access.
         </p>
         <button
-          onClick={() => router.push('/')}
+          onClick={() => router.push('/dashboard')}
           className="px-4 py-2 bg-[#8B4513] text-white rounded-md hover:bg-[#A0522D] transition-colors"
         >
-          Go to Home
+          Go to Dashboard
         </button>
       </div>
     );

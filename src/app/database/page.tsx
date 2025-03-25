@@ -200,23 +200,23 @@ export default function DatabasePage() {
     <RoleBasedRoute>
       <DashboardShell>
         <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900">User Database</h1>
-          <p className="mt-1 text-sm text-gray-600">
+          <h1 className="text-2xl font-semibold text-black">User Database</h1>
+          <p className="mt-1 text-sm text-black">
             Manage teachers, students, and managers in the system
           </p>
         </div>
         
         {/* Success and Error Messages */}
         {successMessage && (
-          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-md flex items-center text-green-800">
-            <CheckCircleIcon className="h-5 w-5 mr-2" />
+          <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-md flex items-center text-black">
+            <CheckCircleIcon className="h-5 w-5 mr-2 text-green-600" />
             {successMessage}
           </div>
         )}
         
         {errorMessage && (
-          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md flex items-center text-red-800">
-            <XCircleIcon className="h-5 w-5 mr-2" />
+          <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md flex items-center text-black">
+            <XCircleIcon className="h-5 w-5 mr-2 text-red-600" />
             {errorMessage}
           </div>
         )}
@@ -227,12 +227,12 @@ export default function DatabasePage() {
             <div className="flex flex-col sm:flex-row justify-between space-y-4 sm:space-y-0 mb-6">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <MagnifyingGlassIcon className="h-5 w-5 text-gray-500" />
+                  <MagnifyingGlassIcon className="h-5 w-5 text-black" />
                 </div>
                 <input
                   type="text"
                   placeholder="Search users..."
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513]"
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] text-black"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -248,9 +248,9 @@ export default function DatabasePage() {
                   });
                   setShowAddForm(!showAddForm);
                 }}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#8B4513] hover:bg-[#A0522D] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-black bg-[#F0E6D2] hover:bg-[#E6D7B8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
               >
-                <UserPlusIcon className="h-5 w-5 mr-2" />
+                <UserPlusIcon className="h-5 w-5 mr-2 text-black" />
                 {showAddForm ? 'Cancel' : 'Add New User'}
               </button>
             </div>
@@ -258,13 +258,13 @@ export default function DatabasePage() {
             {/* Add/Edit Form */}
             {showAddForm && (
               <div className="mb-8 p-6 bg-[#F5EFE0] rounded-lg border border-[#E6D7B8]">
-                <h3 className="text-lg font-medium mb-4 text-gray-800">
+                <h3 className="text-lg font-medium mb-4 text-black">
                   {editingProfile ? 'Edit User Profile' : 'Add New User'}
                 </h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
-                      <label htmlFor="displayName" className="block text-sm font-medium text-gray-700">
+                      <label htmlFor="displayName" className="block text-sm font-medium text-black">
                         Full Name
                       </label>
                       <input
@@ -272,14 +272,14 @@ export default function DatabasePage() {
                         name="displayName"
                         type="text"
                         required
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-white focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513]"
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-white focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] text-black"
                         value={formData.displayName}
                         onChange={handleInputChange}
                       />
                     </div>
                     
                     <div>
-                      <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                      <label htmlFor="email" className="block text-sm font-medium text-black">
                         Email
                       </label>
                       <input
@@ -288,27 +288,27 @@ export default function DatabasePage() {
                         type="email"
                         required
                         disabled={!!editingProfile} // Can't change email for existing profiles
-                        className={`mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] ${
+                        className={`mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] text-black ${
                           editingProfile ? 'bg-gray-100' : 'bg-white'
                         }`}
                         value={formData.email}
                         onChange={handleInputChange}
                       />
                       {editingProfile && (
-                        <p className="mt-1 text-xs text-gray-600">Email cannot be changed</p>
+                        <p className="mt-1 text-xs text-black">Email cannot be changed</p>
                       )}
                     </div>
                   </div>
                   
                   <div>
-                    <label htmlFor="profileType" className="block text-sm font-medium text-gray-700">
+                    <label htmlFor="profileType" className="block text-sm font-medium text-black">
                       Profile Type
                     </label>
                     <select
                       id="profileType"
                       name="profileType"
                       required
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 bg-white focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
+                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 bg-white focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md text-black"
                       value={formData.profileType}
                       onChange={handleInputChange}
                     >
@@ -325,13 +325,13 @@ export default function DatabasePage() {
                     <button
                       type="button"
                       onClick={() => setShowAddForm(false)}
-                      className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
+                      className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-black bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-[#8B4513] hover:bg-[#A0522D] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
+                      className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-black bg-[#F0E6D2] hover:bg-[#E6D7B8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
                     >
                       {editingProfile ? 'Update User' : 'Add User'}
                     </button>
@@ -373,17 +373,17 @@ export default function DatabasePage() {
                               <UserCircleIcon className="h-6 w-6 text-[#8B4513]" />
                             </div>
                             <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">{profile.displayName}</div>
+                              <div className="text-sm font-medium text-black">{profile.displayName}</div>
                               {profile.lastLogin && (
-                                <div className="text-xs text-gray-600">Last login: {profile.lastLogin}</div>
+                                <div className="text-xs text-black">Last login: {profile.lastLogin}</div>
                               )}
                             </div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{profile.email}</div>
+                          <div className="text-sm text-black">{profile.email}</div>
                           {profile.createdAt && (
-                            <div className="text-xs text-gray-600">Created: {profile.createdAt}</div>
+                            <div className="text-xs text-black">Created: {profile.createdAt}</div>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -418,7 +418,7 @@ export default function DatabasePage() {
                 </table>
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-600">
+              <div className="text-center py-8 text-black">
                 {searchTerm ? 'No users match your search.' : 'No users found. Add some using the button above.'}
               </div>
             )}
