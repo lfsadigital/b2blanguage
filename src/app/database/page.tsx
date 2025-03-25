@@ -350,16 +350,16 @@ export default function DatabasePage() {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-[#F0E6D2]">
                     <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                         Name
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                         Email
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">
                         Type
                       </th>
-                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-black uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
@@ -388,11 +388,11 @@ export default function DatabasePage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                            ${profile.profileType === 'Teacher' ? 'bg-green-100 text-green-800' : 
-                              profile.profileType === 'Student' ? 'bg-blue-100 text-blue-800' : 
-                              profile.profileType === 'Manager' ? 'bg-purple-100 text-purple-800' : 
-                              profile.profileType === 'Owner' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-gray-100 text-gray-800'}`}>
+                            ${profile.profileType === 'Teacher' ? 'bg-green-100 text-black' : 
+                              profile.profileType === 'Student' ? 'bg-blue-100 text-black' : 
+                              profile.profileType === 'Manager' ? 'bg-purple-100 text-black' : 
+                              profile.profileType === 'Owner' ? 'bg-yellow-100 text-black' :
+                              'bg-gray-100 text-black'}`}>
                             {profile.profileType}
                           </span>
                         </td>
