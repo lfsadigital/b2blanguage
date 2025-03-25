@@ -10,69 +10,58 @@ const RoleBasedRoute = ({ children }: RoleBasedRouteProps) => {
   const { user, loading, userProfile } = useAuth();
   const router = useRouter();
   const [isAuthorized, setIsAuthorized] = useState<boolean | null>(null);
-  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [hasCheckedOnce, setHasCheckedOnce] = useState(false);
 
   useEffect(() => {
     const checkAuthorization = async () => {
-      console.log('RoleBasedRoute effect running');
-      console.log('Loading state:', loading);
-      
-      // Wait for the initial Firebase load
+      console.log('Auth State Check:', {
+        loading,
+        hasUser: !!user,
+        userProfile,
+        hasCheckedOnce
+      });
+
+      // Skip if still loading
       if (loading) {
-        console.log('Still loading Firebase auth...');
+        console.log('Still loading auth state...');
         return;
       }
 
-      // Set initial load as complete
-      if (!initialLoadComplete) {
-        console.log('Initial Firebase load complete');
-        setInitialLoadComplete(true);
+      // If we have a user and profile is still Visitor, wait for potential update
+      if (user && userProfile === 'Visitor' && !hasCheckedOnce) {
+        console.log('User exists but profile is Visitor, waiting for potential update...');
+        return;
       }
-      
-      console.log('Auth state:', {
-        userEmail: user?.email,
+
+      // Mark that we've done at least one check
+      if (!hasCheckedOnce) {
+        setHasCheckedOnce(true);
+      }
+
+      // Now check authorization
+      const allowedRoles = ['Teacher', 'Owner', 'Manager'];
+      const authorized = !!user && allowedRoles.includes(userProfile);
+
+      console.log('Final Authorization Check:', {
+        hasUser: !!user,
         userProfile,
-        displayName: user?.displayName,
-        isAuthenticated: !!user
+        isAuthorized: authorized
       });
 
-      // Only proceed with authorization check after initial load
-      if (initialLoadComplete) {
-        // Check if user is authenticated
-        if (!user) {
-          console.log('No user found, redirecting to home');
-          setIsAuthorized(false);
-          router.push('/');
-          return;
-        }
+      setIsAuthorized(authorized);
 
-        // Check if user has the correct profile type
-        const allowedRoles = ['Teacher', 'Owner', 'Manager'];
-        const authorized = allowedRoles.includes(userProfile);
-        
-        console.log('Authorization check:', {
-          userProfile,
-          allowedRoles,
-          isAuthorized: authorized
-        });
-        
-        setIsAuthorized(authorized);
-        
-        if (!authorized) {
-          console.log('Not authorized, redirecting to home');
-          router.push('/');
-        } else {
-          console.log('User is authorized, rendering protected content');
-        }
+      // Only redirect if we're sure the user is not authorized
+      if (!authorized && hasCheckedOnce) {
+        console.log('User is not authorized, redirecting to home');
+        router.push('/');
       }
     };
 
     checkAuthorization();
-  }, [user, loading, userProfile, router, initialLoadComplete]);
+  }, [user, loading, userProfile, router, hasCheckedOnce]);
 
-  // Show loading state while checking authorization or during initial load
-  if (loading || !initialLoadComplete || isAuthorized === null) {
-    console.log('Showing loading state:', { loading, initialLoadComplete, isAuthorized });
+  // Show loading state while checking authorization
+  if (loading || !hasCheckedOnce || isAuthorized === null) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
@@ -82,12 +71,10 @@ const RoleBasedRoute = ({ children }: RoleBasedRouteProps) => {
 
   // If not authorized, render nothing (redirect will happen)
   if (!isAuthorized) {
-    console.log('Not authorized, rendering null');
     return null;
   }
 
   // If authorized, render children
-  console.log('Authorized, rendering children');
   return <>{children}</>;
 };
 
