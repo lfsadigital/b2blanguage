@@ -75,12 +75,14 @@ export default function ClassDiaryPage() {
   const [recentUploads, setRecentUploads] = useState<TestResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Find the teacher ID based on the user's display name
-  const currentTeacherId = mockTeachers.find(t => t.name === user?.displayName)?.id || '';
+  // Find the teacher info based on the user's display name
+  const currentTeacher = user?.displayName 
+    ? mockTeachers.find(t => t.name === user.displayName) 
+    : null;
   
   // Form state
   const [formData, setFormData] = useState({
-    teacherId: currentTeacherId,
+    teacherId: currentTeacher?.id || '',
     studentId: '',
     testDate: new Date().toISOString().split('T')[0], // Today's date
     testGrade: '',
@@ -92,11 +94,13 @@ export default function ClassDiaryPage() {
   // Update teacher ID when user changes
   useEffect(() => {
     if (user?.displayName) {
-      const teacherId = mockTeachers.find(t => t.name === user.displayName)?.id || '';
-      setFormData(prev => ({
-        ...prev,
-        teacherId
-      }));
+      const teacher = mockTeachers.find(t => t.name === user.displayName);
+      if (teacher) {
+        setFormData(prev => ({
+          ...prev,
+          teacherId: teacher.id
+        }));
+      }
     }
   }, [user]);
 
@@ -269,16 +273,7 @@ export default function ClassDiaryPage() {
         setRecentUploads(prev => [newUpload, ...prev]);
         
         // Reset form
-        setSelectedFile(null);
-        setFormData({
-          teacherId: userProfile === 'Teacher' ? mockTeachers[0].id : '',
-          studentId: '',
-          testDate: new Date().toISOString().split('T')[0],
-          testGrade: '',
-          gradeByTeacher: '',
-          forNextClass: '',
-          notes: ''
-        });
+        resetForm();
         
         setUploadSuccess(true);
         setTimeout(() => setUploadSuccess(false), 3000);
@@ -294,6 +289,21 @@ export default function ClassDiaryPage() {
       setIsUploading(false);
       console.log('Upload process ended (success or failure)');
     }
+  };
+
+  // Reset form after successful upload
+  const resetForm = () => {
+    // Keep the current teacher ID but reset other fields
+    setFormData({
+      teacherId: currentTeacher?.id || '',
+      studentId: '',
+      testDate: new Date().toISOString().split('T')[0],
+      testGrade: '',
+      gradeByTeacher: '',
+      forNextClass: '',
+      notes: ''
+    });
+    setSelectedFile(null);
   };
 
   return (
@@ -360,21 +370,38 @@ export default function ClassDiaryPage() {
                         <label htmlFor="teacherId" className="block text-sm font-medium text-gray-700">
                           Teacher
                         </label>
-                        <select
-                          id="teacherId"
-                          name="teacherId"
-                          className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
-                          value={formData.teacherId}
-                          onChange={handleInputChange}
-                          required
-                        >
-                          <option value="">Select Teacher</option>
-                          {mockTeachers.map(teacher => (
-                            <option key={teacher.id} value={teacher.id}>
-                              {teacher.name}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="mt-1 relative rounded-md shadow-sm">
+                          <select
+                            id="teacherId"
+                            name="teacherId"
+                            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 bg-gray-100 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md cursor-not-allowed"
+                            value={formData.teacherId}
+                            onChange={handleInputChange}
+                            disabled={true}
+                            required
+                          >
+                            {currentTeacher ? (
+                              <option value={currentTeacher.id}>{currentTeacher.name}</option>
+                            ) : (
+                              <>
+                                <option value="">Select Teacher</option>
+                                {mockTeachers.map(teacher => (
+                                  <option key={teacher.id} value={teacher.id}>
+                                    {teacher.name}
+                                  </option>
+                                ))}
+                              </>
+                            )}
+                          </select>
+                          {currentTeacher && (
+                            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                              <UserCircleIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                            </div>
+                          )}
+                        </div>
+                        {currentTeacher && (
+                          <p className="mt-1 text-xs text-gray-500">Using your profile as the teacher</p>
+                        )}
                       </div>
                       
                       <div>
