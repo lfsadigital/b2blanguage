@@ -18,11 +18,14 @@ import { addDocument, getDocuments, uploadFile } from '../../lib/firebase/fireba
 import { db } from '../../lib/firebase/firebase';
 import { collection, getDocs, setDoc, doc } from 'firebase/firestore';
 
-// Mock data for teachers
+// Mock data for teachers - add the logged-in user's display name
 const mockTeachers = [
   { id: '1', name: 'Rafael', languages: ['EN', 'ES'] },
   { id: '2', name: 'Ortiz', languages: ['ES'] },
   { id: '3', name: 'Sersun', languages: ['EN'] },
+  { id: '4', name: 'Luiz Fellipe Almeida', languages: ['EN'] },
+  // Add common variations of the name that might match
+  { id: '5', name: 'Luiz', languages: ['EN'] }
 ];
 
 // Mock data for students
@@ -75,10 +78,21 @@ export default function ClassDiaryPage() {
   const [recentUploads, setRecentUploads] = useState<TestResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
+  // Add debugging to see user display name
+  console.log("Current user display name:", user?.displayName);
+  
   // Find the teacher info based on the user's display name
+  // First try exact match, then try includes/partial match
   const currentTeacher = user?.displayName 
-    ? mockTeachers.find(t => t.name === user.displayName) 
+    ? (mockTeachers.find(t => t.name === user.displayName) ||
+       mockTeachers.find(t => 
+         user.displayName && 
+         (user.displayName.includes(t.name) || t.name.includes(user.displayName))
+       ) ||
+       { id: 'auto', name: user.displayName || 'Current User', languages: ['EN'] }) // Create a teacher if none found
     : null;
+    
+  console.log("Found teacher:", currentTeacher);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -91,16 +105,35 @@ export default function ClassDiaryPage() {
     notes: ''
   });
 
-  // Update teacher ID when user changes
+  // Update teacher ID when user changes - more robust matching
   useEffect(() => {
     if (user?.displayName) {
-      const teacher = mockTeachers.find(t => t.name === user.displayName);
-      if (teacher) {
-        setFormData(prev => ({
-          ...prev,
-          teacherId: teacher.id
-        }));
+      const displayName = user.displayName; // Store in a const to avoid TypeScript errors
+      console.log("Updating teacher based on display name:", displayName);
+      
+      // Try exact match first
+      let teacher = mockTeachers.find(t => t.name === displayName);
+      
+      // Then try partial match
+      if (!teacher) {
+        teacher = mockTeachers.find(t => 
+          displayName.includes(t.name) || 
+          t.name.includes(displayName)
+        );
       }
+      
+      // If still no match, create a default one
+      if (!teacher) {
+        console.log("No matching teacher found, using display name directly");
+        teacher = { id: 'auto', name: displayName, languages: ['EN'] };
+      }
+      
+      console.log("Setting teacher to:", teacher);
+      
+      setFormData(prev => ({
+        ...prev,
+        teacherId: teacher.id
+      }));
     }
   }, [user]);
 
