@@ -65,11 +65,11 @@ export default function ClassDiaryPage() {
   
   // Direct permission check
   useEffect(() => {
-    if (!loading && user) {
-      // Check if user has required role
-      const hasAccess = ['Teacher', 'Manager', 'Owner'].includes(userProfile || '');
-      console.log('Direct permission check:', { userProfile, hasAccess });
-      setIsAuthorized(hasAccess);
+    if (!loading) {
+      // Set authorized to false for visitors or users without required roles
+      const hasAccess = user && ['Teacher', 'Manager', 'Owner'].includes(userProfile || '');
+      console.log('Direct permission check:', { userProfile, hasAccess, loading, user: !!user });
+      setIsAuthorized(hasAccess || false); // Explicitly set to false for visitors or unauthorized roles
     }
   }, [user, userProfile, loading]);
   
@@ -356,7 +356,7 @@ export default function ClassDiaryPage() {
   };
 
   // Show loading state during initial load
-  if (loading || isAuthorized === null) {
+  if (loading) {
     return (
       <DashboardShell>
         <div className="flex items-center justify-center min-h-[60vh]">
