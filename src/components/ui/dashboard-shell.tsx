@@ -2,6 +2,7 @@
 
 import { Fragment, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Dialog, Transition } from '@headlessui/react';
 import {
   Bars3Icon,
@@ -149,7 +150,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
         </div>
         <main className="flex-1 relative z-0 overflow-y-auto focus:outline-none">
           <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 bg-gray-50 rounded-lg shadow-sm p-6">
               {children}
             </div>
           </div>
@@ -161,41 +162,48 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 
 function SidebarItems() {
   const { signOut, user } = useAuth();
+  const pathname = usePathname();
+  
   const navigation = [
-    { name: 'Dashboard', href: '/dashboard', icon: HomeIcon, current: true },
-    { name: 'Test Generator', href: '/test-generator', icon: DocumentTextIcon, current: false },
-    { name: 'Class Diary', href: '/class-diary', icon: BookOpenIcon, current: false },
-    { name: 'Database', href: '/database', icon: UserGroupIcon, current: false },
-    { name: 'Experiments', href: '#', icon: BeakerIcon, current: false },
+    { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
+    { name: 'Test Generator', href: '/test-generator', icon: DocumentTextIcon },
+    { name: 'Class Diary', href: '/class-diary', icon: BookOpenIcon },
+    { name: 'Database', href: '/database', icon: UserGroupIcon },
+    { name: 'Experiments', href: '#', icon: BeakerIcon },
   ];
 
   return (
     <>
-      {navigation.map((item) => (
-        <Link
-          key={item.name}
-          href={item.href}
-          className={`
-            group flex items-center px-2 py-2 text-sm font-medium rounded-md 
-            ${item.current
-              ? 'bg-[#F5DEB3] text-[#8B4513]'
-              : 'text-gray-600 hover:bg-[#F5F5DC] hover:text-[#8B4513]'
-            }
-          `}
-        >
-          <item.icon
+      {navigation.map((item) => {
+        const isActive = pathname === item.href || 
+                      (item.href !== '/' && pathname?.startsWith(item.href));
+                      
+        return (
+          <Link
+            key={item.name}
+            href={item.href}
             className={`
-              mr-3 h-6 w-6 
-              ${item.current
-                ? 'text-[#8B4513]'
-                : 'text-gray-400 group-hover:text-[#8B4513]'
+              group flex items-center px-2 py-2 text-sm font-medium rounded-md 
+              ${isActive
+                ? 'bg-[#F5DEB3] text-[#8B4513]'
+                : 'text-gray-600 hover:bg-[#F5F5DC] hover:text-[#8B4513]'
               }
             `}
-            aria-hidden="true"
-          />
-          {item.name}
-        </Link>
-      ))}
+          >
+            <item.icon
+              className={`
+                mr-3 h-6 w-6 
+                ${isActive
+                  ? 'text-[#8B4513]'
+                  : 'text-gray-400 group-hover:text-[#8B4513]'
+                }
+              `}
+              aria-hidden="true"
+            />
+            {item.name}
+          </Link>
+        );
+      })}
       <div className="pt-4 pb-3">
         <div className="border-t border-gray-200" />
       </div>

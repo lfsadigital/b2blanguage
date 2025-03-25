@@ -221,18 +221,18 @@ export default function DatabasePage() {
           </div>
         )}
         
-        <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="bg-[#F8F4EA] shadow rounded-lg overflow-hidden">
           <div className="p-6">
             {/* Search and Add buttons */}
             <div className="flex flex-col sm:flex-row justify-between space-y-4 sm:space-y-0 mb-6">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+                  <MagnifyingGlassIcon className="h-5 w-5 text-gray-500" />
                 </div>
                 <input
                   type="text"
                   placeholder="Search users..."
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513]"
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513]"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -257,8 +257,8 @@ export default function DatabasePage() {
             
             {/* Add/Edit Form */}
             {showAddForm && (
-              <div className="mb-8 p-6 bg-gray-50 rounded-lg">
-                <h3 className="text-lg font-medium mb-4">
+              <div className="mb-8 p-6 bg-[#F5EFE0] rounded-lg border border-[#E6D7B8]">
+                <h3 className="text-lg font-medium mb-4 text-gray-800">
                   {editingProfile ? 'Edit User Profile' : 'Add New User'}
                 </h3>
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -272,7 +272,7 @@ export default function DatabasePage() {
                         name="displayName"
                         type="text"
                         required
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513]"
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-white focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513]"
                         value={formData.displayName}
                         onChange={handleInputChange}
                       />
@@ -289,13 +289,13 @@ export default function DatabasePage() {
                         required
                         disabled={!!editingProfile} // Can't change email for existing profiles
                         className={`mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] ${
-                          editingProfile ? 'bg-gray-100' : ''
+                          editingProfile ? 'bg-gray-100' : 'bg-white'
                         }`}
                         value={formData.email}
                         onChange={handleInputChange}
                       />
                       {editingProfile && (
-                        <p className="mt-1 text-xs text-gray-500">Email cannot be changed</p>
+                        <p className="mt-1 text-xs text-gray-600">Email cannot be changed</p>
                       )}
                     </div>
                   </div>
@@ -308,7 +308,7 @@ export default function DatabasePage() {
                       id="profileType"
                       name="profileType"
                       required
-                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
+                      className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 bg-white focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
                       value={formData.profileType}
                       onChange={handleInputChange}
                     >
@@ -348,34 +348,34 @@ export default function DatabasePage() {
             ) : filteredProfiles.length > 0 ? (
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-[#F0E6D2]">
                     <tr>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                         Name
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                         Email
                       </th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
                         Type
                       </th>
-                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-700 uppercase tracking-wider">
                         Actions
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {filteredProfiles.map((profile) => (
-                      <tr key={profile.id}>
+                      <tr key={profile.id} className="hover:bg-[#FEFAF0]">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center">
-                              <UserCircleIcon className="h-6 w-6 text-gray-400" />
+                            <div className="flex-shrink-0 h-10 w-10 bg-[#F0E6D2] rounded-full flex items-center justify-center">
+                              <UserCircleIcon className="h-6 w-6 text-[#8B4513]" />
                             </div>
                             <div className="ml-4">
                               <div className="text-sm font-medium text-gray-900">{profile.displayName}</div>
                               {profile.lastLogin && (
-                                <div className="text-xs text-gray-500">Last login: {profile.lastLogin}</div>
+                                <div className="text-xs text-gray-600">Last login: {profile.lastLogin}</div>
                               )}
                             </div>
                           </div>
@@ -383,7 +383,7 @@ export default function DatabasePage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm text-gray-900">{profile.email}</div>
                           {profile.createdAt && (
-                            <div className="text-xs text-gray-500">Created: {profile.createdAt}</div>
+                            <div className="text-xs text-gray-600">Created: {profile.createdAt}</div>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -418,7 +418,7 @@ export default function DatabasePage() {
                 </table>
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-gray-600">
                 {searchTerm ? 'No users match your search.' : 'No users found. Add some using the button above.'}
               </div>
             )}
