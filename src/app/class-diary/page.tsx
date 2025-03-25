@@ -23,7 +23,7 @@ const mockTeachers = [
   { id: '1', name: 'Rafael', languages: ['EN', 'ES'] },
   { id: '2', name: 'Ortiz', languages: ['ES'] },
   { id: '3', name: 'Sersun', languages: ['EN'] },
-  { id: '4', name: 'Luiz Fellipe Almeida', languages: ['EN'] },
+  { id: '4', name: 'Luiz Almeida', languages: ['EN'] },
   // Add common variations of the name that might match
   { id: '5', name: 'Luiz', languages: ['EN'] },
   // Add explicit match for your Gmail address in case displayName is empty
@@ -95,25 +95,33 @@ export default function ClassDiaryPage() {
   let currentTeacher = null;
   
   if (user) {
-    // Try displayName first
+    // Try exact displayName match first - this is the most important case
     if (user.displayName) {
+      // Exact match is highest priority
       currentTeacher = mockTeachers.find(t => t.name === user.displayName);
       console.log("Lookup by exact displayName:", currentTeacher);
     }
     
-    // If no match by display name, try partial match
-    if (!currentTeacher && user.displayName) {
-      currentTeacher = mockTeachers.find(t => 
-        user.displayName!.includes(t.name) || 
-        t.name.includes(user.displayName!)
-      );
-      console.log("Lookup by partial displayName:", currentTeacher);
-    }
-    
-    // If still no match, try email
+    // If no exact match by display name, try email
     if (!currentTeacher && user.email) {
       currentTeacher = mockTeachers.find(t => t.name === user.email);
       console.log("Lookup by email:", currentTeacher);
+    }
+    
+    // Only if we still have no match, try partial match
+    if (!currentTeacher && user.displayName) {
+      // For partial matches, prefer longer matches (more specific)
+      const matches = mockTeachers.filter(t => 
+        user.displayName!.includes(t.name) || 
+        t.name.includes(user.displayName!)
+      );
+      
+      if (matches.length > 0) {
+        // Sort by name length (descending) to get the most specific match
+        matches.sort((a, b) => b.name.length - a.name.length);
+        currentTeacher = matches[0];
+        console.log("Lookup by partial displayName (sorted by specificity):", currentTeacher);
+      }
     }
     
     // If still no match, create a default teacher
