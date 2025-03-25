@@ -9,7 +9,7 @@ export async function middleware(request: NextRequest) {
   // Check if the current path is protected
   if (protectedPaths.some(pp => path.startsWith(pp))) {
     // Get all cookies that might contain Firebase session
-    const firebaseSession = request.cookies.get('firebase:authUser:AIzaSyDYpDu7_VVOJ-E2BjYqzHvtDQWvBhHpwxA:[DEFAULT]');
+    const firebaseSession = request.cookies.get('firebase:authUser:[DEFAULT]');
     
     // If no session exists, redirect to home page where auth flow will handle login
     if (!firebaseSession) {
