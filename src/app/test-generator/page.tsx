@@ -7,6 +7,8 @@ import TestTemplate from './TestTemplate';
 import { TestFormData } from '@/app/lib/types';
 import { useAuth } from '@/lib/hooks/useAuth';
 import RoleBasedRoute from '@/app/components/RoleBasedRoute';
+import { db } from '../../lib/firebase/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { 
   DocumentTextIcon,
   LightBulbIcon,
@@ -16,12 +18,13 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function TestGeneratorPage() {
-  const { user } = useAuth();
+  const { user, userProfile } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
   const [testGenerated, setTestGenerated] = useState(false);
   const [currentTab, setCurrentTab] = useState<'test' | 'conversation' | 'teacher-tips'>('test');
   const [docxScript, setDocxScript] = useState<boolean>(false);
   const [pdfScript, setPdfScript] = useState<boolean>(false);
+  const [currentTeacher, setCurrentTeacher] = useState<{id: string; displayName: string} | null>(null);
 
   // Single state for all generated content
   const [generatedContent, setGeneratedContent] = useState<{
@@ -43,7 +46,7 @@ export default function TestGeneratorPage() {
     testTitle: '',
     testContent: '',
     studentName: '',
-    teacherName: user?.displayName || '',
+    teacherName: '',
     testDate: new Date().toLocaleDateString(),
     subject: '',
     questions: [],
@@ -52,14 +55,44 @@ export default function TestGeneratorPage() {
     contentUrl: ''
   });
 
-  // Update teacher name when user changes
+  // Fetch current teacher from database
   useEffect(() => {
-    if (user?.displayName) {
-      setGeneratedContent(prev => ({
-        ...prev,
-        teacherName: user.displayName || ''
-      }));
-    }
+    const fetchCurrentTeacher = async () => {
+      if (user?.email) {
+        try {
+          // Query for the current user by email
+          const usersQuery = query(
+            collection(db, 'users'),
+            where('email', '==', user.email)
+          );
+          
+          const querySnapshot = await getDocs(usersQuery);
+          
+          if (!querySnapshot.empty) {
+            // Get the first matching document
+            const userDoc = querySnapshot.docs[0];
+            const userData = userDoc.data();
+            
+            setCurrentTeacher({
+              id: userDoc.id,
+              displayName: userData.displayName || user.displayName || user.email
+            });
+            
+            // Update teacher name in generated content
+            setGeneratedContent(prev => ({
+              ...prev,
+              teacherName: userData.displayName || user.displayName || user.email
+            }));
+            
+            console.log("Set current teacher to:", userData.displayName || user.displayName);
+          }
+        } catch (error) {
+          console.error('Error fetching teacher:', error);
+        }
+      }
+    };
+    
+    fetchCurrentTeacher();
   }, [user]);
 
   // Load document generation libraries
@@ -735,102 +768,88 @@ Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion),
   // Render test content
   const renderTestContent = () => {
     return (
-      <div>
-        {testGenerated ? (
-          <div className="bg-white rounded-lg shadow-lg p-6 print:shadow-none">
-            <div className="flex justify-between mb-4 print:hidden">
-              <div>
-                <button
-                  onClick={() => setTestGenerated(false)}
-                  className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-                >
-                  Create New Test
-                </button>
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={handleExportToWord}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#8B0000] hover:bg-[#A52A2A]"
-                >
-                  <DocumentDuplicateIcon className="-ml-1 mr-2 h-5 w-5" />
-                  Export Questions (Word)
-                </button>
-                <button
-                  onClick={handleExportTeachingMaterials}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#8B0000] hover:bg-[#A52A2A]"
-                >
-                  <DocumentDuplicateIcon className="-ml-1 mr-2 h-5 w-5" />
-                  Export Teaching Materials (PDF)
-                </button>
-                <button
-                  onClick={handleExportFullPDF}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#8B0000] hover:bg-[#A52A2A]"
-                >
-                  <DocumentDuplicateIcon className="-ml-1 mr-2 h-5 w-5" />
-                  Export Full PDF
-                </button>
+      <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+        {!testGenerated ? (
+          <TestGeneratorForm 
+            onSubmit={handleSubmit} 
+            isGenerating={isGenerating} 
+            defaultTeacherName={currentTeacher?.displayName || user?.displayName || ''} 
+          />
+        ) : (
+          <div className="p-6">
+            {/* Tabs for Test and Export */}
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold">Generated Test</h2>
+              <div className="flex space-x-3">
                 <button
                   onClick={handlePrint}
-                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#8B4513] hover:bg-[#A0522D]"
+                  className="flex items-center px-3 py-1.5 border border-gray-300 rounded text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
                 >
-                  <PrinterIcon className="-ml-1 mr-2 h-5 w-5" />
-                  Print Test
+                  <PrinterIcon className="mr-1.5 h-4 w-4 text-gray-500" />
+                  Print
+                </button>
+                <button
+                  onClick={handleExportToWord}
+                  className="flex items-center px-3 py-1.5 border border-gray-300 rounded text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
+                >
+                  <DocumentDuplicateIcon className="mr-1.5 h-4 w-4 text-gray-500" />
+                  Export to Word
                 </button>
               </div>
             </div>
             
-            <TestTemplate
-              title={generatedContent.testTitle}
-              studentName={generatedContent.studentName}
-              teacherName={generatedContent.teacherName}
-              date={generatedContent.testDate}
-              subject={generatedContent.subject}
-              content={
-                <div className="space-y-6">
-                  <p className="text-gray-800">{generatedContent.testContent}</p>
-                  
-                  <div className="mt-6">
-                    <h2 className="text-lg font-semibold text-gray-900">Questions:</h2>
+            {/* Test content */}
+            <div className="border-t pt-6">
+              <TestTemplate 
+                studentName={generatedContent.studentName} 
+                teacherName={generatedContent.teacherName}
+                date={generatedContent.testDate}
+                subject={generatedContent.subject}
+                content={
+                  <div className="space-y-6">
+                    <p className="text-gray-800">{generatedContent.testContent}</p>
                     
-                    <div className="mt-4 space-y-6">
-                      {generatedContent.questions.map((q, idx) => {
-                        if (q.type === 'multiple-choice') {
-                          return (
-                            <div key={idx} className="space-y-2">
-                              <p className="font-medium">{idx + 1}) {q.question}</p>
-                              <div className="pl-6 space-y-1">
-                                {q.options.map((option: string, optIdx: number) => (
-                                  <p key={optIdx}>{String.fromCharCode(65 + optIdx)}) {option}</p>
-                                ))}
+                    <div className="mt-6">
+                      <h2 className="text-lg font-semibold text-gray-900">Questions:</h2>
+                      
+                      <div className="mt-4 space-y-6">
+                        {generatedContent.questions.map((q, idx) => {
+                          if (q.type === 'multiple-choice') {
+                            return (
+                              <div key={idx} className="space-y-2">
+                                <p className="font-medium">{idx + 1}) {q.question}</p>
+                                <div className="pl-6 space-y-1">
+                                  {q.options.map((option: string, optIdx: number) => (
+                                    <p key={optIdx}>{String.fromCharCode(65 + optIdx)}) {option}</p>
+                                  ))}
+                                </div>
+                                {q.reference && <p className="text-sm text-gray-500">[Ref: {q.reference}]</p>}
                               </div>
-                              {q.reference && <p className="text-sm text-gray-500">[Ref: {q.reference}]</p>}
-                            </div>
-                          );
-                        } else if (q.type === 'true-false') {
-                          return (
-                            <div key={idx} className="space-y-2">
-                              <p className="font-medium">{idx + 1}) {q.question}</p>
-                              {q.reference && <p className="text-sm text-gray-500">[Ref: {q.reference}]</p>}
-                            </div>
-                          );
-                        } else if (q.type === 'open-ended') {
-                          return (
-                            <div key={idx} className="space-y-2">
-                              <p className="font-medium">{idx + 1}) {q.question} (short answer)</p>
-                              {q.reference && <p className="text-sm text-gray-500">[Ref: {q.reference}]</p>}
-                            </div>
-                          );
-                        }
-                        return null;
-                      })}
+                            );
+                          } else if (q.type === 'true-false') {
+                            return (
+                              <div key={idx} className="space-y-2">
+                                <p className="font-medium">{idx + 1}) {q.question}</p>
+                                {q.reference && <p className="text-sm text-gray-500">[Ref: {q.reference}]</p>}
+                              </div>
+                            );
+                          } else if (q.type === 'open-ended') {
+                            return (
+                              <div key={idx} className="space-y-2">
+                                <p className="font-medium">{idx + 1}) {q.question} (short answer)</p>
+                                {q.reference && <p className="text-sm text-gray-500">[Ref: {q.reference}]</p>}
+                              </div>
+                            );
+                          }
+                          return null;
+                        })}
+                      </div>
                     </div>
                   </div>
-                </div>
-              }
-            />
+                }
+              />
+            </div>
           </div>
-        ) : (
-          <TestGeneratorForm onSubmit={handleSubmit} isGenerating={isGenerating} defaultTeacherName={user?.displayName || ''} />
         )}
       </div>
     );
