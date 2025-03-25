@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useState } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Dialog, Transition } from '@headlessui/react';
@@ -13,7 +13,8 @@ import {
   UserGroupIcon,
   BeakerIcon,
   ArrowRightOnRectangleIcon,
-  UserCircleIcon
+  UserCircleIcon,
+  CheckCircleIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../../lib/hooks/useAuth';
 import SignInWithGoogle from '../../components/SignInWithGoogle';
@@ -24,7 +25,17 @@ interface DashboardShellProps {
 
 export default function DashboardShell({ children }: DashboardShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { signOut, user } = useAuth();
+  const { signOut, user, userProfile, profileUpdated, clearProfileUpdatedNotification } = useAuth();
+
+  // Clear profile updated notification after 5 seconds
+  useEffect(() => {
+    if (profileUpdated) {
+      const timer = setTimeout(() => {
+        clearProfileUpdatedNotification();
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [profileUpdated, clearProfileUpdatedNotification]);
 
   return (
     <div className="h-screen flex overflow-hidden bg-gray-100">
@@ -149,6 +160,29 @@ export default function DashboardShell({ children }: DashboardShellProps) {
           </button>
         </div>
         <main className="flex-1 relative z-0 overflow-y-auto focus:outline-none">
+          {/* Profile Updated Notification */}
+          {profileUpdated && (
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 mt-4">
+              <div className="bg-green-50 border border-green-200 rounded-md p-4 flex items-center">
+                <CheckCircleIcon className="h-5 w-5 text-green-500 mr-3" />
+                <div>
+                  <p className="text-sm text-green-800 font-medium">
+                    Your profile has been updated to {userProfile}
+                  </p>
+                  <p className="text-xs text-green-700 mt-1">
+                    You now have access to features associated with your role.
+                  </p>
+                </div>
+                <button 
+                  onClick={clearProfileUpdatedNotification}
+                  className="ml-auto text-green-500 hover:text-green-700"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          )}
+          
           <div className="py-6">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 bg-gray-50 rounded-lg shadow-sm p-6">
               {children}

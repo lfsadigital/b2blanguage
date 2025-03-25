@@ -13,6 +13,8 @@ import {
   deleteDoc,
   setDoc,
   getDoc,
+  query,
+  where,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { UserProfileType } from '../contexts/AuthContext';
@@ -80,6 +82,7 @@ export const uploadFile = async (file: File, path: string) => {
 
 // Interface for user data
 interface UserData {
+  id?: string;  // Make id optional
   email: string;
   displayName?: string;
   profileType: UserProfileType;
@@ -97,24 +100,29 @@ export const saveUserToFirestore = async (
   data: Partial<UserData>
 ): Promise<void> => {
   try {
-    const userRef = doc(db, 'users', email);
-    const userSnap = await getDoc(userRef);
+    // Check if a user with this email already exists
+    const usersCollection = collection(db, 'users');
+    const q = query(usersCollection, where('email', '==', email));
+    const querySnapshot = await getDocs(q);
     
-    if (userSnap.exists()) {
+    if (!querySnapshot.empty) {
       // Update existing user
-      await updateDoc(userRef, {
+      const userDoc = querySnapshot.docs[0];
+      await updateDoc(doc(db, 'users', userDoc.id), {
         ...data,
         lastLogin: new Date(),
       });
+      console.log('Updated existing user profile for:', email);
     } else {
       // Create new user
-      await setDoc(userRef, {
+      await addDoc(collection(db, 'users'), {
         email,
         profileType: 'Visitor', // Default to Visitor for new users
         createdAt: new Date(),
         lastLogin: new Date(),
         ...data,
       });
+      console.log('Created new user profile for:', email);
     }
   } catch (error) {
     console.error('Error saving user to Firestore:', error);
@@ -129,11 +137,16 @@ export const saveUserToFirestore = async (
  */
 export const getUserProfile = async (email: string): Promise<UserData | null> => {
   try {
-    const userRef = doc(db, 'users', email);
-    const userSnap = await getDoc(userRef);
+    // Query the users collection for a document where the email field matches
+    const usersCollection = collection(db, 'users');
+    const q = query(usersCollection, where('email', '==', email));
+    const querySnapshot = await getDocs(q);
     
-    if (userSnap.exists()) {
-      return userSnap.data() as UserData;
+    if (!querySnapshot.empty) {
+      // Get the first matching document
+      const userDoc = querySnapshot.docs[0];
+      // Return the data with the document ID
+      return { id: userDoc.id, ...userDoc.data() } as UserData;
     }
     
     return null;
@@ -153,8 +166,19 @@ export const updateUserProfileType = async (
   profileType: UserProfileType
 ): Promise<void> => {
   try {
-    const userRef = doc(db, 'users', email);
-    await updateDoc(userRef, { profileType });
+    // Find the user document by email field
+    const usersCollection = collection(db, 'users');
+    const q = query(usersCollection, where('email', '==', email));
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      // Get the first matching document
+      const userDoc = querySnapshot.docs[0];
+      // Update the profileType field
+      await updateDoc(doc(db, 'users', userDoc.id), { profileType });
+    } else {
+      console.error('User not found for email:', email);
+    }
   } catch (error) {
     console.error('Error updating user profile type:', error);
     throw error;
