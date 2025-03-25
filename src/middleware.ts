@@ -8,11 +8,28 @@ export async function middleware(request: NextRequest) {
 
   // Check if the current path is protected
   if (protectedPaths.some(pp => path.startsWith(pp))) {
-    // Get Firebase Auth token from cookies
-    const token = request.cookies.get('__session');
+    // Get all cookies that might contain Firebase session
+    const firebaseSession = request.cookies.get('firebase:authUser:AIzaSyDYpDu7_VVOJ-E2BjYqzHvtDQWvBhHpwxA:[DEFAULT]');
     
-    // If no token exists, redirect to home page where auth flow will handle login
-    if (!token) {
+    // If no session exists, redirect to home page where auth flow will handle login
+    if (!firebaseSession) {
+      console.log('No Firebase session found, redirecting to home');
+      return NextResponse.redirect(new URL('/', request.url));
+    }
+
+    // If we have a session, try to parse it
+    try {
+      const sessionData = JSON.parse(firebaseSession.value);
+      if (!sessionData) {
+        console.log('Invalid session data, redirecting to home');
+        return NextResponse.redirect(new URL('/', request.url));
+      }
+      
+      // Session exists and is valid, allow the request
+      console.log('Valid session found, allowing request');
+      return NextResponse.next();
+    } catch (error) {
+      console.log('Error parsing session data:', error);
       return NextResponse.redirect(new URL('/', request.url));
     }
   }
