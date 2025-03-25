@@ -28,19 +28,28 @@ interface UserProfile {
   createdAt?: string;
 }
 
-// Adding a style block to ensure all text is black with !important
+// Adding style object with improved text colors and contrast
 const tableStyles = {
   headerText: {
-    color: 'black !important',
-    fontWeight: 'bold !important',
+    color: 'rgba(0, 0, 0, 0.9)',
+    fontWeight: 'bold',
   },
   cellText: {
-    color: 'black !important',
+    color: 'rgba(0, 0, 0, 0.9)',
   },
   badgeText: {
-    color: 'black !important',
-    fontWeight: 'bold !important',
+    color: 'rgba(0, 0, 0, 0.9)',
+    fontWeight: 'bold',
   }
+};
+
+// CSS classes for different badge types with improved contrast
+const badgeClasses = {
+  Teacher: 'bg-green-100 text-black border border-green-300',
+  Student: 'bg-blue-100 text-black border border-blue-300',
+  Manager: 'bg-purple-100 text-black border border-purple-300',
+  Owner: 'bg-yellow-100 text-black border border-yellow-300',
+  Visitor: 'bg-gray-100 text-black border border-gray-300'
 };
 
 export default function DatabasePage() {
@@ -250,7 +259,8 @@ export default function DatabasePage() {
                 <input
                   type="text"
                   placeholder="Search users..."
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] text-black"
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-md bg-white focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513]"
+                  style={{ color: 'rgba(0, 0, 0, 0.9)' }}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -266,7 +276,8 @@ export default function DatabasePage() {
                   });
                   setShowAddForm(!showAddForm);
                 }}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-black bg-[#F0E6D2] hover:bg-[#E6D7B8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm bg-[#F0E6D2] hover:bg-[#E6D7B8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
+                style={{ color: 'rgba(0, 0, 0, 0.9)' }}
               >
                 <UserPlusIcon className="h-5 w-5 mr-2 text-black" />
                 {showAddForm ? 'Cancel' : 'Add New User'}
@@ -290,7 +301,8 @@ export default function DatabasePage() {
                         name="displayName"
                         type="text"
                         required
-                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-white focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] text-black"
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 bg-white focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513]"
+                        style={{ color: 'rgba(0, 0, 0, 0.9)' }}
                         value={formData.displayName}
                         onChange={handleInputChange}
                       />
@@ -306,9 +318,10 @@ export default function DatabasePage() {
                         type="email"
                         required
                         disabled={!!editingProfile} // Can't change email for existing profiles
-                        className={`mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] text-black ${
+                        className={`mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] ${
                           editingProfile ? 'bg-gray-100' : 'bg-white'
                         }`}
+                        style={{ color: 'rgba(0, 0, 0, 0.9)' }}
                         value={formData.email}
                         onChange={handleInputChange}
                       />
@@ -329,12 +342,13 @@ export default function DatabasePage() {
                       className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 bg-white focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md text-black"
                       value={formData.profileType}
                       onChange={handleInputChange}
+                      style={{ color: 'rgba(0, 0, 0, 0.9)' }}
                     >
-                      <option value="Student">Student</option>
-                      <option value="Teacher">Teacher</option>
-                      <option value="Manager">Manager</option>
+                      <option value="Student" style={{ color: 'black' }}>Student</option>
+                      <option value="Teacher" style={{ color: 'black' }}>Teacher</option>
+                      <option value="Manager" style={{ color: 'black' }}>Manager</option>
                       {userProfile === 'Owner' && (
-                        <option value="Owner">Owner</option>
+                        <option value="Owner" style={{ color: 'black' }}>Owner</option>
                       )}
                     </select>
                   </div>
@@ -343,13 +357,15 @@ export default function DatabasePage() {
                     <button
                       type="button"
                       onClick={() => setShowAddForm(false)}
-                      className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-black bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
+                      className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
+                      style={{ color: 'rgba(0, 0, 0, 0.9)' }}
                     >
                       Cancel
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-black bg-[#F0E6D2] hover:bg-[#E6D7B8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
+                      className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium bg-[#F0E6D2] hover:bg-[#E6D7B8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
+                      style={{ color: 'rgba(0, 0, 0, 0.9)' }}
                     >
                       {editingProfile ? 'Update User' : 'Add User'}
                     </button>
@@ -370,7 +386,7 @@ export default function DatabasePage() {
                     <tr>
                       <th 
                         scope="col" 
-                        className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider"
+                        className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-black"
                         style={tableStyles.headerText}
                       >
                         Name
@@ -422,12 +438,9 @@ export default function DatabasePage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span 
-                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full 
-                              ${profile.profileType === 'Teacher' ? 'bg-green-100 text-black' : 
-                                profile.profileType === 'Student' ? 'bg-blue-100 text-black' : 
-                                profile.profileType === 'Manager' ? 'bg-purple-100 text-black' : 
-                                profile.profileType === 'Owner' ? 'bg-yellow-100 text-black' :
-                                'bg-gray-100 text-black'}`}
+                            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              badgeClasses[profile.profileType as keyof typeof badgeClasses] || 'bg-gray-100 text-black'
+                            }`}
                             style={tableStyles.badgeText}
                           >
                             {profile.profileType}
@@ -455,7 +468,7 @@ export default function DatabasePage() {
                 </table>
               </div>
             ) : (
-              <div className="text-center py-8 text-black">
+              <div className="text-center py-8 text-black" style={{ color: 'rgba(0, 0, 0, 0.9)' }}>
                 {searchTerm ? 'No users match your search.' : 'No users found. Add some using the button above.'}
               </div>
             )}
