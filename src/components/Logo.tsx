@@ -8,20 +8,23 @@ interface LogoProps {
 }
 
 export default function Logo({ 
-  width = 70, 
-  height = 35, 
+  width = 100, 
+  height = 33, 
   variant = 'dark',
   className = ''
 }: LogoProps) {
+  // Add a version parameter to prevent caching
+  const version = '1.2';
+  
   return (
-    <div className={`flex items-center ${className}`}>
+    <div className={`flex items-center justify-center ${className}`}>
       <Image
-        src="/images/logo.svg"
+        src={`/images/logo.svg?v=${version}`}
         alt="B2B Languages Logo"
         width={width}
         height={height}
         priority
-        className={variant === 'light' ? 'brightness-0 invert' : ''}
+        className={`${variant === 'light' ? 'brightness-0 invert' : ''} object-contain`}
       />
     </div>
   );

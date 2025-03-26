@@ -1,6 +1,5 @@
-<svg width="140" height="70" viewBox="0 0 140 70" xmlns="http://www.w3.org/2000/svg">
-  <!-- Three horizontal lines -->
-  <rect x="10" y="15" width="50" height="5" fill="#000"/>
-  <rect x="10" y="25" width="50" height="5" fill="#000"/>
-  <rect x="10" y="35" width="50" height="5" fill="#000"/>
+<svg width="300" height="100" viewBox="0 0 300 100" xmlns="http://www.w3.org/2000/svg">
+  <path d="M90 25h40c11 0 20 9 20 20s-9 20-20 20h-20v-10h20c5.5 0 10-4.5 10-10s-4.5-10-10-10h-30v50h-10V25z" fill="#000"/>
+  <path d="M128 25h40c11 0 20 9 20 20s-9 20-20 20h-20v-10h20c5.5 0 10-4.5 10-10s-4.5-10-10-10h-30v50h-10V25z" fill="#000"/>
+  <path d="M166 25h40c11 0 20 9 20 20s-9 20-20 20h-20v-10h20c5.5 0 10-4.5 10-10s-4.5-10-10-10h-30v50h-10V25z" fill="#000"/>
 </svg> 
