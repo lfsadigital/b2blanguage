@@ -181,7 +181,7 @@ const quickAccess: QuickAccessItem[] = [
     title: 'View Analytics',
     description: 'See student performance and engagement metrics',
     icon: <ChartBarIcon className="h-6 w-6 text-[#8B4513]" />,
-    href: '#',
+    href: '/analytics',
   },
   {
     title: 'Manage Billing',
