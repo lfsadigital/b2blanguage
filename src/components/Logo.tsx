@@ -14,7 +14,7 @@ export default function Logo({
   className = ''
 }: LogoProps) {
   // Add a version parameter to prevent caching
-  const version = '1.2';
+  const version = '2.0';
   
   return (
     <div className={`flex items-center justify-center ${className}`}>
