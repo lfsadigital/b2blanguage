@@ -24,8 +24,9 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <div className="flex justify-center items-center">
-              <Logo width={160} height={53} />
-              <span className="text-[#8B4513] font-extrabold text-4xl tracking-tight sm:text-5xl md:text-6xl ml-3">Languages</span>
+              <h1 className="text-4xl tracking-tight font-extrabold text-[#8B4513] sm:text-5xl md:text-6xl">
+                B2B Languages
+              </h1>
             </div>
             <p className="mt-3 max-w-md mx-auto text-base text-[#A0522D] sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
               LET'S TALK BUSINESS: WE LOVE TO TEACH
