@@ -859,7 +859,8 @@ Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion),
           <TestGeneratorForm 
             onSubmit={handleSubmit} 
             isGenerating={isGenerating} 
-            defaultTeacherName={currentTeacher?.displayName || user?.displayName || ''} 
+            defaultTeacherName={currentTeacher?.displayName || user?.displayName || ''}
+            currentTeacher={currentTeacher}
           />
         ) : (
           <div className="p-6">
@@ -947,15 +948,21 @@ Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion),
       return (
         <div className="bg-white rounded-lg shadow-lg p-6">
           <div className="text-center py-8">
+            <h2 className="text-xl font-bold mb-4">Conversation Questions</h2>
             <p className="text-gray-700 mb-4">
-              Please generate a test first to see conversation topics related to the content.
+              Generate conversation topics based on business content for your English lessons.
             </p>
-            <button
-              onClick={() => setCurrentTab('test')}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#8B4513] hover:bg-[#A0522D]"
-            >
-              Go to Test Generator
-            </button>
+            <p className="text-sm text-gray-500 mb-4">
+              Create a test first to generate conversation topics based on the content.
+            </p>
+            <div className="flex justify-center">
+              <button
+                onClick={() => setCurrentTab('test')}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#8B4513] hover:bg-[#A0522D]"
+              >
+                Go to Test Generator
+              </button>
+            </div>
           </div>
         </div>
       );
@@ -988,15 +995,21 @@ Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion),
       return (
         <div className="bg-white rounded-lg shadow-lg p-6">
           <div className="text-center py-8">
+            <h2 className="text-xl font-bold mb-4">Teacher Tips</h2>
             <p className="text-gray-700 mb-4">
-              Please generate a test first to see teaching tips related to the content.
+              Get customized teaching tips based on the content for more effective English lessons.
             </p>
-            <button
-              onClick={() => setCurrentTab('test')}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#8B4513] hover:bg-[#A0522D]"
-            >
-              Go to Test Generator
-            </button>
+            <p className="text-sm text-gray-500 mb-4">
+              Create a test first to generate teaching tips based on the business content.
+            </p>
+            <div className="flex justify-center">
+              <button
+                onClick={() => setCurrentTab('test')}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#8B4513] hover:bg-[#A0522D]"
+              >
+                Go to Test Generator
+              </button>
+            </div>
           </div>
         </div>
       );
@@ -1030,15 +1043,21 @@ Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion),
       return (
         <div className="bg-white rounded-lg shadow-lg p-6">
           <div className="text-center py-8">
+            <h2 className="text-xl font-bold mb-4">Last Class Diary</h2>
             <p className="text-gray-700 mb-4">
-              Please generate a test first to see the last class diary information.
+              View information from the last class with the selected student to help with continuity.
             </p>
-            <button
-              onClick={() => setCurrentTab('test')}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#8B4513] hover:bg-[#A0522D]"
-            >
-              Go to Test Generator
-            </button>
+            <p className="text-sm text-gray-500 mb-4">
+              Select a teacher and student in the Test tab and generate a test to see their last class diary entry.
+            </p>
+            <div className="flex justify-center">
+              <button
+                onClick={() => setCurrentTab('test')}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#8B4513] hover:bg-[#A0522D]"
+              >
+                Go to Test Generator
+              </button>
+            </div>
           </div>
         </div>
       );
@@ -1139,45 +1158,41 @@ Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion),
                 Test
               </button>
               
-              {testGenerated && (
-                <>
-                  <button
-                    onClick={() => setCurrentTab('conversation')}
-                    className={`${
-                      currentTab === 'conversation'
-                        ? 'border-[#8B4513] text-[#8B4513]'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
-                  >
-                    <ChatBubbleLeftRightIcon className="mr-2 h-5 w-5" />
-                    Conversation Questions
-                  </button>
-                  
-                  <button
-                    onClick={() => setCurrentTab('teacher-tips')}
-                    className={`${
-                      currentTab === 'teacher-tips'
-                        ? 'border-[#8B4513] text-[#8B4513]'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
-                  >
-                    <LightBulbIcon className="mr-2 h-5 w-5" />
-                    Teacher Tips
-                  </button>
-                  
-                  <button
-                    onClick={() => setCurrentTab('last-class-diary')}
-                    className={`${
-                      currentTab === 'last-class-diary'
-                        ? 'border-[#8B4513] text-[#8B4513]'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
-                  >
-                    <ClipboardDocumentIcon className="mr-2 h-5 w-5" />
-                    Last Class Diary
-                  </button>
-                </>
-              )}
+              <button
+                onClick={() => setCurrentTab('conversation')}
+                className={`${
+                  currentTab === 'conversation'
+                    ? 'border-[#8B4513] text-[#8B4513]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
+              >
+                <ChatBubbleLeftRightIcon className="mr-2 h-5 w-5" />
+                Conversation Questions
+              </button>
+              
+              <button
+                onClick={() => setCurrentTab('teacher-tips')}
+                className={`${
+                  currentTab === 'teacher-tips'
+                    ? 'border-[#8B4513] text-[#8B4513]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
+              >
+                <LightBulbIcon className="mr-2 h-5 w-5" />
+                Teacher Tips
+              </button>
+              
+              <button
+                onClick={() => setCurrentTab('last-class-diary')}
+                className={`${
+                  currentTab === 'last-class-diary'
+                    ? 'border-[#8B4513] text-[#8B4513]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
+              >
+                <ClipboardDocumentIcon className="mr-2 h-5 w-5" />
+                Last Class Diary
+              </button>
             </nav>
           </div>
 
