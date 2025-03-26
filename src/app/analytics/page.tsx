@@ -137,6 +137,23 @@ export default function AnalyticsPage() {
   const [chartLoading, setChartLoading] = useState<boolean>(true);
   const [rankingsLoading, setRankingsLoading] = useState<boolean>(true);
   
+  // Add state for storing overall metrics for metric cards
+  const [overallMetrics, setOverallMetrics] = useState<{
+    avgTestGrade: number;
+    avgTeacherGrade: number;
+    testGradeChange: number;
+    teacherGradeChange: number;
+    completionRate: number;
+    completionRateChange: number;
+  }>({
+    avgTestGrade: 0,
+    avgTeacherGrade: 0,
+    testGradeChange: 0,
+    teacherGradeChange: 0,
+    completionRate: 0,
+    completionRateChange: 0
+  });
+  
   // Format dates for inputs
   const formatDateForInput = (date: Date): string => {
     return date.toISOString().split('T')[0];
@@ -645,6 +662,167 @@ export default function AnalyticsPage() {
     fetchStudentRankings();
   }, [dateRange]);
   
+  // Add useEffect to calculate overall metrics for all test results
+  useEffect(() => {
+    const calculateOverallMetrics = async () => {
+      try {
+        // Get all test results
+        const testsCollection = collection(db, 'testResults');
+        const testsSnapshot = await getDocs(testsCollection);
+        
+        // Convert date range to strings for comparison
+        const startDateStr = formatDateForInput(dateRange.startDate);
+        const endDateStr = formatDateForInput(dateRange.endDate);
+        
+        // Calculate previous period start and end dates (same duration, previous period)
+        const currentPeriodDays = (dateRange.endDate.getTime() - dateRange.startDate.getTime()) / (1000 * 60 * 60 * 24);
+        const previousPeriodEndDate = new Date(dateRange.startDate);
+        previousPeriodEndDate.setDate(previousPeriodEndDate.getDate() - 1);
+        const previousPeriodStartDate = new Date(previousPeriodEndDate);
+        previousPeriodStartDate.setDate(previousPeriodStartDate.getDate() - currentPeriodDays);
+        
+        const previousStartDateStr = formatDateForInput(previousPeriodStartDate);
+        const previousEndDateStr = formatDateForInput(previousPeriodEndDate);
+        
+        console.log("Date ranges for metrics:", {
+          current: { startDateStr, endDateStr },
+          previous: { previousStartDateStr, previousEndDateStr }
+        });
+        
+        // Arrays to store filtered test results
+        const currentPeriodTests: Array<{
+          testGrade: number;
+          teacherGrade: number;
+          isCompleted: boolean;
+        }> = [];
+        
+        const previousPeriodTests: Array<{
+          testGrade: number;
+          teacherGrade: number;
+          isCompleted: boolean;
+        }> = [];
+        
+        // Process all tests and filter by date
+        testsSnapshot.forEach(doc => {
+          const data = doc.data();
+          
+          // Extract test date
+          let testDate: Date;
+          if (typeof data.testDate === 'string') {
+            testDate = new Date(data.testDate);
+          } else if (data.testDate instanceof Timestamp) {
+            testDate = data.testDate.toDate();
+          } else {
+            return; // Skip invalid dates
+          }
+          
+          const testDateStr = testDate.toISOString().split('T')[0];
+          
+          // Convert grades to numbers
+          const testGrade = typeof data.testGrade === 'string' 
+            ? parseInt(data.testGrade, 10) 
+            : (data.testGrade || 0);
+            
+          const teacherGrade = typeof data.gradeByTeacher === 'string' 
+            ? parseInt(data.gradeByTeacher, 10) 
+            : (data.gradeByTeacher || 0);
+          
+          // Determine if test is completed (has both grades)
+          const isCompleted = testGrade > 0 && teacherGrade > 0;
+          
+          // Add to appropriate array based on date range
+          if (testDateStr >= startDateStr && testDateStr <= endDateStr) {
+            currentPeriodTests.push({
+              testGrade,
+              teacherGrade,
+              isCompleted
+            });
+          } else if (testDateStr >= previousStartDateStr && testDateStr <= previousEndDateStr) {
+            previousPeriodTests.push({
+              testGrade,
+              teacherGrade,
+              isCompleted
+            });
+          }
+        });
+        
+        // Calculate current period metrics
+        const currentTestGradeSum = currentPeriodTests.reduce((sum, test) => sum + test.testGrade, 0);
+        const currentTeacherGradeSum = currentPeriodTests.reduce((sum, test) => sum + test.teacherGrade, 0);
+        const currentCompletedCount = currentPeriodTests.filter(test => test.isCompleted).length;
+        
+        const currentAvgTestGrade = currentPeriodTests.length > 0 
+          ? Math.round(currentTestGradeSum / currentPeriodTests.length) 
+          : 0;
+        const currentAvgTeacherGrade = currentPeriodTests.length > 0 
+          ? Math.round(currentTeacherGradeSum / currentPeriodTests.length) 
+          : 0;
+        const currentCompletionRate = currentPeriodTests.length > 0 
+          ? Math.round((currentCompletedCount / currentPeriodTests.length) * 100) 
+          : 0;
+        
+        // Calculate previous period metrics
+        const previousTestGradeSum = previousPeriodTests.reduce((sum, test) => sum + test.testGrade, 0);
+        const previousTeacherGradeSum = previousPeriodTests.reduce((sum, test) => sum + test.teacherGrade, 0);
+        const previousCompletedCount = previousPeriodTests.filter(test => test.isCompleted).length;
+        
+        const previousAvgTestGrade = previousPeriodTests.length > 0 
+          ? Math.round(previousTestGradeSum / previousPeriodTests.length) 
+          : 0;
+        const previousAvgTeacherGrade = previousPeriodTests.length > 0 
+          ? Math.round(previousTeacherGradeSum / previousPeriodTests.length) 
+          : 0;
+        const previousCompletionRate = previousPeriodTests.length > 0 
+          ? Math.round((previousCompletedCount / previousPeriodTests.length) * 100) 
+          : 0;
+        
+        // Calculate changes
+        const testGradeChange = previousAvgTestGrade > 0 
+          ? currentAvgTestGrade - previousAvgTestGrade 
+          : 0;
+        const teacherGradeChange = previousAvgTeacherGrade > 0 
+          ? currentAvgTeacherGrade - previousAvgTeacherGrade 
+          : 0;
+        const completionRateChange = previousCompletionRate > 0 
+          ? currentCompletionRate - previousCompletionRate 
+          : 0;
+        
+        console.log("Calculated metrics:", {
+          current: {
+            avgTestGrade: currentAvgTestGrade,
+            avgTeacherGrade: currentAvgTeacherGrade,
+            completionRate: currentCompletionRate
+          },
+          previous: {
+            avgTestGrade: previousAvgTestGrade,
+            avgTeacherGrade: previousAvgTeacherGrade,
+            completionRate: previousCompletionRate
+          },
+          changes: {
+            testGradeChange,
+            teacherGradeChange,
+            completionRateChange
+          }
+        });
+        
+        // Update state with metrics
+        setOverallMetrics({
+          avgTestGrade: currentAvgTestGrade,
+          avgTeacherGrade: currentAvgTeacherGrade,
+          testGradeChange,
+          teacherGradeChange,
+          completionRate: currentCompletionRate,
+          completionRateChange
+        });
+        
+      } catch (error) {
+        console.error("Error calculating overall metrics:", error);
+      }
+    };
+    
+    calculateOverallMetrics();
+  }, [dateRange]);
+  
   // Prepare chart data
   const chartData: ChartData<'line'> = {
     labels: timeSeriesData.labels,
@@ -958,13 +1136,13 @@ export default function AnalyticsPage() {
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <StarIcon className="h-4 w-4 text-yellow-400 mr-1" />
-                            <span className="text-sm text-black">{student.testGrade}%</span>
+                            <span className="text-sm text-black">{student.testGrade}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex items-center">
                             <StarIcon className="h-4 w-4 text-blue-400 mr-1" />
-                            <span className="text-sm text-black">{student.teacherGrade}%</span>
+                            <span className="text-sm text-black">{student.teacherGrade}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -978,7 +1156,7 @@ export default function AnalyticsPage() {
                             ) : (
                               <span className="h-4 w-4 mr-1">-</span>
                             )}
-                            <span>{Math.abs(student.progress)}%</span>
+                            <span>{Math.abs(student.progress)}</span>
                           </div>
                         </td>
                       </tr>
@@ -994,31 +1172,31 @@ export default function AnalyticsPage() {
           </div>
         </div>
         
-        {/* Additional Metrics Section */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Updated Metrics Section with real data and without Most Difficult Test */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           <MetricCard 
             title="Average Test Grade" 
-            value="85%" 
-            change="+3%" 
-            trend="up" 
+            value={overallMetrics.avgTestGrade.toString()} 
+            change={overallMetrics.testGradeChange !== 0 ? 
+              (overallMetrics.testGradeChange > 0 ? "+" : "") + overallMetrics.testGradeChange.toString() 
+              : undefined} 
+            trend={overallMetrics.testGradeChange > 0 ? 'up' : overallMetrics.testGradeChange < 0 ? 'down' : 'neutral'} 
           />
           <MetricCard 
             title="Average Teacher Grade" 
-            value="78%" 
-            change="+5%" 
-            trend="up" 
+            value={overallMetrics.avgTeacherGrade.toString()} 
+            change={overallMetrics.teacherGradeChange !== 0 ? 
+              (overallMetrics.teacherGradeChange > 0 ? "+" : "") + overallMetrics.teacherGradeChange.toString() 
+              : undefined} 
+            trend={overallMetrics.teacherGradeChange > 0 ? 'up' : overallMetrics.teacherGradeChange < 0 ? 'down' : 'neutral'} 
           />
           <MetricCard 
             title="Completion Rate" 
-            value="92%" 
-            change="-2%" 
-            trend="down" 
-          />
-          <MetricCard 
-            title="Most Difficult Test" 
-            value="Business Grammar" 
-            changeValue="63% avg. score" 
-            trend="neutral" 
+            value={`${overallMetrics.completionRate}%`} 
+            change={overallMetrics.completionRateChange !== 0 ? 
+              (overallMetrics.completionRateChange > 0 ? "+" : "") + overallMetrics.completionRateChange + "%" 
+              : undefined} 
+            trend={overallMetrics.completionRateChange > 0 ? 'up' : overallMetrics.completionRateChange < 0 ? 'down' : 'neutral'} 
           />
         </div>
       </DashboardShell>
@@ -1032,7 +1210,7 @@ function SkillBar({ label, percentage, color }: { label: string; percentage: num
     <div>
       <div className="flex justify-between mb-1">
         <span className="text-sm font-medium text-black">{label}</span>
-        <span className="text-sm font-medium text-black">{percentage}%</span>
+        <span className="text-sm font-medium text-black">{percentage}</span>
       </div>
       <div className="w-full bg-gray-200 rounded-full h-2.5">
         <div className={`${color} h-2.5 rounded-full`} style={{ width: `${percentage}%` }}></div>
