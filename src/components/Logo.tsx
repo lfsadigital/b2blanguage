@@ -13,18 +13,20 @@ export default function Logo({
   variant = 'dark',
   className = ''
 }: LogoProps) {
-  // Add a version parameter to prevent caching
-  const version = '2.0';
+  // Use the new logo files
+  const logoFile = variant === 'light' 
+    ? '/images/Design%20sem%20nome%20(1).svg' 
+    : '/images/Design%20sem%20nome.svg';
   
   return (
     <div className={`flex items-center justify-center ${className}`}>
       <Image
-        src={`/images/logo.svg?v=${version}`}
+        src={logoFile}
         alt="B2B Languages Logo"
         width={width}
         height={height}
         priority
-        className={`${variant === 'light' ? 'brightness-0 invert' : ''} object-contain`}
+        className="object-contain"
       />
     </div>
   );
