@@ -13,10 +13,8 @@ export default function Logo({
   variant = 'dark',
   className = ''
 }: LogoProps) {
-  // Use the new logo files
-  const logoFile = variant === 'light' 
-    ? '/images/Design%20sem%20nome%20(1).svg' 
-    : '/images/Design%20sem%20nome.svg';
+  // Use the new logo file
+  const logoFile = '/images/use_this_one_white.svg';
   
   return (
     <div className={`flex items-center justify-center ${className}`}>
@@ -26,7 +24,7 @@ export default function Logo({
         width={width}
         height={height}
         priority
-        className="object-contain"
+        className={`object-contain ${variant === 'dark' ? 'brightness-0' : ''}`}
       />
     </div>
   );
