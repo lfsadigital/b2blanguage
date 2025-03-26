@@ -72,7 +72,9 @@ export async function POST(request: Request) {
               contentInfo,
               {
                 professorName: '',
+                professorId: '',
                 studentName: '',
+                studentId: '',
                 contentUrl: data.contentUrl,
                 studentLevel: data.studentLevel as StudentLevel,
                 questionTypes: data.questionTypes.map(type => type as QuestionType),

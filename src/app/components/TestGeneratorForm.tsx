@@ -29,6 +29,14 @@ interface TestGeneratorFormProps {
   currentTeacher?: { id: string; displayName: string } | null;
 }
 
+// Helper function to validate StudentLevel
+const ensureValidStudentLevel = (level: string | undefined): StudentLevel => {
+  if (level === 'Beginner' || level === 'Medium' || level === 'Advanced') {
+    return level;
+  }
+  return 'Beginner'; // Default fallback
+};
+
 export default function TestGeneratorForm({ 
   onSubmit, 
   isGenerating, 
@@ -159,7 +167,7 @@ export default function TestGeneratorForm({
           studentId: value,
           studentName: selectedStudent.displayName,
           // Optionally update student level based on student data
-          studentLevel: selectedStudent.level || formData.studentLevel
+          studentLevel: ensureValidStudentLevel(selectedStudent.level) || formData.studentLevel
         }));
       }
     } else {
