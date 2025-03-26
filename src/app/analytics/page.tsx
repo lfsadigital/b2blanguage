@@ -130,7 +130,6 @@ export default function AnalyticsPage() {
     email: string;
     testGrade: number;
     teacherGrade: number;
-    participation: number;
     progress: number;
   }[]>([]);
   
@@ -586,20 +585,23 @@ export default function AnalyticsPage() {
           const avgTestGrade = tests.reduce((sum, test) => sum + test.testGrade, 0) / tests.length;
           const avgTeacherGrade = tests.reduce((sum, test) => sum + test.teacherGrade, 0) / tests.length;
           
-          // Calculate progress (change in test grade between oldest and newest tests)
-          tests.sort((a, b) => a.date.getTime() - b.date.getTime());
-          const oldestTest = tests[0];
-          const newestTest = tests[tests.length - 1];
-          const progressDiff = newestTest.testGrade - oldestTest.testGrade;
+          // Calculate progress (change in test grade between newest and second newest tests)
+          tests.sort((a, b) => b.date.getTime() - a.date.getTime()); // Sort by date descending (newest first)
           
-          // Simulated participation rate (could be based on attendance in a real system)
-          const participation = 75 + Math.floor(Math.random() * 25); // Random 75-100%
+          // Default progress to 0 if there's only one test
+          let progressDiff = 0;
+          
+          // Only calculate progress if there are at least 2 tests
+          if (tests.length >= 2) {
+            const newestTest = tests[0];
+            const secondNewestTest = tests[1];
+            progressDiff = newestTest.testGrade - secondNewestTest.testGrade;
+          }
           
           return {
             ...student,
             testGrade: Math.round(avgTestGrade),
             teacherGrade: Math.round(avgTeacherGrade),
-            participation,
             progress: progressDiff,
             testsCount: tests.length
           };
@@ -612,7 +614,6 @@ export default function AnalyticsPage() {
           email: string;
           testGrade: number;
           teacherGrade: number;
-          participation: number;
           progress: number;
           testsCount: number;
         }>;
@@ -627,7 +628,6 @@ export default function AnalyticsPage() {
           email: student.email,
           testGrade: student.testGrade,
           teacherGrade: student.teacherGrade,
-          participation: student.participation,
           progress: student.progress
         }));
         
@@ -929,7 +929,6 @@ export default function AnalyticsPage() {
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Student</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Test Grade</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Grade by Teacher</th>
-                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Participation</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Progress</th>
                     </tr>
                   </thead>
@@ -969,19 +968,15 @@ export default function AnalyticsPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="w-full bg-gray-200 rounded-full h-2.5">
-                            <div className="bg-[#8B4513] h-2.5 rounded-full" style={{ width: `${student.participation}%` }}></div>
-                          </div>
-                          <div className="mt-1 text-xs text-black">{student.participation}% attendance</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
                           <div className={`flex items-center ${
-                            student.progress > 0 ? 'text-green-600' : 'text-red-600'
+                            student.progress > 0 ? 'text-green-600' : student.progress < 0 ? 'text-red-600' : 'text-gray-500'
                           }`}>
                             {student.progress > 0 ? (
                               <ArrowUpIcon className="h-4 w-4 mr-1" />
-                            ) : (
+                            ) : student.progress < 0 ? (
                               <ArrowDownIcon className="h-4 w-4 mr-1" />
+                            ) : (
+                              <span className="h-4 w-4 mr-1">-</span>
                             )}
                             <span>{Math.abs(student.progress)}%</span>
                           </div>
