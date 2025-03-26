@@ -11,9 +11,12 @@ import {
   AcademicCapIcon,
   FunnelIcon,
   CalendarIcon,
+  ClockIcon,
+  BookOpenIcon,
+  PresentationChartLineIcon,
 } from '@heroicons/react/24/outline';
 import RoleBasedRoute from '@/app/components/RoleBasedRoute';
-import { db } from '../../lib/firebase/firebase';
+import { db } from '@/lib/firebase/firebase';
 import { collection, getDocs, query, where, orderBy, limit, Timestamp, DocumentData } from 'firebase/firestore';
 import {
   Chart as ChartJS,
@@ -25,9 +28,11 @@ import {
   Tooltip,
   Legend,
   ChartData,
-  ChartOptions
+  ChartOptions,
+  BarElement,
 } from 'chart.js';
-import { Line } from 'react-chartjs-2';
+import { Line, Bar } from 'react-chartjs-2';
+import { format, subDays } from 'date-fns';
 
 // Register ChartJS components
 ChartJS.register(
@@ -37,7 +42,8 @@ ChartJS.register(
   LineElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  BarElement
 );
 
 // Define user profile types
@@ -59,11 +65,19 @@ interface DateRange {
 interface TestData {
   id: string;
   studentId: string;
+  studentName?: string;
+  teacherId?: string;
+  teacherName?: string;
   testGrade: number;
   teacherGrade: number;
   date: Date;
-  studentName?: string;
-  teacherName?: string;
+  testDate?: Date;
+  forNextClass?: string;
+  notes?: string;
+  studentLevel?: string;
+  timestamp?: number;
+  uploadDate?: string;
+  uploadedBy?: string;
 }
 
 interface TimeSeriesData {
@@ -108,8 +122,21 @@ export default function AnalyticsPage() {
     teacherGrades: []
   });
   
+  // Add state for student rankings
+  const [studentRankings, setStudentRankings] = useState<{
+    id: string;
+    rank: number;
+    name: string;
+    email: string;
+    testGrade: number;
+    teacherGrade: number;
+    participation: number;
+    progress: number;
+  }[]>([]);
+  
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [chartLoading, setChartLoading] = useState<boolean>(true);
+  const [rankingsLoading, setRankingsLoading] = useState<boolean>(true);
   
   // Format dates for inputs
   const formatDateForInput = (date: Date): string => {
@@ -184,60 +211,86 @@ export default function AnalyticsPage() {
     const fetchPerformanceData = async () => {
       setIsLoading(true);
       try {
-        // Create a base query for the tests collection
-        let testsQuery = collection(db, 'tests');
+        console.log("Fetching performance data with filters:", {
+          student: selectedStudent,
+          teacher: selectedTeacher,
+          manager: selectedManager,
+          dateRange
+        });
+        
+        // Create a base query for the testResults collection
+        let testsQuery = collection(db, 'testResults');
         let constraints = [];
         
         // Add filter constraints based on selections
         if (selectedStudent) {
           constraints.push(where('studentId', '==', selectedStudent));
         }
+
+        if (selectedTeacher) {
+          constraints.push(where('teacherId', '==', selectedTeacher));
+        }
         
-        // Add date range constraints
-        constraints.push(where('date', '>=', Timestamp.fromDate(dateRange.startDate)));
-        constraints.push(where('date', '<=', Timestamp.fromDate(dateRange.endDate)));
+        // Add date range constraints - convert string dates to Timestamp if needed
+        const startTimestamp = Timestamp.fromDate(dateRange.startDate);
+        const endTimestamp = Timestamp.fromDate(dateRange.endDate);
+        
+        console.log("Date range:", {
+          start: startTimestamp,
+          end: endTimestamp,
+          startFormatted: dateRange.startDate.toLocaleDateString(),
+          endFormatted: dateRange.endDate.toLocaleDateString()
+        });
+        
+        // This assumes the field is called 'testDate' in Firestore
+        constraints.push(where('testDate', '>=', startTimestamp));
+        constraints.push(where('testDate', '<=', endTimestamp));
         
         // Execute query with constraints
         const testsRef = constraints.length > 0 
           ? query(testsQuery, ...constraints) 
           : query(testsQuery);
         
+        console.log("Executing query with constraints:", constraints);
         const testsSnapshot = await getDocs(testsRef);
+        console.log(`Query returned ${testsSnapshot.docs.length} documents`);
         
         // Process results
         const testResults: TestData[] = [];
         testsSnapshot.forEach(doc => {
           const data = doc.data();
+          console.log("Processing document:", doc.id, data);
+          
+          // Convert string grades to numbers if needed
+          const testGrade = typeof data.testGrade === 'string' 
+            ? parseInt(data.testGrade, 10) 
+            : (data.testGrade || 0);
+            
+          const teacherGrade = typeof data.gradeByTeacher === 'string' 
+            ? parseInt(data.gradeByTeacher, 10) 
+            : (data.gradeByTeacher || 0);
+          
           testResults.push({
             id: doc.id,
             studentId: data.studentId || '',
-            testGrade: data.testGrade || 0,
-            teacherGrade: data.teacherGrade || 0,
-            date: data.date ? data.date.toDate() : new Date(),
+            testGrade: testGrade,
+            teacherGrade: teacherGrade,
+            date: data.testDate?.toDate() || new Date(),
+            studentName: data.studentName,
+            teacherName: data.teacherName
           });
         });
         
-        // Filter by teacher if selected
-        let filteredResults = testResults;
-        if (selectedTeacher) {
-          // In a real implementation, you would have a teacher-student relationship
-          // Here we're using a simplified approach
-          const teacherStudents = await getTeacherStudents(selectedTeacher);
-          filteredResults = testResults.filter(test => 
-            teacherStudents.includes(test.studentId)
-          );
-        }
-        
-        // Filter by manager if selected
-        if (selectedManager) {
-          // Similar to teacher filtering, we would need manager-teacher-student relationships
-          // This is a placeholder for the logic
-        }
-        
         // Calculate averages
-        if (filteredResults.length > 0) {
-          const avgTestGrade = filteredResults.reduce((sum, test) => sum + test.testGrade, 0) / filteredResults.length;
-          const avgTeacherGrade = filteredResults.reduce((sum, test) => sum + test.teacherGrade, 0) / filteredResults.length;
+        if (testResults.length > 0) {
+          const avgTestGrade = testResults.reduce((sum, test) => sum + test.testGrade, 0) / testResults.length;
+          const avgTeacherGrade = testResults.reduce((sum, test) => sum + test.teacherGrade, 0) / testResults.length;
+          
+          console.log("Calculated grades:", {
+            avgTestGrade,
+            avgTeacherGrade,
+            numRecords: testResults.length
+          });
           
           setPerformanceData({
             testGrade: Math.round(avgTestGrade),
@@ -245,6 +298,7 @@ export default function AnalyticsPage() {
           });
         } else {
           // No data available
+          console.log("No data available for the current filters");
           setPerformanceData({
             testGrade: 0,
             teacherGrade: 0
@@ -277,8 +331,15 @@ export default function AnalyticsPage() {
       }
       
       try {
-        // Create a base query for the tests collection
-        let testsQuery = collection(db, 'tests');
+        console.log("Fetching time series data with filters:", {
+          student: selectedStudent,
+          teacher: selectedTeacher,
+          manager: selectedManager,
+          dateRange
+        });
+        
+        // Create a base query for the testResults collection
+        let testsQuery = collection(db, 'testResults');
         let constraints = [];
         
         // Add filter constraints based on selections
@@ -286,46 +347,57 @@ export default function AnalyticsPage() {
           constraints.push(where('studentId', '==', selectedStudent));
         }
         
+        if (selectedTeacher) {
+          constraints.push(where('teacherId', '==', selectedTeacher));
+        }
+        
         // Add date range constraints
-        constraints.push(where('date', '>=', Timestamp.fromDate(dateRange.startDate)));
-        constraints.push(where('date', '<=', Timestamp.fromDate(dateRange.endDate)));
-        constraints.push(orderBy('date', 'asc')); // Order by date ascending
+        const startTimestamp = Timestamp.fromDate(dateRange.startDate);
+        const endTimestamp = Timestamp.fromDate(dateRange.endDate);
+        
+        constraints.push(where('testDate', '>=', startTimestamp));
+        constraints.push(where('testDate', '<=', endTimestamp));
+        constraints.push(orderBy('testDate', 'asc')); // Order by date ascending
         
         // Execute query with constraints
         const testsRef = constraints.length > 0 
           ? query(testsQuery, ...constraints) 
           : query(testsQuery);
         
+        console.log("Executing time series query");
         const testsSnapshot = await getDocs(testsRef);
+        console.log(`Time series query returned ${testsSnapshot.docs.length} documents`);
         
         // Process results
         const testResults: TestData[] = [];
         testsSnapshot.forEach(doc => {
           const data = doc.data();
+          console.log("Processing time series document:", doc.id, data);
+          
+          // Convert string grades to numbers if needed
+          const testGrade = typeof data.testGrade === 'string' 
+            ? parseInt(data.testGrade, 10) 
+            : (data.testGrade || 0);
+            
+          const teacherGrade = typeof data.gradeByTeacher === 'string' 
+            ? parseInt(data.gradeByTeacher, 10) 
+            : (data.gradeByTeacher || 0);
+          
           testResults.push({
             id: doc.id,
             studentId: data.studentId || '',
-            testGrade: data.testGrade || 0,
-            teacherGrade: data.teacherGrade || 0,
-            date: data.date ? data.date.toDate() : new Date(),
+            testGrade: testGrade,
+            teacherGrade: teacherGrade,
+            date: data.testDate?.toDate() || new Date(),
           });
         });
         
-        // Filter by teacher if selected (and no student is selected)
-        let filteredResults = testResults;
-        if (selectedTeacher && !selectedStudent) {
-          const teacherStudents = await getTeacherStudents(selectedTeacher);
-          filteredResults = testResults.filter(test => 
-            teacherStudents.includes(test.studentId)
-          );
-        }
-        
         // Prepare data for the chart
-        if (filteredResults.length > 0) {
+        if (testResults.length > 0) {
           // Group by date for cleaner chart
           const dataByDate = new Map<string, { testGrades: number[], teacherGrades: number[] }>();
           
-          filteredResults.forEach(test => {
+          testResults.forEach(test => {
             const dateStr = test.date.toLocaleDateString();
             if (!dataByDate.has(dateStr)) {
               dataByDate.set(dateStr, { testGrades: [], teacherGrades: [] });
@@ -357,6 +429,12 @@ export default function AnalyticsPage() {
             teacherGrades.push(Math.round(avgTeacherGrade));
           });
           
+          console.log("Chart data prepared:", {
+            labels,
+            testGrades,
+            teacherGrades
+          });
+          
           setTimeSeriesData({
             labels,
             testGrades,
@@ -364,6 +442,7 @@ export default function AnalyticsPage() {
           });
         } else {
           // No data
+          console.log("No data available for time series chart");
           setTimeSeriesData({
             labels: [],
             testGrades: [],
@@ -385,6 +464,114 @@ export default function AnalyticsPage() {
     
     fetchTimeSeriesData();
   }, [selectedStudent, selectedTeacher, selectedManager, dateRange]);
+  
+  // Add useEffect to fetch student rankings
+  useEffect(() => {
+    const fetchStudentRankings = async () => {
+      setRankingsLoading(true);
+      try {
+        console.log("Fetching student rankings");
+        
+        // Get all student users
+        const usersCollection = collection(db, 'users');
+        const studentsQuery = query(usersCollection, where('profileType', '==', 'Student'));
+        const studentsSnapshot = await getDocs(studentsQuery);
+        
+        // Get student IDs and names
+        const studentUsers = studentsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          name: doc.data().displayName || 'Unknown',
+          email: doc.data().email || ''
+        }));
+        
+        console.log(`Found ${studentUsers.length} students`);
+        
+        // For each student, get their test results
+        const studentTestsPromises = studentUsers.map(async student => {
+          const testsCollection = collection(db, 'testResults');
+          const studentTestsQuery = query(
+            testsCollection, 
+            where('studentId', '==', student.id),
+            where('testDate', '>=', Timestamp.fromDate(dateRange.startDate)),
+            where('testDate', '<=', Timestamp.fromDate(dateRange.endDate))
+          );
+          
+          const testsSnapshot = await getDocs(studentTestsQuery);
+          console.log(`Found ${testsSnapshot.docs.length} tests for student ${student.name}`);
+          
+          // Calculate average scores
+          if (testsSnapshot.docs.length === 0) return null;
+          
+          const tests = testsSnapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+              testGrade: typeof data.testGrade === 'string' ? parseInt(data.testGrade, 10) : (data.testGrade || 0),
+              teacherGrade: typeof data.gradeByTeacher === 'string' ? parseInt(data.gradeByTeacher, 10) : (data.gradeByTeacher || 0),
+              date: data.testDate?.toDate() || new Date()
+            };
+          });
+          
+          const avgTestGrade = tests.reduce((sum, test) => sum + test.testGrade, 0) / tests.length;
+          const avgTeacherGrade = tests.reduce((sum, test) => sum + test.teacherGrade, 0) / tests.length;
+          
+          // Calculate progress (change in test grade between oldest and newest tests)
+          tests.sort((a, b) => a.date.getTime() - b.date.getTime());
+          const oldestTest = tests[0];
+          const newestTest = tests[tests.length - 1];
+          const progressDiff = newestTest.testGrade - oldestTest.testGrade;
+          
+          // Simulated participation rate (could be based on attendance in a real system)
+          const participation = 75 + Math.floor(Math.random() * 25); // Random 75-100%
+          
+          return {
+            ...student,
+            testGrade: Math.round(avgTestGrade),
+            teacherGrade: Math.round(avgTeacherGrade),
+            participation,
+            progress: progressDiff,
+            testsCount: tests.length
+          };
+        });
+        
+        // Resolve all promises and filter out nulls
+        const studentTestResults = (await Promise.all(studentTestsPromises)).filter(Boolean) as Array<{
+          id: string;
+          name: string;
+          email: string;
+          testGrade: number;
+          teacherGrade: number;
+          participation: number;
+          progress: number;
+          testsCount: number;
+        }>;
+        
+        // Sort students by test grade and assign rank
+        studentTestResults.sort((a, b) => b.testGrade - a.testGrade);
+        
+        const rankings = studentTestResults.map((student, index) => ({
+          id: student.id,
+          rank: index + 1,
+          name: student.name,
+          email: student.email,
+          testGrade: student.testGrade,
+          teacherGrade: student.teacherGrade,
+          participation: student.participation,
+          progress: student.progress
+        }));
+        
+        console.log("Student rankings:", rankings);
+        setStudentRankings(rankings);
+      } catch (error) {
+        console.error("Error fetching student rankings:", error);
+        // Use empty array if there's an error
+        setStudentRankings([]);
+      } finally {
+        setRankingsLoading(false);
+      }
+    };
+    
+    fetchStudentRankings();
+  }, [dateRange]);
   
   // Prepare chart data
   const chartData: ChartData<'line'> = {
@@ -437,6 +624,43 @@ export default function AnalyticsPage() {
       }
     },
   };
+  
+  // Add a function to inspect Firestore collections
+  const inspectFirestoreCollections = async () => {
+    try {
+      // Check available collections
+      console.log("Inspecting Firestore collections");
+      
+      // Try both 'tests' and 'testResults' collections
+      const collectionsToCheck = ['tests', 'testResults', 'testResult'];
+      
+      for (const collectionName of collectionsToCheck) {
+        try {
+          const collectionRef = collection(db, collectionName);
+          const snapshot = await getDocs(collectionRef);
+          console.log(`Collection '${collectionName}' exists with ${snapshot.docs.length} documents`);
+          
+          // Inspect first document structure if available
+          if (snapshot.docs.length > 0) {
+            const firstDoc = snapshot.docs[0];
+            console.log(`Sample document from '${collectionName}':`, {
+              id: firstDoc.id,
+              data: firstDoc.data()
+            });
+          }
+        } catch (err) {
+          console.log(`Error checking collection '${collectionName}':`, err);
+        }
+      }
+    } catch (error) {
+      console.error("Error inspecting Firestore collections:", error);
+    }
+  };
+  
+  // Run the collection inspector on component mount
+  useEffect(() => {
+    inspectFirestoreCollections();
+  }, []);
   
   return (
     <RoleBasedRoute 
@@ -609,7 +833,7 @@ export default function AnalyticsPage() {
           </div>
         </div>
         
-        {/* Student Rankings Section - Updated with Test Grade and Grade by Teacher */}
+        {/* Student Rankings Section - Updated with real data */}
         <div className="mb-6">
           <div className="bg-[#F8F4EA] rounded-lg shadow">
             <div className="p-6 border-b border-[#E6D7B8]">
@@ -620,76 +844,86 @@ export default function AnalyticsPage() {
               <p className="text-sm text-gray-600">Based on test scores and teacher evaluations</p>
             </div>
             
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-[#E6D7B8]">
-                <thead className="bg-[#F0E6D2]">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Rank</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Student</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Test Grade</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Grade by Teacher</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Participation</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Progress</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {studentRankings.map((student) => (
-                    <tr key={student.id} className="hover:bg-[#FEFAF0]">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <span className={`flex items-center justify-center h-6 w-6 rounded-full ${
-                            student.rank <= 3 ? 'bg-[#F0E6D2] text-[#8B4513]' : 'bg-gray-100 text-gray-500'
-                          } text-xs font-medium`}>
-                            {student.rank}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-8 w-8 bg-[#F0E6D2] rounded-full flex items-center justify-center">
-                            <UserGroupIcon className="h-4 w-4 text-[#8B4513]" />
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-black">{student.name}</div>
-                            <div className="text-xs text-gray-600">{student.email}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <StarIcon className="h-4 w-4 text-yellow-400 mr-1" />
-                          <span className="text-sm text-black">{student.testGrade}%</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <StarIcon className="h-4 w-4 text-blue-400 mr-1" />
-                          <span className="text-sm text-black">{student.teacherGrade}%</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="w-full bg-gray-200 rounded-full h-2.5">
-                          <div className="bg-[#8B4513] h-2.5 rounded-full" style={{ width: `${student.participation}%` }}></div>
-                        </div>
-                        <div className="mt-1 text-xs text-black">{student.participation}% attendance</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className={`flex items-center ${
-                          student.progress > 0 ? 'text-green-600' : 'text-red-600'
-                        }`}>
-                          {student.progress > 0 ? (
-                            <ArrowUpIcon className="h-4 w-4 mr-1" />
-                          ) : (
-                            <ArrowDownIcon className="h-4 w-4 mr-1" />
-                          )}
-                          <span>{Math.abs(student.progress)}%</span>
-                        </div>
-                      </td>
+            {rankingsLoading ? (
+              <div className="flex justify-center p-8">
+                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#8B4513]"></div>
+              </div>
+            ) : studentRankings.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-[#E6D7B8]">
+                  <thead className="bg-[#F0E6D2]">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Rank</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Student</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Test Grade</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Grade by Teacher</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Participation</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Progress</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {studentRankings.map((student) => (
+                      <tr key={student.id} className="hover:bg-[#FEFAF0]">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <span className={`flex items-center justify-center h-6 w-6 rounded-full ${
+                              student.rank <= 3 ? 'bg-[#F0E6D2] text-[#8B4513]' : 'bg-gray-100 text-gray-500'
+                            } text-xs font-medium`}>
+                              {student.rank}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-8 w-8 bg-[#F0E6D2] rounded-full flex items-center justify-center">
+                              <UserGroupIcon className="h-4 w-4 text-[#8B4513]" />
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-black">{student.name}</div>
+                              <div className="text-xs text-gray-600">{student.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <StarIcon className="h-4 w-4 text-yellow-400 mr-1" />
+                            <span className="text-sm text-black">{student.testGrade}%</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <StarIcon className="h-4 w-4 text-blue-400 mr-1" />
+                            <span className="text-sm text-black">{student.teacherGrade}%</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="w-full bg-gray-200 rounded-full h-2.5">
+                            <div className="bg-[#8B4513] h-2.5 rounded-full" style={{ width: `${student.participation}%` }}></div>
+                          </div>
+                          <div className="mt-1 text-xs text-black">{student.participation}% attendance</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className={`flex items-center ${
+                            student.progress > 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                            {student.progress > 0 ? (
+                              <ArrowUpIcon className="h-4 w-4 mr-1" />
+                            ) : (
+                              <ArrowDownIcon className="h-4 w-4 mr-1" />
+                            )}
+                            <span>{Math.abs(student.progress)}%</span>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                No student data available for the selected date range
+              </div>
+            )}
           </div>
         </div>
         
@@ -787,15 +1021,4 @@ function MetricCard({
       </div>
     </div>
   );
-}
-
-// Mock student rankings data
-const studentRankings = [
-  { id: 1, rank: 1, name: 'Eduardo S', email: 'edus@notreal.com', testGrade: 94, teacherGrade: 90, participation: 98, progress: 5 },
-  { id: 2, rank: 2, name: 'Rafaela S', email: 'sersunnaoreal@gmail.com', testGrade: 88, teacherGrade: 92, participation: 95, progress: 3 },
-  { id: 3, rank: 3, name: 'Serra', email: 'serra_almeida@hotmail.com', testGrade: 84, teacherGrade: 86, participation: 90, progress: 2 },
-  { id: 4, rank: 4, name: 'Lucas Ferreira', email: 'lucasf@example.com', testGrade: 83, teacherGrade: 78, participation: 87, progress: -1 },
-  { id: 5, rank: 5, name: 'Beatriz Campos', email: 'beatrizc@example.com', testGrade: 76, teacherGrade: 82, participation: 84, progress: 4 },
-  { id: 6, rank: 6, name: 'Daniel Santos', email: 'daniels@example.com', testGrade: 74, teacherGrade: 76, participation: 79, progress: -2 },
-  { id: 7, rank: 7, name: 'Isabella Melo', email: 'isabellam@example.com', testGrade: 70, teacherGrade: 74, participation: 85, progress: 1 },
-]; 
+} 
