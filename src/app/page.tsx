@@ -45,7 +45,7 @@ export default function Home() {
       <section className="py-12 bg-white">
         <div className="container mx-auto px-6">
           <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">Our Tools</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="p-6 bg-[#FFF8DC] rounded-lg border border-[#DEB887]">
               <h3 className="text-xl font-semibold text-[#8B4513] mb-3">Test Generator</h3>
               <p className="text-gray-700 mb-4">
@@ -77,6 +77,18 @@ export default function Home() {
               </p>
               <Link 
                 href="/database" 
+                className="text-[#8B4513] font-medium hover:text-[#A0522D]"
+              >
+                Try it now →
+              </Link>
+            </div>
+            <div className="p-6 bg-[#FFF8DC] rounded-lg border border-[#DEB887]">
+              <h3 className="text-xl font-semibold text-[#8B4513] mb-3">Report</h3>
+              <p className="text-gray-700 mb-4">
+                Analyze student performance metrics and view rankings based on test results.
+              </p>
+              <Link 
+                href="/report" 
                 className="text-[#8B4513] font-medium hover:text-[#A0522D]"
               >
                 Try it now →
@@ -114,6 +126,8 @@ export default function Home() {
               <Link href="/dashboard" className="text-gray-300 hover:text-white">Dashboard</Link>
               <Link href="/test-generator" className="text-gray-300 hover:text-white">Test Generator</Link>
               <Link href="/class-diary" className="text-gray-300 hover:text-white">Class Diary</Link>
+              <Link href="/database" className="text-gray-300 hover:text-white">User Database</Link>
+              <Link href="/report" className="text-gray-300 hover:text-white">Report</Link>
             </div>
           </div>
           <div className="mt-8 pt-8 border-t border-gray-700 text-center text-gray-400 text-sm">
