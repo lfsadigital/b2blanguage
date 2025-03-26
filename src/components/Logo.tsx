@@ -8,8 +8,8 @@ interface LogoProps {
 }
 
 export default function Logo({ 
-  width = 80, 
-  height = 30, 
+  width = 70, 
+  height = 35, 
   variant = 'dark',
   className = ''
 }: LogoProps) {
@@ -21,7 +21,7 @@ export default function Logo({
         width={width}
         height={height}
         priority
-        className={variant === 'light' ? 'invert' : ''}
+        className={variant === 'light' ? 'brightness-0 invert' : ''}
       />
     </div>
   );

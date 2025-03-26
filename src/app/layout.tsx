@@ -33,8 +33,8 @@ export default function RootLayout({
                     href="/" 
                     className="flex-shrink-0 flex items-center"
                   >
-                    <Logo width={100} height={40} />
-                    <span className="text-[var(--foreground)] font-medium text-2xl ml-2">Languages</span>
+                    <Logo width={70} height={35} />
+                    <span className="text-[var(--primary)] font-bold text-2xl ml-3">Languages</span>
                   </Link>
                   <div className="hidden sm:ml-8 sm:flex sm:space-x-8">
                     <Link
@@ -80,8 +80,8 @@ export default function RootLayout({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div>
                   <div className="flex items-center">
-                    <Logo width={80} height={30} variant="light" />
-                    <span className="text-gray-300 font-medium text-2xl ml-2">Languages</span>
+                    <Logo width={70} height={35} variant="light" />
+                    <span className="text-white font-bold text-2xl ml-3">Languages</span>
                   </div>
                   <p className="mt-4 text-gray-400">
                     Elevating business professionals through specialized language training

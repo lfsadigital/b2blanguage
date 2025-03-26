@@ -24,8 +24,8 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <div className="flex justify-center items-center">
-              <Logo width={120} height={50} />
-              <span className="text-4xl tracking-tight font-extrabold text-[#8B4513] sm:text-5xl md:text-6xl ml-2">Languages</span>
+              <Logo width={80} height={40} />
+              <span className="text-[#8B4513] font-extrabold text-4xl tracking-tight sm:text-5xl md:text-6xl ml-3">Languages</span>
             </div>
             <p className="mt-3 max-w-md mx-auto text-base text-[#A0522D] sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
               LET'S TALK BUSINESS: WE LOVE TO TEACH
@@ -122,8 +122,8 @@ export default function Home() {
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-6 md:mb-0">
               <div className="flex items-center justify-center md:justify-start">
-                <Logo width={80} height={30} variant="light" />
-                <h3 className="text-xl font-bold text-white ml-2">Languages</h3>
+                <Logo width={70} height={35} variant="light" />
+                <h3 className="text-white font-bold text-xl ml-3">Languages</h3>
               </div>
               <p className="text-gray-300 mt-2">Professional English teaching tools</p>
             </div>
