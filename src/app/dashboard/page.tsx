@@ -8,7 +8,8 @@ import {
   UserGroupIcon,
   PresentationChartBarIcon,
   ArrowTrendingUpIcon,
-  BanknotesIcon
+  BanknotesIcon,
+  BookOpenIcon
 } from '@heroicons/react/24/outline';
 
 export default function Dashboard() {
@@ -172,22 +173,28 @@ interface QuickAccessItem {
 
 const quickAccess: QuickAccessItem[] = [
   {
-    title: 'Create a New Test',
-    description: 'Generate vocabulary, grammar, or business English tests',
+    title: 'Create a Test',
+    description: 'Create custom language tests based on business content, articles, or videos.',
     icon: <DocumentTextIcon className="h-6 w-6 text-[#8B4513]" />,
     href: '/test-generator',
   },
   {
-    title: 'View Analytics',
-    description: 'See student performance and engagement metrics',
-    icon: <ChartBarIcon className="h-6 w-6 text-[#8B4513]" />,
-    href: '/analytics',
+    title: 'Class Diary',
+    description: 'Track student activities, manage class notes, and monitor progress.',
+    icon: <BookOpenIcon className="h-6 w-6 text-[#8B4513]" />,
+    href: '/class-diary',
   },
   {
-    title: 'Manage Billing',
-    description: 'View your subscription status and billing history',
-    icon: <BanknotesIcon className="h-6 w-6 text-[#8B4513]" />,
-    href: '#',
+    title: 'Database',
+    description: 'Manage student and teacher profiles with role-based access.',
+    icon: <UserGroupIcon className="h-6 w-6 text-[#8B4513]" />,
+    href: '/database',
+  },
+  {
+    title: 'View Report',
+    description: 'Analyze student performance metrics and view rankings.',
+    icon: <ChartBarIcon className="h-6 w-6 text-[#8B4513]" />,
+    href: '/report',
   },
 ];
 

@@ -15,7 +15,9 @@ import {
   ArrowRightOnRectangleIcon,
   UserCircleIcon,
   CheckCircleIcon,
-  ChartBarIcon
+  ChartBarIcon,
+  CalendarIcon,
+  UsersIcon
 } from '@heroicons/react/24/outline';
 import { useAuth } from '../../lib/hooks/useAuth';
 import SignInWithGoogle from '../../components/SignInWithGoogle';
@@ -202,9 +204,9 @@ function SidebarItems() {
   const navigation = [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
     { name: 'Test Generator', href: '/test-generator', icon: DocumentTextIcon },
-    { name: 'Class Diary', href: '/class-diary', icon: BookOpenIcon },
-    { name: 'Database', href: '/database', icon: UserGroupIcon },
-    { name: 'Analytics', href: '/analytics', icon: ChartBarIcon },
+    { name: 'Class Diary', href: '/class-diary', icon: CalendarIcon },
+    { name: 'Database', href: '/database', icon: UsersIcon },
+    { name: 'Report', href: '/report', icon: ChartBarIcon },
   ];
 
   return (
