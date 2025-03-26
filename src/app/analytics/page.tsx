@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DashboardShell from '../../components/ui/dashboard-shell';
 import { 
   ChartBarIcon,
@@ -9,11 +9,97 @@ import {
   ArrowUpIcon,
   ArrowDownIcon,
   AcademicCapIcon,
+  FunnelIcon,
+  CalendarIcon,
 } from '@heroicons/react/24/outline';
 import RoleBasedRoute from '@/app/components/RoleBasedRoute';
+import { db } from '../../lib/firebase/firebase';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+
+// Define user profile types
+type UserProfileType = 'Visitor' | 'Owner' | 'Manager' | 'Teacher' | 'Student';
+
+interface UserProfile {
+  id: string;
+  displayName: string;
+  email: string;
+  profileType: UserProfileType;
+}
+
+interface DateRange {
+  startDate: Date;
+  endDate: Date;
+}
 
 export default function AnalyticsPage() {
-  const [timeFrame, setTimeFrame] = useState('month');
+  // User filters
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [students, setStudents] = useState<UserProfile[]>([]);
+  const [teachers, setTeachers] = useState<UserProfile[]>([]);
+  const [managers, setManagers] = useState<UserProfile[]>([]);
+  const [owners, setOwners] = useState<UserProfile[]>([]);
+  
+  // Selected filters
+  const [selectedStudent, setSelectedStudent] = useState<string>('');
+  const [selectedTeacher, setSelectedTeacher] = useState<string>('');
+  const [selectedManager, setSelectedManager] = useState<string>('');
+  const [selectedOwner, setSelectedOwner] = useState<string>('');
+  
+  // Date range
+  const [dateRange, setDateRange] = useState<DateRange>({
+    startDate: new Date(new Date().setMonth(new Date().getMonth() - 1)),
+    endDate: new Date()
+  });
+  
+  // Format dates for inputs
+  const formatDateForInput = (date: Date): string => {
+    return date.toISOString().split('T')[0];
+  };
+
+  // Fetch users for filters
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const usersCollection = collection(db, 'users');
+        const usersSnapshot = await getDocs(usersCollection);
+        
+        const usersList = usersSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return { 
+            id: doc.id, 
+            displayName: data.displayName || '', 
+            email: data.email || '',
+            profileType: data.profileType || 'Visitor',
+          } as UserProfile;
+        });
+        
+        setUsers(usersList);
+        setStudents(usersList.filter(user => user.profileType === 'Student'));
+        setTeachers(usersList.filter(user => user.profileType === 'Teacher'));
+        setManagers(usersList.filter(user => user.profileType === 'Manager'));
+        setOwners(usersList.filter(user => user.profileType === 'Owner'));
+      } catch (error) {
+        console.error('Error fetching users:', error);
+      }
+    };
+    
+    fetchUsers();
+  }, []);
+  
+  // Handle date range changes
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDateRange(prev => ({
+      ...prev,
+      startDate: new Date(e.target.value)
+    }));
+  };
+  
+  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDateRange(prev => ({
+      ...prev,
+      endDate: new Date(e.target.value)
+    }));
+  };
   
   return (
     <RoleBasedRoute 
@@ -28,90 +114,176 @@ export default function AnalyticsPage() {
           </p>
         </div>
         
-        {/* Time frame selector */}
+        {/* User and Date Filters */}
         <div className="mb-6 bg-[#F8F4EA] rounded-lg p-4 shadow-sm">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <h2 className="text-lg font-medium text-black">Performance Overview</h2>
-            <div className="inline-flex bg-white rounded-md shadow-sm" role="group">
-              <button 
-                type="button" 
-                onClick={() => setTimeFrame('week')}
-                className={`px-4 py-2 text-sm font-medium border border-r-0 rounded-l-lg ${
-                  timeFrame === 'week' 
-                    ? 'bg-[#F0E6D2] text-[#8B4513] border-[#E6D7B8]' 
-                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
-                }`}
+          <div className="flex items-center mb-3">
+            <FunnelIcon className="h-5 w-5 text-[#8B4513] mr-2" />
+            <h2 className="text-lg font-medium text-black">Filters</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* Student Filter */}
+            <div>
+              <label htmlFor="student-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                Student
+              </label>
+              <select
+                id="student-filter"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white"
+                value={selectedStudent}
+                onChange={(e) => setSelectedStudent(e.target.value)}
               >
-                Week
-              </button>
-              <button 
-                type="button" 
-                onClick={() => setTimeFrame('month')}
-                className={`px-4 py-2 text-sm font-medium border border-r-0 ${
-                  timeFrame === 'month' 
-                    ? 'bg-[#F0E6D2] text-[#8B4513] border-[#E6D7B8]' 
-                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
-                }`}
+                <option value="">All Students (Average)</option>
+                {students.map(student => (
+                  <option key={student.id} value={student.id}>
+                    {student.displayName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Teacher Filter */}
+            <div>
+              <label htmlFor="teacher-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                Teacher
+              </label>
+              <select
+                id="teacher-filter"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white"
+                value={selectedTeacher}
+                onChange={(e) => setSelectedTeacher(e.target.value)}
               >
-                Month
-              </button>
-              <button 
-                type="button" 
-                onClick={() => setTimeFrame('quarter')}
-                className={`px-4 py-2 text-sm font-medium border rounded-r-lg ${
-                  timeFrame === 'quarter' 
-                    ? 'bg-[#F0E6D2] text-[#8B4513] border-[#E6D7B8]' 
-                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-100'
-                }`}
+                <option value="">All Teachers (Average)</option>
+                {teachers.map(teacher => (
+                  <option key={teacher.id} value={teacher.id}>
+                    {teacher.displayName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Manager Filter */}
+            <div>
+              <label htmlFor="manager-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                Manager
+              </label>
+              <select
+                id="manager-filter"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white"
+                value={selectedManager}
+                onChange={(e) => setSelectedManager(e.target.value)}
               >
-                Quarter
-              </button>
+                <option value="">All Managers (Average)</option>
+                {managers.map(manager => (
+                  <option key={manager.id} value={manager.id}>
+                    {manager.displayName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Owner Filter */}
+            <div>
+              <label htmlFor="owner-filter" className="block text-sm font-medium text-gray-700 mb-1">
+                Owner
+              </label>
+              <select
+                id="owner-filter"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white"
+                value={selectedOwner}
+                onChange={(e) => setSelectedOwner(e.target.value)}
+              >
+                <option value="">All Owners (Average)</option>
+                {owners.map(owner => (
+                  <option key={owner.id} value={owner.id}>
+                    {owner.displayName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            {/* Date Range Filter */}
+            <div className="lg:col-span-1">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Date Range
+              </label>
+              <div className="flex space-x-2">
+                <div className="relative rounded-md shadow-sm flex-1">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <CalendarIcon className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <input
+                    type="date"
+                    className="block w-full pl-10 rounded-md border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white"
+                    value={formatDateForInput(dateRange.startDate)}
+                    onChange={handleStartDateChange}
+                  />
+                </div>
+                <span className="inline-flex items-center text-gray-500">to</span>
+                <div className="relative rounded-md shadow-sm flex-1">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <CalendarIcon className="h-4 w-4 text-gray-400" />
+                  </div>
+                  <input
+                    type="date"
+                    className="block w-full pl-10 rounded-md border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white"
+                    value={formatDateForInput(dateRange.endDate)}
+                    onChange={handleEndDateChange}
+                  />
+                </div>
+              </div>
             </div>
           </div>
         </div>
         
         {/* Charts Section */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
-          {/* Performance Chart */}
+          {/* Performance Chart - Simplified to Test Grade and Grade by Teacher */}
           <div className="bg-[#F8F4EA] rounded-lg p-6 shadow">
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-medium text-black">Average Performance by Skill</h3>
+              <h3 className="text-lg font-medium text-black">Average Performance</h3>
               <ChartBarIcon className="h-6 w-6 text-[#8B4513]" />
             </div>
             <div className="space-y-4">
-              <SkillBar label="Grammar" percentage={78} color="bg-blue-500" />
-              <SkillBar label="Vocabulary" percentage={85} color="bg-green-500" />
-              <SkillBar label="Reading" percentage={72} color="bg-purple-500" />
-              <SkillBar label="Writing" percentage={68} color="bg-yellow-500" />
-              <SkillBar label="Speaking" percentage={75} color="bg-red-500" />
+              <SkillBar label="Test Grade" percentage={85} color="bg-blue-500" />
+              <SkillBar label="Grade by Teacher" percentage={78} color="bg-green-500" />
             </div>
           </div>
           
-          {/* Progress Over Time Chart */}
+          {/* Progress Over Time Chart - Only visible when a specific user is selected */}
           <div className="bg-[#F8F4EA] rounded-lg p-6 shadow">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-black">Progress Over Time</h3>
               <div className="flex space-x-2">
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-blue-500 mr-1"></div>
-                  <span className="text-xs text-gray-600">Grammar</span>
+                  <span className="text-xs text-gray-600">Test Grade</span>
                 </div>
                 <div className="flex items-center">
                   <div className="w-3 h-3 rounded-full bg-green-500 mr-1"></div>
-                  <span className="text-xs text-gray-600">Vocabulary</span>
+                  <span className="text-xs text-gray-600">Grade by Teacher</span>
                 </div>
               </div>
             </div>
             
-            {/* Placeholder for line chart */}
-            <div className="h-64 bg-[#FCF8F3] rounded-md border border-[#E6D7B8] flex items-center justify-center">
-              <p className="text-gray-500">Line chart visualization will be implemented here</p>
-            </div>
-            <p className="mt-2 text-xs text-gray-600 text-center">Data shown for the {timeFrame}</p>
+            {selectedStudent || selectedTeacher || selectedManager || selectedOwner ? (
+              /* Placeholder for line chart - to be implemented */
+              <div className="h-64 bg-[#FCF8F3] rounded-md border border-[#E6D7B8] flex items-center justify-center">
+                <p className="text-gray-500">Line chart showing progression over time</p>
+              </div>
+            ) : (
+              <div className="h-64 bg-[#FCF8F3] rounded-md border border-[#E6D7B8] flex items-center justify-center">
+                <p className="text-gray-500">Select a specific user to view progress over time</p>
+              </div>
+            )}
+            
+            <p className="mt-2 text-xs text-gray-600 text-center">
+              Data from {dateRange.startDate.toLocaleDateString()} to {dateRange.endDate.toLocaleDateString()}
+            </p>
           </div>
         </div>
         
-        {/* Student Rankings Section */}
+        {/* Student Rankings Section - Updated with Test Grade and Grade by Teacher */}
         <div className="mb-6">
           <div className="bg-[#F8F4EA] rounded-lg shadow">
             <div className="p-6 border-b border-[#E6D7B8]">
@@ -119,7 +291,7 @@ export default function AnalyticsPage() {
                 <h3 className="text-lg font-medium text-black">Student Rankings</h3>
                 <AcademicCapIcon className="h-6 w-6 text-[#8B4513]" />
               </div>
-              <p className="text-sm text-gray-600">Based on test scores and participation</p>
+              <p className="text-sm text-gray-600">Based on test scores and teacher evaluations</p>
             </div>
             
             <div className="overflow-x-auto">
@@ -128,7 +300,8 @@ export default function AnalyticsPage() {
                   <tr>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Rank</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Student</th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Average Score</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Test Grade</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Grade by Teacher</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Participation</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-black uppercase tracking-wider">Progress</th>
                   </tr>
@@ -159,7 +332,13 @@ export default function AnalyticsPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center">
                           <StarIcon className="h-4 w-4 text-yellow-400 mr-1" />
-                          <span className="text-sm text-black">{student.averageScore}%</span>
+                          <span className="text-sm text-black">{student.testGrade}%</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <StarIcon className="h-4 w-4 text-blue-400 mr-1" />
+                          <span className="text-sm text-black">{student.teacherGrade}%</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -191,32 +370,28 @@ export default function AnalyticsPage() {
         {/* Additional Metrics Section */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard 
-            title="Average Score" 
-            value="78%" 
+            title="Average Test Grade" 
+            value="85%" 
             change="+3%" 
             trend="up" 
-            timeFrame={timeFrame} 
+          />
+          <MetricCard 
+            title="Average Teacher Grade" 
+            value="78%" 
+            change="+5%" 
+            trend="up" 
           />
           <MetricCard 
             title="Completion Rate" 
             value="92%" 
-            change="+5%" 
-            trend="up" 
-            timeFrame={timeFrame} 
-          />
-          <MetricCard 
-            title="Engagement" 
-            value="84%" 
             change="-2%" 
             trend="down" 
-            timeFrame={timeFrame} 
           />
           <MetricCard 
-            title="Most Difficult Topic" 
-            value="Conditionals" 
+            title="Most Difficult Test" 
+            value="Business Grammar" 
             changeValue="63% avg. score" 
             trend="neutral" 
-            timeFrame={timeFrame} 
           />
         </div>
       </DashboardShell>
@@ -245,14 +420,12 @@ function MetricCard({
   value, 
   change, 
   trend, 
-  timeFrame,
   changeValue
 }: { 
   title: string; 
   value: string; 
   change?: string; 
   trend: 'up' | 'down' | 'neutral'; 
-  timeFrame: string;
   changeValue?: string;
 }) {
   return (
@@ -282,7 +455,7 @@ function MetricCard({
             ) : trend === 'down' ? (
               <ArrowDownIcon className="h-3 w-3 mr-1" />
             ) : null}
-            <span>Since last {timeFrame}</span>
+            <span>Since previous period</span>
           </div>
         )}
       </div>
@@ -292,11 +465,11 @@ function MetricCard({
 
 // Mock student rankings data
 const studentRankings = [
-  { id: 1, rank: 1, name: 'Eduardo S', email: 'edus@notreal.com', averageScore: 92, participation: 98, progress: 5 },
-  { id: 2, rank: 2, name: 'Rafaela S', email: 'sersunnaoreal@gmail.com', averageScore: 89, participation: 95, progress: 3 },
-  { id: 3, rank: 3, name: 'Serra', email: 'serra_almeida@hotmail.com', averageScore: 85, participation: 90, progress: 2 },
-  { id: 4, rank: 4, name: 'Lucas Ferreira', email: 'lucasf@example.com', averageScore: 82, participation: 87, progress: -1 },
-  { id: 5, rank: 5, name: 'Beatriz Campos', email: 'beatrizc@example.com', averageScore: 78, participation: 84, progress: 4 },
-  { id: 6, rank: 6, name: 'Daniel Santos', email: 'daniels@example.com', averageScore: 75, participation: 79, progress: -2 },
-  { id: 7, rank: 7, name: 'Isabella Melo', email: 'isabellam@example.com', averageScore: 72, participation: 85, progress: 1 },
+  { id: 1, rank: 1, name: 'Eduardo S', email: 'edus@notreal.com', testGrade: 94, teacherGrade: 90, participation: 98, progress: 5 },
+  { id: 2, rank: 2, name: 'Rafaela S', email: 'sersunnaoreal@gmail.com', testGrade: 88, teacherGrade: 92, participation: 95, progress: 3 },
+  { id: 3, rank: 3, name: 'Serra', email: 'serra_almeida@hotmail.com', testGrade: 84, teacherGrade: 86, participation: 90, progress: 2 },
+  { id: 4, rank: 4, name: 'Lucas Ferreira', email: 'lucasf@example.com', testGrade: 83, teacherGrade: 78, participation: 87, progress: -1 },
+  { id: 5, rank: 5, name: 'Beatriz Campos', email: 'beatrizc@example.com', testGrade: 76, teacherGrade: 82, participation: 84, progress: 4 },
+  { id: 6, rank: 6, name: 'Daniel Santos', email: 'daniels@example.com', testGrade: 74, teacherGrade: 76, participation: 79, progress: -2 },
+  { id: 7, rank: 7, name: 'Isabella Melo', email: 'isabellam@example.com', testGrade: 70, teacherGrade: 74, participation: 85, progress: 1 },
 ]; 
