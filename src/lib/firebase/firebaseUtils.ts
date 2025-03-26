@@ -15,6 +15,8 @@ import {
   getDoc,
   query,
   where,
+  writeBatch,
+  serverTimestamp,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { UserProfileType } from '../contexts/AuthContext';
@@ -181,6 +183,394 @@ export const updateUserProfileType = async (
     }
   } catch (error) {
     console.error('Error updating user profile type:', error);
+    throw error;
+  }
+};
+
+// Interface for relationships
+export interface Relationship {
+  id?: string;
+  studentId?: string;
+  teacherId?: string;
+  managerId?: string;
+  ownerId?: string;
+  userId?: string; // Generic user ID for non-student relationships
+  type: 'student-teacher' | 'student-manager' | 'student-owner' | 
+        'teacher-manager' | 'teacher-owner' | 
+        'manager-owner';
+  createdAt: any;
+}
+
+/**
+ * Create relationships for a new user based on their role
+ * Students must have at least one teacher
+ * All users are automatically linked to all managers and owners
+ */
+export const createUserRelationships = async (
+  userId: string,
+  userRole: UserProfileType,
+  selectedTeachers?: string[]
+): Promise<void> => {
+  try {
+    // Skip for visitors
+    if (userRole === 'Visitor') {
+      return;
+    }
+
+    console.log(`Creating relationships for ${userRole} with ID ${userId}`);
+    const batch = writeBatch(db);
+    const relationshipsRef = collection(db, 'relationships');
+
+    // For students, create relationships with selected teachers
+    if (userRole === 'Student') {
+      // Validate at least one teacher is selected
+      if (!selectedTeachers || selectedTeachers.length === 0) {
+        throw new Error('Students must have at least one teacher assigned');
+      }
+
+      console.log(`Creating ${selectedTeachers.length} student-teacher relationships`);
+      // Create student-teacher relationships
+      for (const teacherId of selectedTeachers) {
+        batch.set(doc(relationshipsRef), {
+          studentId: userId,
+          teacherId,
+          type: 'student-teacher',
+          createdAt: serverTimestamp()
+        });
+      }
+    }
+
+    // For all users, create relationships with managers and owners
+    // First, fetch all managers
+    const managersSnapshot = await getDocs(
+      query(collection(db, 'users'), where('profileType', '==', 'Manager'))
+    );
+
+    // Create relationships with all managers
+    managersSnapshot.forEach(managerDoc => {
+      const managerId = managerDoc.id;
+      
+      if (userRole === 'Student') {
+        batch.set(doc(relationshipsRef), {
+          studentId: userId,
+          managerId,
+          type: 'student-manager',
+          createdAt: serverTimestamp()
+        });
+      } else if (userRole === 'Teacher') {
+        batch.set(doc(relationshipsRef), {
+          teacherId: userId,
+          managerId,
+          type: 'teacher-manager',
+          createdAt: serverTimestamp()
+        });
+      }
+      // No relationship needed for manager-manager
+    });
+
+    // Fetch all owners
+    const ownersSnapshot = await getDocs(
+      query(collection(db, 'users'), where('profileType', '==', 'Owner'))
+    );
+
+    // Create relationships with all owners
+    ownersSnapshot.forEach(ownerDoc => {
+      const ownerId = ownerDoc.id;
+      
+      if (userRole === 'Student') {
+        batch.set(doc(relationshipsRef), {
+          studentId: userId,
+          ownerId,
+          type: 'student-owner',
+          createdAt: serverTimestamp()
+        });
+      } else if (userRole === 'Teacher') {
+        batch.set(doc(relationshipsRef), {
+          teacherId: userId,
+          ownerId,
+          type: 'teacher-owner',
+          createdAt: serverTimestamp()
+        });
+      } else if (userRole === 'Manager') {
+        batch.set(doc(relationshipsRef), {
+          managerId: userId,
+          ownerId,
+          type: 'manager-owner',
+          createdAt: serverTimestamp()
+        });
+      }
+    });
+
+    // Commit all the relationship creations
+    await batch.commit();
+    console.log(`Successfully created relationships for user ${userId}`);
+  } catch (error) {
+    console.error('Error creating user relationships:', error);
+    throw error;
+  }
+};
+
+/**
+ * Update relationships when a user's role changes
+ */
+export const updateUserRelationships = async (
+  userId: string,
+  oldRole: UserProfileType,
+  newRole: UserProfileType,
+  selectedTeachers?: string[]
+): Promise<void> => {
+  try {
+    if (oldRole === newRole && newRole !== 'Student') {
+      // No role change and not a student (student might just change teachers)
+      return;
+    }
+
+    // Delete existing relationships
+    await deleteUserRelationships(userId, oldRole);
+    
+    // Create new relationships based on new role
+    await createUserRelationships(userId, newRole, selectedTeachers);
+    
+  } catch (error) {
+    console.error('Error updating user relationships:', error);
+    throw error;
+  }
+};
+
+/**
+ * Delete all relationships for a user
+ */
+export const deleteUserRelationships = async (
+  userId: string,
+  userRole: UserProfileType
+): Promise<void> => {
+  try {
+    const relationshipsRef = collection(db, 'relationships');
+    const batch = writeBatch(db);
+    let relationshipsToDelete: any[] = [];
+
+    if (userRole === 'Student') {
+      // Find relationships where user is a student
+      const studentRelationships = await getDocs(
+        query(relationshipsRef, where('studentId', '==', userId))
+      );
+      relationshipsToDelete = [...relationshipsToDelete, ...studentRelationships.docs];
+    } else if (userRole === 'Teacher') {
+      // Find relationships where user is a teacher
+      const teacherRelationships = await getDocs(
+        query(relationshipsRef, where('teacherId', '==', userId))
+      );
+      relationshipsToDelete = [...relationshipsToDelete, ...teacherRelationships.docs];
+    } else if (userRole === 'Manager') {
+      // Find relationships where user is a manager
+      const managerRelationships = await getDocs(
+        query(relationshipsRef, where('managerId', '==', userId))
+      );
+      relationshipsToDelete = [...relationshipsToDelete, ...managerRelationships.docs];
+    } else if (userRole === 'Owner') {
+      // Find relationships where user is an owner
+      const ownerRelationships = await getDocs(
+        query(relationshipsRef, where('ownerId', '==', userId))
+      );
+      relationshipsToDelete = [...relationshipsToDelete, ...ownerRelationships.docs];
+    }
+
+    // Delete all relationships
+    for (const doc of relationshipsToDelete) {
+      batch.delete(doc.ref);
+    }
+    
+    await batch.commit();
+    console.log(`Deleted ${relationshipsToDelete.length} relationships for user ${userId}`);
+  } catch (error) {
+    console.error('Error deleting user relationships:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get all teachers associated with a student
+ */
+export const getStudentTeachers = async (studentId: string): Promise<string[]> => {
+  try {
+    const relationshipsRef = collection(db, 'relationships');
+    const q = query(
+      relationshipsRef, 
+      where('studentId', '==', studentId),
+      where('type', '==', 'student-teacher')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => doc.data().teacherId);
+  } catch (error) {
+    console.error('Error getting student teachers:', error);
+    throw error;
+  }
+};
+
+/**
+ * Get all students associated with a teacher
+ */
+export const getTeacherStudents = async (teacherId: string): Promise<string[]> => {
+  try {
+    const relationshipsRef = collection(db, 'relationships');
+    const q = query(
+      relationshipsRef, 
+      where('teacherId', '==', teacherId),
+      where('type', '==', 'student-teacher')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => doc.data().studentId);
+  } catch (error) {
+    console.error('Error getting teacher students:', error);
+    throw error;
+  }
+};
+
+/**
+ * Create all missing relationships to ensure data consistency 
+ * (for existing users before this feature was implemented)
+ */
+export const updateAllExistingRelationships = async (): Promise<void> => {
+  try {
+    console.log('Updating all existing relationships...');
+    const batch = writeBatch(db);
+    const relationshipsRef = collection(db, 'relationships');
+    
+    // Get all users grouped by role
+    const studentsSnapshot = await getDocs(
+      query(collection(db, 'users'), where('profileType', '==', 'Student'))
+    );
+    const teachersSnapshot = await getDocs(
+      query(collection(db, 'users'), where('profileType', '==', 'Teacher'))
+    );
+    const managersSnapshot = await getDocs(
+      query(collection(db, 'users'), where('profileType', '==', 'Manager'))
+    );
+    const ownersSnapshot = await getDocs(
+      query(collection(db, 'users'), where('profileType', '==', 'Owner'))
+    );
+    
+    const students = studentsSnapshot.docs;
+    const teachers = teachersSnapshot.docs;
+    const managers = managersSnapshot.docs;
+    const owners = ownersSnapshot.docs;
+    
+    console.log(`Found ${students.length} students, ${teachers.length} teachers, ${managers.length} managers, ${owners.length} owners`);
+    
+    // First, assign the first teacher to all students (as a starting point)
+    if (teachers.length > 0 && students.length > 0) {
+      const defaultTeacherId = teachers[0].id;
+      
+      for (const studentDoc of students) {
+        const studentId = studentDoc.id;
+        
+        // Check if student already has any teacher
+        const existingRelations = await getDocs(
+          query(relationshipsRef, 
+            where('studentId', '==', studentId),
+            where('type', '==', 'student-teacher')
+          )
+        );
+        
+        if (existingRelations.empty) {
+          // If no teacher assigned, assign the default one
+          batch.set(doc(relationshipsRef), {
+            studentId,
+            teacherId: defaultTeacherId,
+            type: 'student-teacher',
+            createdAt: serverTimestamp()
+          });
+        }
+      }
+    }
+    
+    // Connect all students to all managers
+    for (const studentDoc of students) {
+      const studentId = studentDoc.id;
+      
+      for (const managerDoc of managers) {
+        const managerId = managerDoc.id;
+        
+        batch.set(doc(relationshipsRef), {
+          studentId,
+          managerId,
+          type: 'student-manager',
+          createdAt: serverTimestamp()
+        });
+      }
+    }
+    
+    // Connect all teachers to all managers
+    for (const teacherDoc of teachers) {
+      const teacherId = teacherDoc.id;
+      
+      for (const managerDoc of managers) {
+        const managerId = managerDoc.id;
+        
+        batch.set(doc(relationshipsRef), {
+          teacherId,
+          managerId,
+          type: 'teacher-manager',
+          createdAt: serverTimestamp()
+        });
+      }
+    }
+    
+    // Connect all students to all owners
+    for (const studentDoc of students) {
+      const studentId = studentDoc.id;
+      
+      for (const ownerDoc of owners) {
+        const ownerId = ownerDoc.id;
+        
+        batch.set(doc(relationshipsRef), {
+          studentId,
+          ownerId,
+          type: 'student-owner',
+          createdAt: serverTimestamp()
+        });
+      }
+    }
+    
+    // Connect all teachers to all owners
+    for (const teacherDoc of teachers) {
+      const teacherId = teacherDoc.id;
+      
+      for (const ownerDoc of owners) {
+        const ownerId = ownerDoc.id;
+        
+        batch.set(doc(relationshipsRef), {
+          teacherId,
+          ownerId,
+          type: 'teacher-owner',
+          createdAt: serverTimestamp()
+        });
+      }
+    }
+    
+    // Connect all managers to all owners
+    for (const managerDoc of managers) {
+      const managerId = managerDoc.id;
+      
+      for (const ownerDoc of owners) {
+        const ownerId = ownerDoc.id;
+        
+        batch.set(doc(relationshipsRef), {
+          managerId,
+          ownerId,
+          type: 'manager-owner',
+          createdAt: serverTimestamp()
+        });
+      }
+    }
+    
+    // Commit all the relationship creations - may need to be done in chunks if too many
+    await batch.commit();
+    console.log('Successfully updated all existing relationships');
+  } catch (error) {
+    console.error('Error updating existing relationships:', error);
     throw error;
   }
 };

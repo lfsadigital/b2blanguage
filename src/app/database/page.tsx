@@ -15,6 +15,13 @@ import {
 } from '@heroicons/react/24/outline';
 import { db } from '../../lib/firebase/firebase';
 import { collection, getDocs, addDoc, doc, deleteDoc, updateDoc, query, where, orderBy } from 'firebase/firestore';
+import { 
+  createUserRelationships, 
+  updateUserRelationships, 
+  deleteUserRelationships,
+  updateAllExistingRelationships,
+  getStudentTeachers
+} from '@/lib/firebase/firebaseUtils';
 
 // Define available user profile types
 type UserProfileType = 'Visitor' | 'Owner' | 'Manager' | 'Teacher' | 'Student';
@@ -61,6 +68,9 @@ export default function DatabasePage() {
   const [editingProfile, setEditingProfile] = useState<UserProfile | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [teachers, setTeachers] = useState<UserProfile[]>([]);
+  const [selectedTeachers, setSelectedTeachers] = useState<string[]>([]);
+  const [isUpdatingRelationships, setIsUpdatingRelationships] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -89,6 +99,10 @@ export default function DatabasePage() {
         });
         
         setProfiles(usersList);
+        
+        // Filter teachers for the dropdown
+        const teachersList = usersList.filter(u => u.profileType === 'Teacher');
+        setTeachers(teachersList);
       } catch (error) {
         console.error('Error fetching user profiles:', error);
         setErrorMessage('Failed to load user profiles');
@@ -108,6 +122,12 @@ export default function DatabasePage() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  // Handle teacher selection change
+  const handleTeacherSelectionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedOptions = Array.from(e.target.selectedOptions, option => option.value);
+    setSelectedTeachers(selectedOptions);
+  };
+
   // Clear messages after 3 seconds
   useEffect(() => {
     if (successMessage || errorMessage) {
@@ -119,18 +139,53 @@ export default function DatabasePage() {
     }
   }, [successMessage, errorMessage]);
 
+  // Fetch student's teachers when editing a student
+  useEffect(() => {
+    const fetchStudentTeachers = async () => {
+      if (editingProfile && editingProfile.profileType === 'Student') {
+        try {
+          const teacherIds = await getStudentTeachers(editingProfile.id);
+          setSelectedTeachers(teacherIds);
+        } catch (error) {
+          console.error('Error fetching student teachers:', error);
+        }
+      }
+    };
+    
+    fetchStudentTeachers();
+  }, [editingProfile]);
+
   // Handle form submission for adding/editing a profile
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
+      // Validate: if student, must have at least one teacher selected
+      if (formData.profileType === 'Student' && selectedTeachers.length === 0) {
+        setErrorMessage('Students must have at least one teacher assigned');
+        return;
+      }
+
       if (editingProfile) {
+        // Store old profile type for relationship updates
+        const oldProfileType = editingProfile.profileType;
+        
         // Update existing profile
         const userRef = doc(db, 'users', editingProfile.id);
         await updateDoc(userRef, {
           displayName: formData.displayName,
           profileType: formData.profileType,
         });
+        
+        // Update relationships if role changed or teacher assignments changed for students
+        if (oldProfileType !== formData.profileType || formData.profileType === 'Student') {
+          await updateUserRelationships(
+            editingProfile.id, 
+            oldProfileType, 
+            formData.profileType,
+            formData.profileType === 'Student' ? selectedTeachers : undefined
+          );
+        }
         
         // Update local state
         setProfiles(prev => prev.map(profile => 
@@ -161,6 +216,13 @@ export default function DatabasePage() {
         
         const docRef = await addDoc(collection(db, 'users'), newProfile);
         
+        // Create relationships
+        await createUserRelationships(
+          docRef.id,
+          formData.profileType,
+          formData.profileType === 'Student' ? selectedTeachers : undefined
+        );
+        
         // Update local state
         setProfiles(prev => [...prev, { 
           id: docRef.id, 
@@ -177,7 +239,7 @@ export default function DatabasePage() {
         email: '',
         profileType: 'Student'
       });
-      
+      setSelectedTeachers([]);
       setShowAddForm(false);
     } catch (error) {
       console.error('Error saving profile:', error);
@@ -186,13 +248,18 @@ export default function DatabasePage() {
   };
 
   // Handle profile deletion
-  const handleDeleteProfile = async (profileId: string, profileName: string) => {
+  const handleDeleteProfile = async (profileId: string, profileName: string, profileType: UserProfileType) => {
     if (!confirm(`Are you sure you want to delete ${profileName}'s profile?`)) {
       return;
     }
     
     try {
+      // Delete relationships first
+      await deleteUserRelationships(profileId, profileType);
+      
+      // Then delete the user
       await deleteDoc(doc(db, 'users', profileId));
+      
       setProfiles(prev => prev.filter(profile => profile.id !== profileId));
       setSuccessMessage(`Deleted ${profileName}'s profile`);
     } catch (error) {
@@ -209,7 +276,26 @@ export default function DatabasePage() {
       email: profile.email,
       profileType: profile.profileType
     });
+    setSelectedTeachers([]);  // Will be populated by useEffect when profile is set
     setShowAddForm(true);
+  };
+
+  // Update all existing relationships
+  const handleUpdateAllRelationships = async () => {
+    if (!confirm('This will create relationships between all existing users. Continue?')) {
+      return;
+    }
+    
+    try {
+      setIsUpdatingRelationships(true);
+      await updateAllExistingRelationships();
+      setSuccessMessage('Successfully updated all user relationships');
+    } catch (error) {
+      console.error('Error updating relationships:', error);
+      setErrorMessage('Failed to update relationships');
+    } finally {
+      setIsUpdatingRelationships(false);
+    }
   };
 
   // Filter profiles based on search term
@@ -266,22 +352,39 @@ export default function DatabasePage() {
                 />
               </div>
               
-              <button
-                onClick={() => {
-                  setEditingProfile(null);
-                  setFormData({
-                    displayName: '',
-                    email: '',
-                    profileType: 'Student'
-                  });
-                  setShowAddForm(!showAddForm);
-                }}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm bg-[#F0E6D2] hover:bg-[#E6D7B8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
-                style={{ color: 'rgba(0, 0, 0, 0.9)' }}
-              >
-                <UserPlusIcon className="h-5 w-5 mr-2 text-black" />
-                {showAddForm ? 'Cancel' : 'Add New User'}
-              </button>
+              <div className="flex space-x-3">
+                <button
+                  onClick={() => {
+                    setEditingProfile(null);
+                    setFormData({
+                      displayName: '',
+                      email: '',
+                      profileType: 'Student'
+                    });
+                    setSelectedTeachers([]);
+                    setShowAddForm(!showAddForm);
+                  }}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm bg-[#F0E6D2] hover:bg-[#E6D7B8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
+                  style={{ color: 'rgba(0, 0, 0, 0.9)' }}
+                >
+                  <UserPlusIcon className="h-5 w-5 mr-2 text-black" />
+                  {showAddForm ? 'Cancel' : 'Add New User'}
+                </button>
+                
+                <button
+                  onClick={handleUpdateAllRelationships}
+                  disabled={isUpdatingRelationships}
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm bg-[#F0E6D2] hover:bg-[#E6D7B8] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513] disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{ color: 'rgba(0, 0, 0, 0.9)' }}
+                >
+                  {isUpdatingRelationships ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-[#8B4513] mr-2"></div>
+                  ) : (
+                    <CheckCircleIcon className="h-5 w-5 mr-2 text-black" />
+                  )}
+                  Update All Relationships
+                </button>
+              </div>
             </div>
             
             {/* Add/Edit Form */}
@@ -352,6 +455,39 @@ export default function DatabasePage() {
                       )}
                     </select>
                   </div>
+                  
+                  {/* Teacher selection for students */}
+                  {formData.profileType === 'Student' && (
+                    <div>
+                      <label htmlFor="teachers" className="block text-sm font-medium text-black">
+                        Assign Teachers <span className="text-red-600">*</span>
+                      </label>
+                      <select
+                        id="teachers"
+                        name="teachers"
+                        multiple
+                        required
+                        className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 bg-white focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md text-black"
+                        value={selectedTeachers}
+                        onChange={handleTeacherSelectionChange}
+                        style={{ color: 'rgba(0, 0, 0, 0.9)', height: '120px' }}
+                      >
+                        {teachers.map(teacher => (
+                          <option key={teacher.id} value={teacher.id} style={{ color: 'black' }}>
+                            {teacher.displayName}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 text-xs text-gray-700">
+                        Hold Ctrl/Cmd to select multiple teachers
+                      </p>
+                      {selectedTeachers.length === 0 && (
+                        <p className="mt-1 text-xs text-red-600">
+                          Students must have at least one teacher assigned
+                        </p>
+                      )}
+                    </div>
+                  )}
                   
                   <div className="flex justify-end space-x-3 pt-4">
                     <button
@@ -455,7 +591,7 @@ export default function DatabasePage() {
                             <PencilSquareIcon className="h-5 w-5" />
                           </button>
                           <button
-                            onClick={() => handleDeleteProfile(profile.id, profile.displayName)}
+                            onClick={() => handleDeleteProfile(profile.id, profile.displayName, profile.profileType)}
                             className="text-red-600 hover:text-red-900"
                             title="Delete User"
                           >
