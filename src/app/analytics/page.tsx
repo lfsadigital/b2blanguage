@@ -14,7 +14,7 @@ import {
 } from '@heroicons/react/24/outline';
 import RoleBasedRoute from '@/app/components/RoleBasedRoute';
 import { db } from '../../lib/firebase/firebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, documentId } from 'firebase/firestore';
 
 // Define user profile types
 type UserProfileType = 'Visitor' | 'Owner' | 'Manager' | 'Teacher' | 'Student';
@@ -31,6 +31,18 @@ interface DateRange {
   endDate: Date;
 }
 
+interface Relationship {
+  id: string;
+  studentId: string;
+  teacherId: string;
+  type: string;
+}
+
+interface PerformanceData {
+  testGrade: number;
+  teacherGrade: number;
+}
+
 export default function AnalyticsPage() {
   // User filters
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -44,6 +56,16 @@ export default function AnalyticsPage() {
   const [selectedTeacher, setSelectedTeacher] = useState<string>('');
   const [selectedManager, setSelectedManager] = useState<string>('');
   const [selectedOwner, setSelectedOwner] = useState<string>('');
+  
+  // Relationships data
+  const [relationships, setRelationships] = useState<Relationship[]>([]);
+  const [availableTeachers, setAvailableTeachers] = useState<UserProfile[]>([]);
+  
+  // Performance data
+  const [performanceData, setPerformanceData] = useState<PerformanceData>({
+    testGrade: 85,
+    teacherGrade: 78
+  });
   
   // Date range
   const [dateRange, setDateRange] = useState<DateRange>({
@@ -86,19 +108,92 @@ export default function AnalyticsPage() {
     fetchUsers();
   }, []);
   
-  // Handle date range changes
-  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDateRange(prev => ({
-      ...prev,
-      startDate: new Date(e.target.value)
-    }));
-  };
+  // Fetch relationships
+  useEffect(() => {
+    const fetchRelationships = async () => {
+      try {
+        const relationshipsCollection = collection(db, 'relationships');
+        const relationshipsSnapshot = await getDocs(relationshipsCollection);
+        
+        const relationshipsList = relationshipsSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            studentId: data.studentId || '',
+            teacherId: data.teacherId || '',
+            type: data.type || ''
+          } as Relationship;
+        });
+        
+        setRelationships(relationshipsList);
+      } catch (error) {
+        console.error('Error fetching relationships:', error);
+      }
+    };
+    
+    fetchRelationships();
+  }, []);
   
-  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDateRange(prev => ({
-      ...prev,
-      endDate: new Date(e.target.value)
-    }));
+  // Update available teachers based on selected student
+  useEffect(() => {
+    if (selectedStudent) {
+      // Filter relationships to find teachers for this student
+      const studentTeacherRelationships = relationships.filter(
+        rel => rel.studentId === selectedStudent && rel.type === 'student-teacher'
+      );
+      
+      // Get teacher IDs
+      const teacherIds = studentTeacherRelationships.map(rel => rel.teacherId);
+      
+      // Filter teachers to only include those related to this student
+      const studentTeachers = teachers.filter(teacher => 
+        teacherIds.includes(teacher.id)
+      );
+      
+      setAvailableTeachers(studentTeachers);
+    } else {
+      // If no student selected, all teachers are available
+      setAvailableTeachers(teachers);
+    }
+  }, [selectedStudent, relationships, teachers]);
+  
+  // Update performance data based on selected filters
+  useEffect(() => {
+    // In a real app, this would fetch actual data from the database
+    // For now, we'll just update with mock data
+    if (selectedStudent) {
+      const student = studentRankings.find(s => s.id.toString() === selectedStudent);
+      if (student) {
+        setPerformanceData({
+          testGrade: student.testGrade,
+          teacherGrade: student.teacherGrade
+        });
+      }
+    } else {
+      // Show average data
+      const avgTestGrade = Math.round(
+        studentRankings.reduce((sum, student) => sum + student.testGrade, 0) / 
+        studentRankings.length
+      );
+      
+      const avgTeacherGrade = Math.round(
+        studentRankings.reduce((sum, student) => sum + student.teacherGrade, 0) / 
+        studentRankings.length
+      );
+      
+      setPerformanceData({
+        testGrade: avgTestGrade,
+        teacherGrade: avgTeacherGrade
+      });
+    }
+  }, [selectedStudent, selectedTeacher, selectedManager, selectedOwner]);
+  
+  // Handle filter changes
+  const handleStudentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const studentId = e.target.value;
+    setSelectedStudent(studentId);
+    // Reset teacher selection if we're changing students
+    setSelectedTeacher('');
   };
   
   return (
@@ -121,25 +216,32 @@ export default function AnalyticsPage() {
             <h2 className="text-lg font-medium text-black">Filters</h2>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
             {/* Student Filter */}
             <div>
               <label htmlFor="student-filter" className="block text-sm font-medium text-gray-700 mb-1">
                 Student
               </label>
-              <select
-                id="student-filter"
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white"
-                value={selectedStudent}
-                onChange={(e) => setSelectedStudent(e.target.value)}
-              >
-                <option value="">All Students (Average)</option>
-                {students.map(student => (
-                  <option key={student.id} value={student.id}>
-                    {student.displayName}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  id="student-filter"
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white appearance-none pl-3 pr-10 py-2"
+                  value={selectedStudent}
+                  onChange={handleStudentChange}
+                >
+                  <option value="">All Students (Average)</option>
+                  {students.map(student => (
+                    <option key={student.id} value={student.id}>
+                      {student.displayName}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </div>
+              </div>
             </div>
             
             {/* Teacher Filter */}
@@ -147,19 +249,26 @@ export default function AnalyticsPage() {
               <label htmlFor="teacher-filter" className="block text-sm font-medium text-gray-700 mb-1">
                 Teacher
               </label>
-              <select
-                id="teacher-filter"
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white"
-                value={selectedTeacher}
-                onChange={(e) => setSelectedTeacher(e.target.value)}
-              >
-                <option value="">All Teachers (Average)</option>
-                {teachers.map(teacher => (
-                  <option key={teacher.id} value={teacher.id}>
-                    {teacher.displayName}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  id="teacher-filter"
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white appearance-none pl-3 pr-10 py-2"
+                  value={selectedTeacher}
+                  onChange={(e) => setSelectedTeacher(e.target.value)}
+                >
+                  <option value="">All Teachers (Average)</option>
+                  {availableTeachers.map(teacher => (
+                    <option key={teacher.id} value={teacher.id}>
+                      {teacher.displayName}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </div>
+              </div>
             </div>
             
             {/* Manager Filter */}
@@ -167,19 +276,26 @@ export default function AnalyticsPage() {
               <label htmlFor="manager-filter" className="block text-sm font-medium text-gray-700 mb-1">
                 Manager
               </label>
-              <select
-                id="manager-filter"
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white"
-                value={selectedManager}
-                onChange={(e) => setSelectedManager(e.target.value)}
-              >
-                <option value="">All Managers (Average)</option>
-                {managers.map(manager => (
-                  <option key={manager.id} value={manager.id}>
-                    {manager.displayName}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  id="manager-filter"
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white appearance-none pl-3 pr-10 py-2"
+                  value={selectedManager}
+                  onChange={(e) => setSelectedManager(e.target.value)}
+                >
+                  <option value="">All Managers (Average)</option>
+                  {managers.map(manager => (
+                    <option key={manager.id} value={manager.id}>
+                      {manager.displayName}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </div>
+              </div>
             </div>
             
             {/* Owner Filter */}
@@ -187,23 +303,30 @@ export default function AnalyticsPage() {
               <label htmlFor="owner-filter" className="block text-sm font-medium text-gray-700 mb-1">
                 Owner
               </label>
-              <select
-                id="owner-filter"
-                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white"
-                value={selectedOwner}
-                onChange={(e) => setSelectedOwner(e.target.value)}
-              >
-                <option value="">All Owners (Average)</option>
-                {owners.map(owner => (
-                  <option key={owner.id} value={owner.id}>
-                    {owner.displayName}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  id="owner-filter"
+                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white appearance-none pl-3 pr-10 py-2"
+                  value={selectedOwner}
+                  onChange={(e) => setSelectedOwner(e.target.value)}
+                >
+                  <option value="">All Owners (Average)</option>
+                  {owners.map(owner => (
+                    <option key={owner.id} value={owner.id}>
+                      {owner.displayName}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                  </svg>
+                </div>
+              </div>
             </div>
             
             {/* Date Range Filter */}
-            <div className="lg:col-span-1">
+            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Date Range
               </label>
@@ -214,9 +337,14 @@ export default function AnalyticsPage() {
                   </div>
                   <input
                     type="date"
-                    className="block w-full pl-10 rounded-md border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white"
+                    className="block w-full pl-10 rounded-md border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white py-2"
                     value={formatDateForInput(dateRange.startDate)}
-                    onChange={handleStartDateChange}
+                    onChange={(e) => {
+                      setDateRange(prev => ({
+                        ...prev,
+                        startDate: new Date(e.target.value)
+                      }));
+                    }}
                   />
                 </div>
                 <span className="inline-flex items-center text-gray-500">to</span>
@@ -226,9 +354,14 @@ export default function AnalyticsPage() {
                   </div>
                   <input
                     type="date"
-                    className="block w-full pl-10 rounded-md border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white"
+                    className="block w-full pl-10 rounded-md border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white py-2"
                     value={formatDateForInput(dateRange.endDate)}
-                    onChange={handleEndDateChange}
+                    onChange={(e) => {
+                      setDateRange(prev => ({
+                        ...prev,
+                        endDate: new Date(e.target.value)
+                      }));
+                    }}
                   />
                 </div>
               </div>
@@ -245,8 +378,8 @@ export default function AnalyticsPage() {
               <ChartBarIcon className="h-6 w-6 text-[#8B4513]" />
             </div>
             <div className="space-y-4">
-              <SkillBar label="Test Grade" percentage={85} color="bg-blue-500" />
-              <SkillBar label="Grade by Teacher" percentage={78} color="bg-green-500" />
+              <SkillBar label="Test Grade" percentage={performanceData.testGrade} color="bg-blue-500" />
+              <SkillBar label="Grade by Teacher" percentage={performanceData.teacherGrade} color="bg-green-500" />
             </div>
           </div>
           
@@ -267,9 +400,11 @@ export default function AnalyticsPage() {
             </div>
             
             {selectedStudent || selectedTeacher || selectedManager || selectedOwner ? (
-              /* Placeholder for line chart - to be implemented */
-              <div className="h-64 bg-[#FCF8F3] rounded-md border border-[#E6D7B8] flex items-center justify-center">
-                <p className="text-gray-500">Line chart showing progression over time</p>
+              // Simple line chart implementation
+              <div className="h-64 bg-[#FCF8F3] rounded-md border border-[#E6D7B8] relative">
+                <div className="absolute inset-0 p-4">
+                  <SimpleLineChart />
+                </div>
               </div>
             ) : (
               <div className="h-64 bg-[#FCF8F3] rounded-md border border-[#E6D7B8] flex items-center justify-center">
@@ -371,15 +506,15 @@ export default function AnalyticsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard 
             title="Average Test Grade" 
-            value="85%" 
-            change="+3%" 
-            trend="up" 
+            value={`${performanceData.testGrade}%`} 
+            change={performanceData.testGrade > 85 ? '+3%' : performanceData.testGrade < 85 ? '-3%' : ''} 
+            trend={performanceData.testGrade > 85 ? 'up' : performanceData.testGrade < 85 ? 'down' : 'neutral'} 
           />
           <MetricCard 
             title="Average Teacher Grade" 
-            value="78%" 
-            change="+5%" 
-            trend="up" 
+            value={`${performanceData.teacherGrade}%`} 
+            change={performanceData.teacherGrade > 78 ? '+5%' : performanceData.teacherGrade < 78 ? '-5%' : ''} 
+            trend={performanceData.teacherGrade > 78 ? 'up' : performanceData.teacherGrade < 78 ? 'down' : 'neutral'} 
           />
           <MetricCard 
             title="Completion Rate" 
@@ -472,4 +607,117 @@ const studentRankings = [
   { id: 5, rank: 5, name: 'Beatriz Campos', email: 'beatrizc@example.com', testGrade: 76, teacherGrade: 82, participation: 84, progress: 4 },
   { id: 6, rank: 6, name: 'Daniel Santos', email: 'daniels@example.com', testGrade: 74, teacherGrade: 76, participation: 79, progress: -2 },
   { id: 7, rank: 7, name: 'Isabella Melo', email: 'isabellam@example.com', testGrade: 70, teacherGrade: 74, participation: 85, progress: 1 },
-]; 
+];
+
+// Simple Line Chart Component
+function SimpleLineChart() {
+  // Mock data points (in a real app, these would come from the database)
+  const testGradeData = [68, 75, 70, 80, 85, 90, 94];
+  const teacherGradeData = [65, 70, 72, 75, 78, 82, 90];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'];
+  
+  // Chart dimensions
+  const width = 100;
+  const height = 100;
+  const padding = 20;
+  
+  // Find max value for scaling
+  const maxValue = Math.max(
+    ...testGradeData,
+    ...teacherGradeData
+  );
+  
+  // Create data points (normalized to percentage of chart height)
+  const testPoints = testGradeData.map((value, index) => ({
+    x: (index / (testGradeData.length - 1)) * width,
+    y: height - ((value / maxValue) * (height - padding)),
+  }));
+  
+  const teacherPoints = teacherGradeData.map((value, index) => ({
+    x: (index / (teacherGradeData.length - 1)) * width,
+    y: height - ((value / maxValue) * (height - padding)),
+  }));
+  
+  // Create SVG path commands for the lines
+  const createPathData = (points: {x: number, y: number}[]) => {
+    if (points.length === 0) return '';
+    
+    return points.reduce((path, point, i) => 
+      i === 0
+        ? `M ${point.x},${point.y}`
+        : `${path} L ${point.x},${point.y}`,
+      ''
+    );
+  };
+  
+  const testGradePath = createPathData(testPoints);
+  const teacherGradePath = createPathData(teacherPoints);
+  
+  return (
+    <div className="w-full h-full flex flex-col">
+      <div className="flex-1 relative">
+        <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="w-full h-full">
+          {/* X axis */}
+          <line x1="0" y1={height} x2={width} y2={height} stroke="rgba(0,0,0,0.1)" strokeWidth="0.5" />
+          
+          {/* Y axis */}
+          <line x1="0" y1="0" x2="0" y2={height} stroke="rgba(0,0,0,0.1)" strokeWidth="0.5" />
+          
+          {/* Test Grade Line */}
+          <path
+            d={testGradePath}
+            fill="none"
+            stroke="#3B82F6" // blue-500
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          
+          {/* Teacher Grade Line */}
+          <path
+            d={teacherGradePath}
+            fill="none"
+            stroke="#10B981" // green-500
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          
+          {/* Data Points for Test Grade */}
+          {testPoints.map((point, index) => (
+            <circle
+              key={`test-${index}`}
+              cx={point.x}
+              cy={point.y}
+              r="1.5"
+              fill="#3B82F6" // blue-500
+            />
+          ))}
+          
+          {/* Data Points for Teacher Grade */}
+          {teacherPoints.map((point, index) => (
+            <circle
+              key={`teacher-${index}`}
+              cx={point.x}
+              cy={point.y}
+              r="1.5"
+              fill="#10B981" // green-500
+            />
+          ))}
+        </svg>
+        
+        {/* Value tooltips - these would be dynamic in a real implementation */}
+        <div className="absolute bottom-0 right-0 bg-white/80 rounded px-2 py-1 text-xs">
+          Last: {testGradeData[testGradeData.length - 1]}% / {teacherGradeData[teacherGradeData.length - 1]}%
+        </div>
+      </div>
+      
+      {/* X-axis labels */}
+      <div className="h-6 flex justify-between text-xs text-gray-500 mt-1">
+        {months.map((month, i) => (
+          <div key={month}>{month}</div>
+        ))}
+      </div>
+    </div>
+  );
+} 
