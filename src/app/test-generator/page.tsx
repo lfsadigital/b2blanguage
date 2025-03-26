@@ -14,17 +14,36 @@ import {
   LightBulbIcon,
   ChatBubbleLeftRightIcon,
   PrinterIcon,
-  DocumentDuplicateIcon
+  DocumentDuplicateIcon,
+  ClipboardDocumentIcon
 } from '@heroicons/react/24/outline';
+
+// Interface for the last class diary entry
+interface LastClassDiaryEntry {
+  id: string;
+  studentName: string;
+  studentId: string;
+  teacherName: string;
+  teacherId: string;
+  testDate: string;
+  testGrade: string;
+  gradeByTeacher: string;
+  forNextClass: string;
+  notes: string;
+  uploadDate: string;
+  timestamp: number;
+}
 
 export default function TestGeneratorPage() {
   const { user, userProfile } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
   const [testGenerated, setTestGenerated] = useState(false);
-  const [currentTab, setCurrentTab] = useState<'test' | 'conversation' | 'teacher-tips'>('test');
+  const [currentTab, setCurrentTab] = useState<'test' | 'conversation' | 'teacher-tips' | 'last-class-diary'>('test');
   const [docxScript, setDocxScript] = useState<boolean>(false);
   const [pdfScript, setPdfScript] = useState<boolean>(false);
   const [currentTeacher, setCurrentTeacher] = useState<{id: string; displayName: string} | null>(null);
+  const [lastClassDiary, setLastClassDiary] = useState<LastClassDiaryEntry | null>(null);
+  const [isLoadingDiary, setIsLoadingDiary] = useState(false);
 
   // Single state for all generated content
   const [generatedContent, setGeneratedContent] = useState<{
@@ -115,6 +134,68 @@ export default function TestGeneratorPage() {
       document.body.appendChild(pdfScriptTag);
     }
   }, [docxScript, pdfScript]);
+
+  // This function fetches the most recent class diary entry for the current teacher and student
+  const fetchLastClassDiary = async (teacherId: string, studentId: string) => {
+    if (!teacherId || !studentId) return;
+    
+    try {
+      setIsLoadingDiary(true);
+      
+      // Get all test results
+      const testResultsCollection = collection(db, 'testResults');
+      
+      // Query for the most recent test result matching the teacher and student
+      const q = query(
+        testResultsCollection,
+        where('teacherId', '==', teacherId),
+        where('studentId', '==', studentId)
+      );
+      
+      const querySnapshot = await getDocs(q);
+      
+      if (querySnapshot.empty) {
+        console.log('No previous test results found for this teacher-student combination');
+        setLastClassDiary(null);
+        return;
+      }
+      
+      // Find the most recent one by timestamp
+      let mostRecentResult: LastClassDiaryEntry | null = null;
+      let mostRecentTimestamp = 0;
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        const timestamp = data.timestamp || 0;
+        
+        if (timestamp > mostRecentTimestamp) {
+          mostRecentTimestamp = timestamp;
+          mostRecentResult = {
+            id: doc.id,
+            studentName: data.studentName || '',
+            studentId: data.studentId || '',
+            teacherName: data.teacherName || '',
+            teacherId: data.teacherId || '',
+            testDate: data.testDate || '',
+            testGrade: data.testGrade || '',
+            gradeByTeacher: data.gradeByTeacher || '',
+            forNextClass: data.forNextClass || '',
+            notes: data.notes || '',
+            uploadDate: data.uploadDate || '',
+            timestamp: data.timestamp || 0,
+          };
+        }
+      });
+      
+      setLastClassDiary(mostRecentResult);
+      console.log('Found most recent class diary:', mostRecentResult);
+    } catch (error) {
+      console.error('Error fetching last class diary:', error);
+      setLastClassDiary(null);
+    } finally {
+      setIsLoadingDiary(false);
+    }
+  };
 
   // This function handles the form submission and generates all content
   const handleSubmit = async (data: TestFormData) => {
@@ -264,6 +345,11 @@ export default function TestGeneratorPage() {
         teachingTips: teachingTips,
         contentUrl: data.contentUrl
       });
+      
+      // Fetch last class diary if we have both teacher and student IDs
+      if (data.professorId && data.studentId) {
+        await fetchLastClassDiary(data.professorId, data.studentId);
+      }
       
       setTestGenerated(true);
     } catch (error) {
@@ -938,6 +1024,92 @@ Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion),
     );
   };
 
+  // Render last class diary content
+  const renderLastClassDiaryContent = () => {
+    if (!testGenerated) {
+      return (
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <div className="text-center py-8">
+            <p className="text-gray-700 mb-4">
+              Please generate a test first to see the last class diary information.
+            </p>
+            <button
+              onClick={() => setCurrentTab('test')}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-[#8B4513] hover:bg-[#A0522D]"
+            >
+              Go to Test Generator
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (isLoadingDiary) {
+      return (
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-[#8B4513]"></div>
+            <span className="ml-3 text-gray-700">Loading last class information...</span>
+          </div>
+        </div>
+      );
+    }
+
+    if (!lastClassDiary) {
+      return (
+        <div className="bg-white rounded-lg shadow-lg p-6">
+          <div className="text-center py-8">
+            <p className="text-gray-700 mb-4">
+              No previous class diary entries found for this teacher and student combination.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <h2 className="text-xl font-bold mb-4">Last Class Diary</h2>
+        
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-gray-50 p-4 rounded-md">
+              <h3 className="text-sm font-medium text-gray-500">Test Date</h3>
+              <p className="mt-1 text-base font-medium text-gray-900">{lastClassDiary.testDate}</p>
+            </div>
+            
+            <div className="bg-gray-50 p-4 rounded-md">
+              <h3 className="text-sm font-medium text-gray-500">Upload Date</h3>
+              <p className="mt-1 text-base font-medium text-gray-900">{lastClassDiary.uploadDate}</p>
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-gray-50 p-4 rounded-md">
+              <h3 className="text-sm font-medium text-gray-500">Test Grade</h3>
+              <p className="mt-1 text-base font-medium text-gray-900">{lastClassDiary.testGrade || 'Not provided'}</p>
+            </div>
+            
+            <div className="bg-gray-50 p-4 rounded-md">
+              <h3 className="text-sm font-medium text-gray-500">Grade by Teacher</h3>
+              <p className="mt-1 text-base font-medium text-gray-900">{lastClassDiary.gradeByTeacher || 'Not provided'}</p>
+            </div>
+          </div>
+          
+          <div className="bg-gray-50 p-4 rounded-md">
+            <h3 className="text-sm font-medium text-gray-500">For Next Class</h3>
+            <p className="mt-1 text-base text-gray-900">{lastClassDiary.forNextClass || 'No recommendations provided'}</p>
+          </div>
+          
+          <div className="bg-gray-50 p-4 rounded-md">
+            <h3 className="text-sm font-medium text-gray-500">Teacher Notes</h3>
+            <p className="mt-1 text-base text-gray-900">{lastClassDiary.notes || 'No notes provided'}</p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <RoleBasedRoute 
       requiredRoles={['Teacher', 'Manager', 'Owner']}
@@ -954,7 +1126,7 @@ Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion),
 
           {/* Tabs */}
           <div className="border-b border-gray-200 mb-6">
-            <nav className="-mb-px flex space-x-8" aria-label="Tabs">
+            <nav className="-mb-px flex space-x-8 overflow-x-auto" aria-label="Tabs">
               <button
                 onClick={() => setCurrentTab('test')}
                 className={`${
@@ -967,29 +1139,45 @@ Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion),
                 Test
               </button>
               
-              <button
-                onClick={() => setCurrentTab('conversation')}
-                className={`${
-                  currentTab === 'conversation'
-                    ? 'border-[#8B4513] text-[#8B4513]'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
-              >
-                <ChatBubbleLeftRightIcon className="mr-2 h-5 w-5" />
-                Conversation Questions
-              </button>
-              
-              <button
-                onClick={() => setCurrentTab('teacher-tips')}
-                className={`${
-                  currentTab === 'teacher-tips'
-                    ? 'border-[#8B4513] text-[#8B4513]'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
-              >
-                <LightBulbIcon className="mr-2 h-5 w-5" />
-                Teacher Tips
-              </button>
+              {testGenerated && (
+                <>
+                  <button
+                    onClick={() => setCurrentTab('conversation')}
+                    className={`${
+                      currentTab === 'conversation'
+                        ? 'border-[#8B4513] text-[#8B4513]'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
+                  >
+                    <ChatBubbleLeftRightIcon className="mr-2 h-5 w-5" />
+                    Conversation Questions
+                  </button>
+                  
+                  <button
+                    onClick={() => setCurrentTab('teacher-tips')}
+                    className={`${
+                      currentTab === 'teacher-tips'
+                        ? 'border-[#8B4513] text-[#8B4513]'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
+                  >
+                    <LightBulbIcon className="mr-2 h-5 w-5" />
+                    Teacher Tips
+                  </button>
+                  
+                  <button
+                    onClick={() => setCurrentTab('last-class-diary')}
+                    className={`${
+                      currentTab === 'last-class-diary'
+                        ? 'border-[#8B4513] text-[#8B4513]'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center`}
+                  >
+                    <ClipboardDocumentIcon className="mr-2 h-5 w-5" />
+                    Last Class Diary
+                  </button>
+                </>
+              )}
             </nav>
           </div>
 
@@ -998,6 +1186,7 @@ Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion),
             {currentTab === 'test' && renderTestContent()}
             {currentTab === 'conversation' && renderConversationContent()}
             {currentTab === 'teacher-tips' && renderTeachingTipsContent()}
+            {currentTab === 'last-class-diary' && renderLastClassDiaryContent()}
           </div>
         </div>
       </DashboardShell>

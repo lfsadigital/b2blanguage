@@ -2,17 +2,47 @@
 
 import { useState, useEffect } from 'react';
 import { TestFormData, StudentLevel, QuestionType } from '@/app/lib/types';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { db } from '@/lib/firebase/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { UserCircleIcon } from '@heroicons/react/24/outline';
+
+interface Teacher {
+  id: string;
+  displayName: string;
+  email: string;
+  profileType: string;
+}
+
+interface Student {
+  id: string;
+  displayName: string;
+  email: string;
+  profileType: string;
+  level?: string;
+}
 
 interface TestGeneratorFormProps {
   onSubmit: (data: TestFormData) => Promise<void>;
   isGenerating: boolean;
   defaultTeacherName?: string;
+  currentTeacher?: { id: string; displayName: string } | null;
 }
 
-export default function TestGeneratorForm({ onSubmit, isGenerating, defaultTeacherName }: TestGeneratorFormProps) {
+export default function TestGeneratorForm({ 
+  onSubmit, 
+  isGenerating, 
+  defaultTeacherName,
+  currentTeacher
+}: TestGeneratorFormProps) {
+  const { userProfile, user } = useAuth();
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [students, setStudents] = useState<Student[]>([]);
   const [formData, setFormData] = useState<TestFormData>({
     professorName: defaultTeacherName || '',
+    professorId: currentTeacher?.id || '',
     studentName: '',
+    studentId: '',
     contentUrl: '',
     studentLevel: 'Beginner',
     questionTypes: ['multiple-choice'], // Default selection
@@ -20,18 +50,88 @@ export default function TestGeneratorForm({ onSubmit, isGenerating, defaultTeach
     additionalNotes: '',
   });
 
-  // Update professor name when defaultTeacherName changes
+  // Fetch teachers and students from Firestore
   useEffect(() => {
-    if (defaultTeacherName) {
+    const fetchUsers = async () => {
+      try {
+        // Get teachers from Firestore
+        const teachersQuery = query(
+          collection(db, 'users'), 
+          where('profileType', '==', 'Teacher')
+        );
+        const teachersSnapshot = await getDocs(teachersQuery);
+        const teachersList = teachersSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return { 
+            id: doc.id, 
+            displayName: data.displayName || '', 
+            email: data.email || '',
+            profileType: data.profileType || 'Teacher'
+          };
+        });
+        setTeachers(teachersList);
+        
+        // Get students from Firestore
+        const studentsQuery = query(
+          collection(db, 'users'), 
+          where('profileType', '==', 'Student')
+        );
+        const studentsSnapshot = await getDocs(studentsQuery);
+        const studentsList = studentsSnapshot.docs.map(doc => {
+          const data = doc.data();
+          return { 
+            id: doc.id, 
+            displayName: data.displayName || '', 
+            email: data.email || '',
+            profileType: data.profileType || 'Student',
+            level: data.level || 'Intermediate'  // Default level if not specified
+          };
+        });
+        setStudents(studentsList);
+      } catch (error) {
+        console.error('Error fetching users:', error);
+      }
+    };
+
+    if (user) {
+      fetchUsers();
+    }
+  }, [user]);
+
+  // Update professor names when currentTeacher or teachers change
+  useEffect(() => {
+    // If user is a teacher, always set their own profile
+    if (userProfile === 'Teacher' && currentTeacher) {
       setFormData(prev => ({
         ...prev,
-        professorName: defaultTeacherName
+        professorId: currentTeacher.id,
+        professorName: currentTeacher.displayName
       }));
     }
-  }, [defaultTeacherName]);
+    // For non-teachers, only set if the field is empty
+    else if ((userProfile === 'Owner' || userProfile === 'Manager') && currentTeacher && !formData.professorId) {
+      setFormData(prev => ({
+        ...prev,
+        professorId: currentTeacher.id,
+        professorName: currentTeacher.displayName
+      }));
+    }
+  }, [currentTeacher, userProfile, formData.professorId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Find the student name if we have an ID
+    if (formData.studentId && !formData.studentName) {
+      const student = students.find(s => s.id === formData.studentId);
+      if (student) {
+        setFormData(prev => ({
+          ...prev,
+          studentName: student.displayName
+        }));
+      }
+    }
+    
     await onSubmit(formData);
   };
 
@@ -39,10 +139,35 @@ export default function TestGeneratorForm({ onSubmit, isGenerating, defaultTeach
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    
+    if (name === 'professorId') {
+      // Update professor name when ID changes
+      const selectedTeacher = teachers.find(t => t.id === value);
+      if (selectedTeacher) {
+        setFormData(prev => ({
+          ...prev,
+          professorId: value,
+          professorName: selectedTeacher.displayName
+        }));
+      }
+    } else if (name === 'studentId') {
+      // Update student name when ID changes
+      const selectedStudent = students.find(s => s.id === value);
+      if (selectedStudent) {
+        setFormData(prev => ({
+          ...prev,
+          studentId: value,
+          studentName: selectedStudent.displayName,
+          // Optionally update student level based on student data
+          studentLevel: selectedStudent.level || formData.studentLevel
+        }));
+      }
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [name]: value,
+      }));
+    }
   };
 
   const handleCheckboxChange = (type: QuestionType) => {
@@ -73,7 +198,7 @@ export default function TestGeneratorForm({ onSubmit, isGenerating, defaultTeach
   };
 
   return (
-    <form onSubmit={handleSubmit} className="form-container">
+    <form onSubmit={handleSubmit} className="form-container p-6">
       <div className="space-y-8">
         <div>
           <h3 className="text-xl font-semibold text-gray-800 apple-heading">Create New Test</h3>
@@ -84,36 +209,64 @@ export default function TestGeneratorForm({ onSubmit, isGenerating, defaultTeach
 
         <div className="grid grid-cols-1 gap-y-6 gap-x-6 sm:grid-cols-2">
           <div>
-            <label htmlFor="professorName" className="block text-sm font-medium text-gray-800">
+            <label htmlFor="professorId" className="block text-sm font-medium text-gray-800">
               Teacher Name
             </label>
-            <div className="mt-1 relative rounded-md">
-              <input
-                type="text"
-                name="professorName"
-                id="professorName"
-                value={formData.professorName}
+            <div className="mt-1 relative rounded-md shadow-sm">
+              <select
+                id="professorId"
+                name="professorId"
+                className={`mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md ${
+                  userProfile === 'Teacher' ? 'bg-gray-100 cursor-not-allowed' : ''
+                }`}
+                value={formData.professorId}
                 onChange={handleChange}
-                className="block w-full rounded-lg border-gray-300 focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4"
-                placeholder="Optional"
-              />
+                disabled={userProfile === 'Teacher'}
+                required
+              >
+                {userProfile === 'Teacher' && currentTeacher ? (
+                  <option value={currentTeacher.id}>{currentTeacher.displayName}</option>
+                ) : (
+                  <>
+                    <option value="">Select Teacher</option>
+                    {teachers.map(teacher => (
+                      <option key={teacher.id} value={teacher.id}>
+                        {teacher.displayName}
+                      </option>
+                    ))}
+                  </>
+                )}
+              </select>
+              {userProfile === 'Teacher' && currentTeacher && (
+                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                  <UserCircleIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                </div>
+              )}
             </div>
+            {userProfile === 'Teacher' && currentTeacher && (
+              <p className="mt-1 text-xs text-gray-500">Using your profile as the teacher</p>
+            )}
           </div>
 
           <div>
-            <label htmlFor="studentName" className="block text-sm font-medium text-gray-800">
+            <label htmlFor="studentId" className="block text-sm font-medium text-gray-800">
               Student Name
             </label>
-            <div className="mt-1 relative rounded-md">
-              <input
-                type="text"
-                name="studentName"
-                id="studentName"
-                value={formData.studentName}
+            <div className="mt-1 relative rounded-md shadow-sm">
+              <select
+                id="studentId"
+                name="studentId"
+                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
+                value={formData.studentId}
                 onChange={handleChange}
-                className="block w-full rounded-lg border-gray-300 focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4"
-                placeholder="Optional"
-              />
+              >
+                <option value="">Select Student</option>
+                {students.map(student => (
+                  <option key={student.id} value={student.id}>
+                    {student.displayName}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -129,7 +282,7 @@ export default function TestGeneratorForm({ onSubmit, isGenerating, defaultTeach
                 value={formData.contentUrl}
                 onChange={handleChange}
                 required
-                className="block w-full rounded-lg border-gray-300 focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4"
+                className="block w-full rounded-lg border-gray-300 focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm py-3 px-4"
                 placeholder="YouTube video or article URL"
               />
               <p className="mt-1 text-xs text-gray-600">
