@@ -882,6 +882,13 @@ Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion),
                   <DocumentDuplicateIcon className="mr-1.5 h-4 w-4 text-gray-500" />
                   Export to Word
                 </button>
+                <button
+                  onClick={handleExportTeachingMaterials}
+                  className="flex items-center px-3 py-1.5 border border-gray-300 rounded text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#8B4513]"
+                >
+                  <DocumentDuplicateIcon className="mr-1.5 h-4 w-4 text-gray-500" />
+                  Teacher Materials PDF
+                </button>
               </div>
             </div>
             
