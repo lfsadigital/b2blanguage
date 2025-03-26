@@ -14,7 +14,31 @@ import {
 } from '@heroicons/react/24/outline';
 import RoleBasedRoute from '@/app/components/RoleBasedRoute';
 import { db } from '../../lib/firebase/firebase';
-import { collection, getDocs, query, where, documentId } from 'firebase/firestore';
+import { collection, getDocs, query, where, orderBy, limit, Timestamp, DocumentData } from 'firebase/firestore';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  ChartData,
+  ChartOptions
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 // Define user profile types
 type UserProfileType = 'Visitor' | 'Owner' | 'Manager' | 'Teacher' | 'Student';
@@ -31,16 +55,21 @@ interface DateRange {
   endDate: Date;
 }
 
-interface Relationship {
+// Add interfaces for test and grade data
+interface TestData {
   id: string;
   studentId: string;
-  teacherId: string;
-  type: string;
-}
-
-interface PerformanceData {
   testGrade: number;
   teacherGrade: number;
+  date: Date;
+  studentName?: string;
+  teacherName?: string;
+}
+
+interface TimeSeriesData {
+  labels: string[];
+  testGrades: number[];
+  teacherGrades: number[];
 }
 
 export default function AnalyticsPage() {
@@ -57,25 +86,52 @@ export default function AnalyticsPage() {
   const [selectedManager, setSelectedManager] = useState<string>('');
   const [selectedOwner, setSelectedOwner] = useState<string>('');
   
-  // Relationships data
-  const [relationships, setRelationships] = useState<Relationship[]>([]);
-  const [availableTeachers, setAvailableTeachers] = useState<UserProfile[]>([]);
-  
-  // Performance data
-  const [performanceData, setPerformanceData] = useState<PerformanceData>({
-    testGrade: 85,
-    teacherGrade: 78
-  });
-  
   // Date range
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: new Date(new Date().setMonth(new Date().getMonth() - 1)),
     endDate: new Date()
   });
   
+  // Add state for the performance data
+  const [performanceData, setPerformanceData] = useState<{
+    testGrade: number;
+    teacherGrade: number;
+  }>({
+    testGrade: 0,
+    teacherGrade: 0,
+  });
+  
+  // Add time series data for the line chart
+  const [timeSeriesData, setTimeSeriesData] = useState<TimeSeriesData>({
+    labels: [],
+    testGrades: [],
+    teacherGrades: []
+  });
+  
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [chartLoading, setChartLoading] = useState<boolean>(true);
+  
   // Format dates for inputs
   const formatDateForInput = (date: Date): string => {
     return date.toISOString().split('T')[0];
+  };
+  
+  // Helper function to get students associated with a teacher
+  const getTeacherStudents = async (teacherId: string): Promise<string[]> => {
+    try {
+      const relationshipsRef = collection(db, 'relationships');
+      const q = query(
+        relationshipsRef, 
+        where('teacherId', '==', teacherId),
+        where('type', '==', 'student-teacher')
+      );
+      
+      const querySnapshot = await getDocs(q);
+      return querySnapshot.docs.map(doc => doc.data().studentId);
+    } catch (error) {
+      console.error('Error getting teacher students:', error);
+      return [];
+    }
   };
 
   // Fetch users for filters
@@ -108,92 +164,278 @@ export default function AnalyticsPage() {
     fetchUsers();
   }, []);
   
-  // Fetch relationships
+  // Handle date range changes
+  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDateRange(prev => ({
+      ...prev,
+      startDate: new Date(e.target.value)
+    }));
+  };
+  
+  const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDateRange(prev => ({
+      ...prev,
+      endDate: new Date(e.target.value)
+    }));
+  };
+  
+  // Add useEffect to fetch performance data based on filters
   useEffect(() => {
-    const fetchRelationships = async () => {
+    const fetchPerformanceData = async () => {
+      setIsLoading(true);
       try {
-        const relationshipsCollection = collection(db, 'relationships');
-        const relationshipsSnapshot = await getDocs(relationshipsCollection);
+        // Create a base query for the tests collection
+        let testsQuery = collection(db, 'tests');
+        let constraints = [];
         
-        const relationshipsList = relationshipsSnapshot.docs.map(doc => {
+        // Add filter constraints based on selections
+        if (selectedStudent) {
+          constraints.push(where('studentId', '==', selectedStudent));
+        }
+        
+        // Add date range constraints
+        constraints.push(where('date', '>=', Timestamp.fromDate(dateRange.startDate)));
+        constraints.push(where('date', '<=', Timestamp.fromDate(dateRange.endDate)));
+        
+        // Execute query with constraints
+        const testsRef = constraints.length > 0 
+          ? query(testsQuery, ...constraints) 
+          : query(testsQuery);
+        
+        const testsSnapshot = await getDocs(testsRef);
+        
+        // Process results
+        const testResults: TestData[] = [];
+        testsSnapshot.forEach(doc => {
           const data = doc.data();
-          return {
+          testResults.push({
             id: doc.id,
             studentId: data.studentId || '',
-            teacherId: data.teacherId || '',
-            type: data.type || ''
-          } as Relationship;
+            testGrade: data.testGrade || 0,
+            teacherGrade: data.teacherGrade || 0,
+            date: data.date ? data.date.toDate() : new Date(),
+          });
         });
         
-        setRelationships(relationshipsList);
+        // Filter by teacher if selected
+        let filteredResults = testResults;
+        if (selectedTeacher) {
+          // In a real implementation, you would have a teacher-student relationship
+          // Here we're using a simplified approach
+          const teacherStudents = await getTeacherStudents(selectedTeacher);
+          filteredResults = testResults.filter(test => 
+            teacherStudents.includes(test.studentId)
+          );
+        }
+        
+        // Filter by manager if selected
+        if (selectedManager) {
+          // Similar to teacher filtering, we would need manager-teacher-student relationships
+          // This is a placeholder for the logic
+        }
+        
+        // Calculate averages
+        if (filteredResults.length > 0) {
+          const avgTestGrade = filteredResults.reduce((sum, test) => sum + test.testGrade, 0) / filteredResults.length;
+          const avgTeacherGrade = filteredResults.reduce((sum, test) => sum + test.teacherGrade, 0) / filteredResults.length;
+          
+          setPerformanceData({
+            testGrade: Math.round(avgTestGrade),
+            teacherGrade: Math.round(avgTeacherGrade)
+          });
+        } else {
+          // No data available
+          setPerformanceData({
+            testGrade: 0,
+            teacherGrade: 0
+          });
+        }
       } catch (error) {
-        console.error('Error fetching relationships:', error);
+        console.error('Error fetching performance data:', error);
+        // Set fallback values
+        setPerformanceData({
+          testGrade: 0,
+          teacherGrade: 0
+        });
+      } finally {
+        setIsLoading(false);
       }
     };
     
-    fetchRelationships();
-  }, []);
+    fetchPerformanceData();
+  }, [selectedStudent, selectedTeacher, selectedManager, dateRange]);
   
-  // Update available teachers based on selected student
+  // Add useEffect for the time series data
   useEffect(() => {
-    if (selectedStudent) {
-      // Filter relationships to find teachers for this student
-      const studentTeacherRelationships = relationships.filter(
-        rel => rel.studentId === selectedStudent && rel.type === 'student-teacher'
-      );
+    const fetchTimeSeriesData = async () => {
+      setChartLoading(true);
       
-      // Get teacher IDs
-      const teacherIds = studentTeacherRelationships.map(rel => rel.teacherId);
-      
-      // Filter teachers to only include those related to this student
-      const studentTeachers = teachers.filter(teacher => 
-        teacherIds.includes(teacher.id)
-      );
-      
-      setAvailableTeachers(studentTeachers);
-    } else {
-      // If no student selected, all teachers are available
-      setAvailableTeachers(teachers);
-    }
-  }, [selectedStudent, relationships, teachers]);
-  
-  // Update performance data based on selected filters
-  useEffect(() => {
-    // In a real app, this would fetch actual data from the database
-    // For now, we'll just update with mock data
-    if (selectedStudent) {
-      const student = studentRankings.find(s => s.id.toString() === selectedStudent);
-      if (student) {
-        setPerformanceData({
-          testGrade: student.testGrade,
-          teacherGrade: student.teacherGrade
-        });
+      // Only fetch time series data if a specific filter is selected
+      if (!selectedStudent && !selectedTeacher && !selectedManager) {
+        setChartLoading(false);
+        return;
       }
-    } else {
-      // Show average data
-      const avgTestGrade = Math.round(
-        studentRankings.reduce((sum, student) => sum + student.testGrade, 0) / 
-        studentRankings.length
-      );
       
-      const avgTeacherGrade = Math.round(
-        studentRankings.reduce((sum, student) => sum + student.teacherGrade, 0) / 
-        studentRankings.length
-      );
-      
-      setPerformanceData({
-        testGrade: avgTestGrade,
-        teacherGrade: avgTeacherGrade
-      });
-    }
-  }, [selectedStudent, selectedTeacher, selectedManager, selectedOwner]);
+      try {
+        // Create a base query for the tests collection
+        let testsQuery = collection(db, 'tests');
+        let constraints = [];
+        
+        // Add filter constraints based on selections
+        if (selectedStudent) {
+          constraints.push(where('studentId', '==', selectedStudent));
+        }
+        
+        // Add date range constraints
+        constraints.push(where('date', '>=', Timestamp.fromDate(dateRange.startDate)));
+        constraints.push(where('date', '<=', Timestamp.fromDate(dateRange.endDate)));
+        constraints.push(orderBy('date', 'asc')); // Order by date ascending
+        
+        // Execute query with constraints
+        const testsRef = constraints.length > 0 
+          ? query(testsQuery, ...constraints) 
+          : query(testsQuery);
+        
+        const testsSnapshot = await getDocs(testsRef);
+        
+        // Process results
+        const testResults: TestData[] = [];
+        testsSnapshot.forEach(doc => {
+          const data = doc.data();
+          testResults.push({
+            id: doc.id,
+            studentId: data.studentId || '',
+            testGrade: data.testGrade || 0,
+            teacherGrade: data.teacherGrade || 0,
+            date: data.date ? data.date.toDate() : new Date(),
+          });
+        });
+        
+        // Filter by teacher if selected (and no student is selected)
+        let filteredResults = testResults;
+        if (selectedTeacher && !selectedStudent) {
+          const teacherStudents = await getTeacherStudents(selectedTeacher);
+          filteredResults = testResults.filter(test => 
+            teacherStudents.includes(test.studentId)
+          );
+        }
+        
+        // Prepare data for the chart
+        if (filteredResults.length > 0) {
+          // Group by date for cleaner chart
+          const dataByDate = new Map<string, { testGrades: number[], teacherGrades: number[] }>();
+          
+          filteredResults.forEach(test => {
+            const dateStr = test.date.toLocaleDateString();
+            if (!dataByDate.has(dateStr)) {
+              dataByDate.set(dateStr, { testGrades: [], teacherGrades: [] });
+            }
+            const dateData = dataByDate.get(dateStr)!;
+            dateData.testGrades.push(test.testGrade);
+            dateData.teacherGrades.push(test.teacherGrade);
+          });
+          
+          // Convert map to arrays for the chart
+          const labels: string[] = [];
+          const testGrades: number[] = [];
+          const teacherGrades: number[] = [];
+          
+          // Sort dates
+          const sortedDates = Array.from(dataByDate.keys()).sort((a, b) => 
+            new Date(a).getTime() - new Date(b).getTime()
+          );
+          
+          sortedDates.forEach(date => {
+            const dateData = dataByDate.get(date)!;
+            labels.push(date);
+            
+            // Calculate average for each date
+            const avgTestGrade = dateData.testGrades.reduce((sum, grade) => sum + grade, 0) / dateData.testGrades.length;
+            const avgTeacherGrade = dateData.teacherGrades.reduce((sum, grade) => sum + grade, 0) / dateData.teacherGrades.length;
+            
+            testGrades.push(Math.round(avgTestGrade));
+            teacherGrades.push(Math.round(avgTeacherGrade));
+          });
+          
+          setTimeSeriesData({
+            labels,
+            testGrades,
+            teacherGrades
+          });
+        } else {
+          // No data
+          setTimeSeriesData({
+            labels: [],
+            testGrades: [],
+            teacherGrades: []
+          });
+        }
+      } catch (error) {
+        console.error('Error fetching time series data:', error);
+        // Reset data
+        setTimeSeriesData({
+          labels: [],
+          testGrades: [],
+          teacherGrades: []
+        });
+      } finally {
+        setChartLoading(false);
+      }
+    };
+    
+    fetchTimeSeriesData();
+  }, [selectedStudent, selectedTeacher, selectedManager, dateRange]);
   
-  // Handle filter changes
-  const handleStudentChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const studentId = e.target.value;
-    setSelectedStudent(studentId);
-    // Reset teacher selection if we're changing students
-    setSelectedTeacher('');
+  // Prepare chart data
+  const chartData: ChartData<'line'> = {
+    labels: timeSeriesData.labels,
+    datasets: [
+      {
+        label: 'Test Grade',
+        data: timeSeriesData.testGrades,
+        borderColor: 'rgb(59, 130, 246)', // blue-500
+        backgroundColor: 'rgba(59, 130, 246, 0.5)',
+        tension: 0.1
+      },
+      {
+        label: 'Grade by Teacher',
+        data: timeSeriesData.teacherGrades,
+        borderColor: 'rgb(34, 197, 94)', // green-500
+        backgroundColor: 'rgba(34, 197, 94, 0.5)',
+        tension: 0.1
+      }
+    ]
+  };
+  
+  // Chart options
+  const chartOptions: ChartOptions<'line'> = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      y: {
+        beginAtZero: true,
+        max: 100,
+        title: {
+          display: true,
+          text: 'Grade (%)'
+        }
+      },
+      x: {
+        title: {
+          display: true,
+          text: 'Date'
+        }
+      }
+    },
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      tooltip: {
+        mode: 'index',
+        intersect: false,
+      }
+    },
   };
   
   return (
@@ -216,32 +458,25 @@ export default function AnalyticsPage() {
             <h2 className="text-lg font-medium text-black">Filters</h2>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {/* Student Filter */}
             <div>
               <label htmlFor="student-filter" className="block text-sm font-medium text-gray-700 mb-1">
                 Student
               </label>
-              <div className="relative">
-                <select
-                  id="student-filter"
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white appearance-none pl-3 pr-10 py-2"
-                  value={selectedStudent}
-                  onChange={handleStudentChange}
-                >
-                  <option value="">All Students (Average)</option>
-                  {students.map(student => (
-                    <option key={student.id} value={student.id}>
-                      {student.displayName}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                  </svg>
-                </div>
-              </div>
+              <select
+                id="student-filter"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white"
+                value={selectedStudent}
+                onChange={(e) => setSelectedStudent(e.target.value)}
+              >
+                <option value="">All Students (Average)</option>
+                {students.map(student => (
+                  <option key={student.id} value={student.id}>
+                    {student.displayName}
+                  </option>
+                ))}
+              </select>
             </div>
             
             {/* Teacher Filter */}
@@ -249,26 +484,19 @@ export default function AnalyticsPage() {
               <label htmlFor="teacher-filter" className="block text-sm font-medium text-gray-700 mb-1">
                 Teacher
               </label>
-              <div className="relative">
-                <select
-                  id="teacher-filter"
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white appearance-none pl-3 pr-10 py-2"
-                  value={selectedTeacher}
-                  onChange={(e) => setSelectedTeacher(e.target.value)}
-                >
-                  <option value="">All Teachers (Average)</option>
-                  {availableTeachers.map(teacher => (
-                    <option key={teacher.id} value={teacher.id}>
-                      {teacher.displayName}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                  </svg>
-                </div>
-              </div>
+              <select
+                id="teacher-filter"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white"
+                value={selectedTeacher}
+                onChange={(e) => setSelectedTeacher(e.target.value)}
+              >
+                <option value="">All Teachers (Average)</option>
+                {teachers.map(teacher => (
+                  <option key={teacher.id} value={teacher.id}>
+                    {teacher.displayName}
+                  </option>
+                ))}
+              </select>
             </div>
             
             {/* Manager Filter */}
@@ -276,53 +504,19 @@ export default function AnalyticsPage() {
               <label htmlFor="manager-filter" className="block text-sm font-medium text-gray-700 mb-1">
                 Manager
               </label>
-              <div className="relative">
-                <select
-                  id="manager-filter"
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white appearance-none pl-3 pr-10 py-2"
-                  value={selectedManager}
-                  onChange={(e) => setSelectedManager(e.target.value)}
-                >
-                  <option value="">All Managers (Average)</option>
-                  {managers.map(manager => (
-                    <option key={manager.id} value={manager.id}>
-                      {manager.displayName}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                  </svg>
-                </div>
-              </div>
-            </div>
-            
-            {/* Owner Filter */}
-            <div>
-              <label htmlFor="owner-filter" className="block text-sm font-medium text-gray-700 mb-1">
-                Owner
-              </label>
-              <div className="relative">
-                <select
-                  id="owner-filter"
-                  className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white appearance-none pl-3 pr-10 py-2"
-                  value={selectedOwner}
-                  onChange={(e) => setSelectedOwner(e.target.value)}
-                >
-                  <option value="">All Owners (Average)</option>
-                  {owners.map(owner => (
-                    <option key={owner.id} value={owner.id}>
-                      {owner.displayName}
-                    </option>
-                  ))}
-                </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                  </svg>
-                </div>
-              </div>
+              <select
+                id="manager-filter"
+                className="block w-full rounded-md border-gray-300 shadow-sm focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white"
+                value={selectedManager}
+                onChange={(e) => setSelectedManager(e.target.value)}
+              >
+                <option value="">All Managers (Average)</option>
+                {managers.map(manager => (
+                  <option key={manager.id} value={manager.id}>
+                    {manager.displayName}
+                  </option>
+                ))}
+              </select>
             </div>
             
             {/* Date Range Filter */}
@@ -330,38 +524,22 @@ export default function AnalyticsPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Date Range
               </label>
-              <div className="flex space-x-2">
-                <div className="relative rounded-md shadow-sm flex-1">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <CalendarIcon className="h-4 w-4 text-gray-400" />
-                  </div>
+              <div className="flex items-center space-x-2">
+                <div className="relative rounded-md shadow-sm">
                   <input
                     type="date"
-                    className="block w-full pl-10 rounded-md border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white py-2"
+                    className="block w-full rounded-md border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white"
                     value={formatDateForInput(dateRange.startDate)}
-                    onChange={(e) => {
-                      setDateRange(prev => ({
-                        ...prev,
-                        startDate: new Date(e.target.value)
-                      }));
-                    }}
+                    onChange={handleStartDateChange}
                   />
                 </div>
-                <span className="inline-flex items-center text-gray-500">to</span>
-                <div className="relative rounded-md shadow-sm flex-1">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <CalendarIcon className="h-4 w-4 text-gray-400" />
-                  </div>
+                <span className="text-gray-500">to</span>
+                <div className="relative rounded-md shadow-sm">
                   <input
                     type="date"
-                    className="block w-full pl-10 rounded-md border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white py-2"
+                    className="block w-full rounded-md border-gray-300 focus:border-[#8B4513] focus:ring-[#8B4513] sm:text-sm bg-white"
                     value={formatDateForInput(dateRange.endDate)}
-                    onChange={(e) => {
-                      setDateRange(prev => ({
-                        ...prev,
-                        endDate: new Date(e.target.value)
-                      }));
-                    }}
+                    onChange={handleEndDateChange}
                   />
                 </div>
               </div>
@@ -371,19 +549,25 @@ export default function AnalyticsPage() {
         
         {/* Charts Section */}
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
-          {/* Performance Chart - Simplified to Test Grade and Grade by Teacher */}
+          {/* Performance Chart - updated to use real data */}
           <div className="bg-[#F8F4EA] rounded-lg p-6 shadow">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-black">Average Performance</h3>
               <ChartBarIcon className="h-6 w-6 text-[#8B4513]" />
             </div>
-            <div className="space-y-4">
-              <SkillBar label="Test Grade" percentage={performanceData.testGrade} color="bg-blue-500" />
-              <SkillBar label="Grade by Teacher" percentage={performanceData.teacherGrade} color="bg-green-500" />
-            </div>
+            {isLoading ? (
+              <div className="flex justify-center p-8">
+                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#8B4513]"></div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <SkillBar label="Test Grade" percentage={performanceData.testGrade} color="bg-blue-500" />
+                <SkillBar label="Grade by Teacher" percentage={performanceData.teacherGrade} color="bg-green-500" />
+              </div>
+            )}
           </div>
           
-          {/* Progress Over Time Chart - Only visible when a specific user is selected */}
+          {/* Progress Over Time Chart - updated with real chart */}
           <div className="bg-[#F8F4EA] rounded-lg p-6 shadow">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-medium text-black">Progress Over Time</h3>
@@ -399,13 +583,20 @@ export default function AnalyticsPage() {
               </div>
             </div>
             
-            {selectedStudent || selectedTeacher || selectedManager || selectedOwner ? (
-              // Simple line chart implementation
-              <div className="h-64 bg-[#FCF8F3] rounded-md border border-[#E6D7B8] relative">
-                <div className="absolute inset-0 p-4">
-                  <SimpleLineChart />
+            {selectedStudent || selectedTeacher || selectedManager ? (
+              chartLoading ? (
+                <div className="h-64 flex justify-center items-center">
+                  <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-[#8B4513]"></div>
                 </div>
-              </div>
+              ) : timeSeriesData.labels.length > 0 ? (
+                <div className="h-64">
+                  <Line data={chartData} options={chartOptions} />
+                </div>
+              ) : (
+                <div className="h-64 bg-[#FCF8F3] rounded-md border border-[#E6D7B8] flex items-center justify-center">
+                  <p className="text-gray-500">No data available for the selected filters</p>
+                </div>
+              )
             ) : (
               <div className="h-64 bg-[#FCF8F3] rounded-md border border-[#E6D7B8] flex items-center justify-center">
                 <p className="text-gray-500">Select a specific user to view progress over time</p>
@@ -506,15 +697,15 @@ export default function AnalyticsPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <MetricCard 
             title="Average Test Grade" 
-            value={`${performanceData.testGrade}%`} 
-            change={performanceData.testGrade > 85 ? '+3%' : performanceData.testGrade < 85 ? '-3%' : ''} 
-            trend={performanceData.testGrade > 85 ? 'up' : performanceData.testGrade < 85 ? 'down' : 'neutral'} 
+            value="85%" 
+            change="+3%" 
+            trend="up" 
           />
           <MetricCard 
             title="Average Teacher Grade" 
-            value={`${performanceData.teacherGrade}%`} 
-            change={performanceData.teacherGrade > 78 ? '+5%' : performanceData.teacherGrade < 78 ? '-5%' : ''} 
-            trend={performanceData.teacherGrade > 78 ? 'up' : performanceData.teacherGrade < 78 ? 'down' : 'neutral'} 
+            value="78%" 
+            change="+5%" 
+            trend="up" 
           />
           <MetricCard 
             title="Completion Rate" 
@@ -607,117 +798,4 @@ const studentRankings = [
   { id: 5, rank: 5, name: 'Beatriz Campos', email: 'beatrizc@example.com', testGrade: 76, teacherGrade: 82, participation: 84, progress: 4 },
   { id: 6, rank: 6, name: 'Daniel Santos', email: 'daniels@example.com', testGrade: 74, teacherGrade: 76, participation: 79, progress: -2 },
   { id: 7, rank: 7, name: 'Isabella Melo', email: 'isabellam@example.com', testGrade: 70, teacherGrade: 74, participation: 85, progress: 1 },
-];
-
-// Simple Line Chart Component
-function SimpleLineChart() {
-  // Mock data points (in a real app, these would come from the database)
-  const testGradeData = [68, 75, 70, 80, 85, 90, 94];
-  const teacherGradeData = [65, 70, 72, 75, 78, 82, 90];
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul'];
-  
-  // Chart dimensions
-  const width = 100;
-  const height = 100;
-  const padding = 20;
-  
-  // Find max value for scaling
-  const maxValue = Math.max(
-    ...testGradeData,
-    ...teacherGradeData
-  );
-  
-  // Create data points (normalized to percentage of chart height)
-  const testPoints = testGradeData.map((value, index) => ({
-    x: (index / (testGradeData.length - 1)) * width,
-    y: height - ((value / maxValue) * (height - padding)),
-  }));
-  
-  const teacherPoints = teacherGradeData.map((value, index) => ({
-    x: (index / (teacherGradeData.length - 1)) * width,
-    y: height - ((value / maxValue) * (height - padding)),
-  }));
-  
-  // Create SVG path commands for the lines
-  const createPathData = (points: {x: number, y: number}[]) => {
-    if (points.length === 0) return '';
-    
-    return points.reduce((path, point, i) => 
-      i === 0
-        ? `M ${point.x},${point.y}`
-        : `${path} L ${point.x},${point.y}`,
-      ''
-    );
-  };
-  
-  const testGradePath = createPathData(testPoints);
-  const teacherGradePath = createPathData(teacherPoints);
-  
-  return (
-    <div className="w-full h-full flex flex-col">
-      <div className="flex-1 relative">
-        <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" className="w-full h-full">
-          {/* X axis */}
-          <line x1="0" y1={height} x2={width} y2={height} stroke="rgba(0,0,0,0.1)" strokeWidth="0.5" />
-          
-          {/* Y axis */}
-          <line x1="0" y1="0" x2="0" y2={height} stroke="rgba(0,0,0,0.1)" strokeWidth="0.5" />
-          
-          {/* Test Grade Line */}
-          <path
-            d={testGradePath}
-            fill="none"
-            stroke="#3B82F6" // blue-500
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          
-          {/* Teacher Grade Line */}
-          <path
-            d={teacherGradePath}
-            fill="none"
-            stroke="#10B981" // green-500
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          
-          {/* Data Points for Test Grade */}
-          {testPoints.map((point, index) => (
-            <circle
-              key={`test-${index}`}
-              cx={point.x}
-              cy={point.y}
-              r="1.5"
-              fill="#3B82F6" // blue-500
-            />
-          ))}
-          
-          {/* Data Points for Teacher Grade */}
-          {teacherPoints.map((point, index) => (
-            <circle
-              key={`teacher-${index}`}
-              cx={point.x}
-              cy={point.y}
-              r="1.5"
-              fill="#10B981" // green-500
-            />
-          ))}
-        </svg>
-        
-        {/* Value tooltips - these would be dynamic in a real implementation */}
-        <div className="absolute bottom-0 right-0 bg-white/80 rounded px-2 py-1 text-xs">
-          Last: {testGradeData[testGradeData.length - 1]}% / {teacherGradeData[teacherGradeData.length - 1]}%
-        </div>
-      </div>
-      
-      {/* X-axis labels */}
-      <div className="h-6 flex justify-between text-xs text-gray-500 mt-1">
-        {months.map((month, i) => (
-          <div key={month}>{month}</div>
-        ))}
-      </div>
-    </div>
-  );
-} 
+]; 
