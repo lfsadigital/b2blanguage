@@ -220,77 +220,86 @@ export default function AnalyticsPage() {
         
         // Create a base query for the testResults collection
         const testsCollection = collection(db, 'testResults');
-        let constraints = [];
-        
-        // Add date range constraints
-        const startTimestamp = Timestamp.fromDate(dateRange.startDate);
-        const endTimestamp = Timestamp.fromDate(dateRange.endDate);
-        
-        constraints.push(where('testDate', '>=', startTimestamp));
-        constraints.push(where('testDate', '<=', endTimestamp));
         
         // Different query approaches based on selected filters
         let testsRef;
         let testResults: TestData[] = [];
         
-        if (selectedStudent && selectedTeacher) {
-          // Both student and teacher selected - get results where both match
-          console.log("Fetching with both student and teacher filters");
-          testsRef = query(
-            testsCollection,
-            where('studentId', '==', selectedStudent),
-            where('teacherId', '==', selectedTeacher),
-            ...constraints
-          );
-        } else if (selectedStudent) {
-          // Only student selected
-          console.log("Fetching with only student filter");
-          testsRef = query(
-            testsCollection,
-            where('studentId', '==', selectedStudent),
-            ...constraints
-          );
-        } else if (selectedTeacher) {
-          // Only teacher selected
-          console.log("Fetching with only teacher filter");
-          testsRef = query(
-            testsCollection,
-            where('teacherId', '==', selectedTeacher),
-            ...constraints
-          );
-        } else {
-          // No specific user selected, get all within date range
-          console.log("Fetching all test results within date range");
-          testsRef = query(testsCollection, ...constraints);
-        }
+        // Convert date range to strings in YYYY-MM-DD format for string comparison
+        const startDateStr = formatDateForInput(dateRange.startDate);
+        const endDateStr = formatDateForInput(dateRange.endDate);
         
-        console.log("Executing query with constraints");
+        console.log("Date range for query:", {
+          startDateStr,
+          endDateStr
+        });
+        
+        // We need to get all documents and filter manually since the testDate is stored as a string
+        testsRef = query(testsCollection);
+        
+        console.log("Executing query for all test results");
         const testsSnapshot = await getDocs(testsRef);
         console.log(`Query returned ${testsSnapshot.docs.length} documents`);
         
-        // Process results
+        // Process results with manual filtering
         testsSnapshot.forEach(doc => {
           const data = doc.data();
           console.log("Document data:", data);
           
-          // Convert string grades to numbers if needed
-          const testGrade = typeof data.testGrade === 'string' 
-            ? parseInt(data.testGrade, 10) 
-            : (data.testGrade || 0);
-            
-          const teacherGrade = typeof data.gradeByTeacher === 'string' 
-            ? parseInt(data.gradeByTeacher, 10) 
-            : (data.gradeByTeacher || 0);
+          // Extract fields with correct names
+          const studentId = data.studentId || '';
+          const teacherId = data.teacherId || '';
           
-          testResults.push({
-            id: doc.id,
-            studentId: data.studentId || '',
-            testGrade: testGrade,
-            teacherGrade: teacherGrade,
-            date: data.testDate?.toDate() || new Date(),
-            studentName: data.studentName,
-            teacherName: data.teacherName
-          });
+          // Convert string testDate to Date object for comparison
+          let testDate: Date;
+          if (typeof data.testDate === 'string') {
+            testDate = new Date(data.testDate);
+          } else if (data.testDate instanceof Timestamp) {
+            testDate = data.testDate.toDate();
+          } else {
+            // Default to current date if no valid date
+            testDate = new Date();
+          }
+          
+          const testDateStr = testDate.toISOString().split('T')[0];
+          
+          // Filter by date range
+          const isInDateRange = testDateStr >= startDateStr && testDateStr <= endDateStr;
+          
+          // Filter by selected student and teacher
+          const matchesStudent = !selectedStudent || studentId === selectedStudent;
+          const matchesTeacher = !selectedTeacher || teacherId === selectedTeacher;
+          
+          // Only include documents that match all active filters
+          if (isInDateRange && matchesStudent && matchesTeacher) {
+            // Convert string grades to numbers if needed
+            const testGrade = typeof data.testGrade === 'string' 
+              ? parseInt(data.testGrade, 10) 
+              : (data.testGrade || 0);
+              
+            const teacherGrade = typeof data.gradeByTeacher === 'string' 
+              ? parseInt(data.gradeByTeacher, 10) 
+              : (data.gradeByTeacher || 0);
+            
+            testResults.push({
+              id: doc.id,
+              studentId: studentId,
+              testGrade: testGrade,
+              teacherGrade: teacherGrade,
+              date: testDate,
+              studentName: data.studentName,
+              teacherName: data.teacherName
+            });
+            
+            console.log("Added document to results:", {
+              id: doc.id,
+              studentId,
+              teacherId,
+              testGrade,
+              teacherGrade,
+              testDate: testDateStr
+            });
+          }
         });
         
         // Calculate averages
@@ -346,83 +355,79 @@ export default function AnalyticsPage() {
         
         // Create a base query for the testResults collection
         const testsCollection = collection(db, 'testResults');
-        let constraints = [];
         
-        // Add date range constraints
-        const startTimestamp = Timestamp.fromDate(dateRange.startDate);
-        const endTimestamp = Timestamp.fromDate(dateRange.endDate);
+        // Convert date range to strings in YYYY-MM-DD format for string comparison
+        const startDateStr = formatDateForInput(dateRange.startDate);
+        const endDateStr = formatDateForInput(dateRange.endDate);
         
-        constraints.push(where('testDate', '>=', startTimestamp));
-        constraints.push(where('testDate', '<=', endTimestamp));
-        
-        // Different query approaches based on selected filters
-        let testsRef;
-        
-        if (selectedStudent && selectedTeacher) {
-          // Both student and teacher selected
-          console.log("Fetching time series with both student and teacher filters");
-          testsRef = query(
-            testsCollection,
-            where('studentId', '==', selectedStudent),
-            where('teacherId', '==', selectedTeacher),
-            ...constraints,
-            orderBy('testDate', 'asc')
-          );
-        } else if (selectedStudent) {
-          // Only student selected
-          console.log("Fetching time series with only student filter");
-          testsRef = query(
-            testsCollection,
-            where('studentId', '==', selectedStudent),
-            ...constraints,
-            orderBy('testDate', 'asc')
-          );
-        } else if (selectedTeacher) {
-          // Only teacher selected
-          console.log("Fetching time series with only teacher filter");
-          testsRef = query(
-            testsCollection,
-            where('teacherId', '==', selectedTeacher),
-            ...constraints,
-            orderBy('testDate', 'asc')
-          );
-        } else {
-          // No specific filters
-          console.log("Fetching time series for all test results within date range");
-          testsRef = query(
-            testsCollection,
-            ...constraints,
-            orderBy('testDate', 'asc')
-          );
-        }
+        // We need to get all documents and filter manually
+        const testsRef = query(testsCollection);
         
         console.log("Executing time series query");
         const testsSnapshot = await getDocs(testsRef);
         console.log(`Time series query returned ${testsSnapshot.docs.length} documents`);
         
-        // Process results
+        // Process results with manual filtering
         const testResults: TestData[] = [];
         testsSnapshot.forEach(doc => {
           const data = doc.data();
-          console.log("Processing time series document:", data);
           
-          // Convert string grades to numbers if needed
-          const testGrade = typeof data.testGrade === 'string' 
-            ? parseInt(data.testGrade, 10) 
-            : (data.testGrade || 0);
+          // Extract fields with correct names
+          const studentId = data.studentId || '';
+          const teacherId = data.teacherId || '';
+          
+          // Convert string testDate to Date object for comparison
+          let testDate: Date;
+          if (typeof data.testDate === 'string') {
+            testDate = new Date(data.testDate);
+          } else if (data.testDate instanceof Timestamp) {
+            testDate = data.testDate.toDate();
+          } else {
+            // Default to current date if no valid date
+            testDate = new Date();
+          }
+          
+          const testDateStr = testDate.toISOString().split('T')[0];
+          
+          // Filter by date range
+          const isInDateRange = testDateStr >= startDateStr && testDateStr <= endDateStr;
+          
+          // Filter by selected student and teacher
+          const matchesStudent = !selectedStudent || studentId === selectedStudent;
+          const matchesTeacher = !selectedTeacher || teacherId === selectedTeacher;
+          
+          // Only include documents that match all active filters
+          if (isInDateRange && matchesStudent && matchesTeacher) {
+            // Convert string grades to numbers if needed
+            const testGrade = typeof data.testGrade === 'string' 
+              ? parseInt(data.testGrade, 10) 
+              : (data.testGrade || 0);
+              
+            const teacherGrade = typeof data.gradeByTeacher === 'string' 
+              ? parseInt(data.gradeByTeacher, 10) 
+              : (data.gradeByTeacher || 0);
             
-          const teacherGrade = typeof data.gradeByTeacher === 'string' 
-            ? parseInt(data.gradeByTeacher, 10) 
-            : (data.gradeByTeacher || 0);
-          
-          testResults.push({
-            id: doc.id,
-            studentId: data.studentId || '',
-            testGrade: testGrade,
-            teacherGrade: teacherGrade,
-            date: data.testDate?.toDate() || new Date(),
-          });
+            testResults.push({
+              id: doc.id,
+              studentId: studentId,
+              testGrade: testGrade,
+              teacherGrade: teacherGrade,
+              date: testDate
+            });
+            
+            console.log("Added document to time series:", {
+              id: doc.id,
+              studentId,
+              teacherId,
+              testGrade,
+              teacherGrade,
+              testDate: testDateStr
+            });
+          }
         });
+        
+        // Sort results by date
+        testResults.sort((a, b) => a.date.getTime() - b.date.getTime());
         
         // Prepare data for the chart
         if (testResults.length > 0) {
@@ -518,30 +523,65 @@ export default function AnalyticsPage() {
         
         console.log(`Found ${studentUsers.length} students`);
         
-        // For each student, get their test results
+        // Convert date range to strings in YYYY-MM-DD format for string comparison
+        const startDateStr = formatDateForInput(dateRange.startDate);
+        const endDateStr = formatDateForInput(dateRange.endDate);
+        
+        // Get all test results
+        const testsCollection = collection(db, 'testResults');
+        const allTestsSnapshot = await getDocs(testsCollection);
+        
+        console.log(`Found ${allTestsSnapshot.docs.length} total test results`);
+        
+        // For each student, filter the test results
         const studentTestsPromises = studentUsers.map(async student => {
-          const testsCollection = collection(db, 'testResults');
-          const studentTestsQuery = query(
-            testsCollection, 
-            where('studentId', '==', student.id),
-            where('testDate', '>=', Timestamp.fromDate(dateRange.startDate)),
-            where('testDate', '<=', Timestamp.fromDate(dateRange.endDate))
-          );
-          
-          const testsSnapshot = await getDocs(studentTestsQuery);
-          console.log(`Found ${testsSnapshot.docs.length} tests for student ${student.name}`);
+          // Filter tests for this student
+          const studentTests = allTestsSnapshot.docs
+            .map(doc => {
+              const data = doc.data();
+              
+              // Check if this test belongs to the student
+              if (data.studentId !== student.id) {
+                return null;
+              }
+              
+              // Convert string testDate to Date object for comparison
+              let testDate: Date;
+              if (typeof data.testDate === 'string') {
+                testDate = new Date(data.testDate);
+              } else if (data.testDate instanceof Timestamp) {
+                testDate = data.testDate.toDate();
+              } else {
+                // Skip if no valid date
+                return null;
+              }
+              
+              const testDateStr = testDate.toISOString().split('T')[0];
+              
+              // Filter by date range
+              const isInDateRange = testDateStr >= startDateStr && testDateStr <= endDateStr;
+              if (!isInDateRange) {
+                return null;
+              }
+              
+              return {
+                testGrade: typeof data.testGrade === 'string' ? parseInt(data.testGrade, 10) : (data.testGrade || 0),
+                teacherGrade: typeof data.gradeByTeacher === 'string' ? parseInt(data.gradeByTeacher, 10) : (data.gradeByTeacher || 0),
+                date: testDate
+              };
+            })
+            .filter(Boolean);
           
           // Calculate average scores
-          if (testsSnapshot.docs.length === 0) return null;
+          const tests = studentTests.filter(test => test !== null) as Array<{
+            testGrade: number;
+            teacherGrade: number;
+            date: Date;
+          }>;
           
-          const tests = testsSnapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-              testGrade: typeof data.testGrade === 'string' ? parseInt(data.testGrade, 10) : (data.testGrade || 0),
-              teacherGrade: typeof data.gradeByTeacher === 'string' ? parseInt(data.gradeByTeacher, 10) : (data.gradeByTeacher || 0),
-              date: data.testDate?.toDate() || new Date()
-            };
-          });
+          console.log(`Found ${tests.length} tests for student ${student.name}`);
+          
+          if (tests.length === 0) return null;
           
           const avgTestGrade = tests.reduce((sum, test) => sum + test.testGrade, 0) / tests.length;
           const avgTeacherGrade = tests.reduce((sum, test) => sum + test.teacherGrade, 0) / tests.length;
