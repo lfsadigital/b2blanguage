@@ -219,47 +219,59 @@ export default function AnalyticsPage() {
         });
         
         // Create a base query for the testResults collection
-        let testsQuery = collection(db, 'testResults');
+        const testsCollection = collection(db, 'testResults');
         let constraints = [];
         
-        // Add filter constraints based on selections
-        if (selectedStudent) {
-          constraints.push(where('studentId', '==', selectedStudent));
-        }
-
-        if (selectedTeacher) {
-          constraints.push(where('teacherId', '==', selectedTeacher));
-        }
-        
-        // Add date range constraints - convert string dates to Timestamp if needed
+        // Add date range constraints
         const startTimestamp = Timestamp.fromDate(dateRange.startDate);
         const endTimestamp = Timestamp.fromDate(dateRange.endDate);
         
-        console.log("Date range:", {
-          start: startTimestamp,
-          end: endTimestamp,
-          startFormatted: dateRange.startDate.toLocaleDateString(),
-          endFormatted: dateRange.endDate.toLocaleDateString()
-        });
-        
-        // This assumes the field is called 'testDate' in Firestore
         constraints.push(where('testDate', '>=', startTimestamp));
         constraints.push(where('testDate', '<=', endTimestamp));
         
-        // Execute query with constraints
-        const testsRef = constraints.length > 0 
-          ? query(testsQuery, ...constraints) 
-          : query(testsQuery);
+        // Different query approaches based on selected filters
+        let testsRef;
+        let testResults: TestData[] = [];
         
-        console.log("Executing query with constraints:", constraints);
+        if (selectedStudent && selectedTeacher) {
+          // Both student and teacher selected - get results where both match
+          console.log("Fetching with both student and teacher filters");
+          testsRef = query(
+            testsCollection,
+            where('studentId', '==', selectedStudent),
+            where('teacherId', '==', selectedTeacher),
+            ...constraints
+          );
+        } else if (selectedStudent) {
+          // Only student selected
+          console.log("Fetching with only student filter");
+          testsRef = query(
+            testsCollection,
+            where('studentId', '==', selectedStudent),
+            ...constraints
+          );
+        } else if (selectedTeacher) {
+          // Only teacher selected
+          console.log("Fetching with only teacher filter");
+          testsRef = query(
+            testsCollection,
+            where('teacherId', '==', selectedTeacher),
+            ...constraints
+          );
+        } else {
+          // No specific user selected, get all within date range
+          console.log("Fetching all test results within date range");
+          testsRef = query(testsCollection, ...constraints);
+        }
+        
+        console.log("Executing query with constraints");
         const testsSnapshot = await getDocs(testsRef);
         console.log(`Query returned ${testsSnapshot.docs.length} documents`);
         
         // Process results
-        const testResults: TestData[] = [];
         testsSnapshot.forEach(doc => {
           const data = doc.data();
-          console.log("Processing document:", doc.id, data);
+          console.log("Document data:", data);
           
           // Convert string grades to numbers if needed
           const testGrade = typeof data.testGrade === 'string' 
@@ -324,12 +336,6 @@ export default function AnalyticsPage() {
     const fetchTimeSeriesData = async () => {
       setChartLoading(true);
       
-      // Only fetch time series data if a specific filter is selected
-      if (!selectedStudent && !selectedTeacher && !selectedManager) {
-        setChartLoading(false);
-        return;
-      }
-      
       try {
         console.log("Fetching time series data with filters:", {
           student: selectedStudent,
@@ -339,17 +345,8 @@ export default function AnalyticsPage() {
         });
         
         // Create a base query for the testResults collection
-        let testsQuery = collection(db, 'testResults');
+        const testsCollection = collection(db, 'testResults');
         let constraints = [];
-        
-        // Add filter constraints based on selections
-        if (selectedStudent) {
-          constraints.push(where('studentId', '==', selectedStudent));
-        }
-        
-        if (selectedTeacher) {
-          constraints.push(where('teacherId', '==', selectedTeacher));
-        }
         
         // Add date range constraints
         const startTimestamp = Timestamp.fromDate(dateRange.startDate);
@@ -357,12 +354,47 @@ export default function AnalyticsPage() {
         
         constraints.push(where('testDate', '>=', startTimestamp));
         constraints.push(where('testDate', '<=', endTimestamp));
-        constraints.push(orderBy('testDate', 'asc')); // Order by date ascending
         
-        // Execute query with constraints
-        const testsRef = constraints.length > 0 
-          ? query(testsQuery, ...constraints) 
-          : query(testsQuery);
+        // Different query approaches based on selected filters
+        let testsRef;
+        
+        if (selectedStudent && selectedTeacher) {
+          // Both student and teacher selected
+          console.log("Fetching time series with both student and teacher filters");
+          testsRef = query(
+            testsCollection,
+            where('studentId', '==', selectedStudent),
+            where('teacherId', '==', selectedTeacher),
+            ...constraints,
+            orderBy('testDate', 'asc')
+          );
+        } else if (selectedStudent) {
+          // Only student selected
+          console.log("Fetching time series with only student filter");
+          testsRef = query(
+            testsCollection,
+            where('studentId', '==', selectedStudent),
+            ...constraints,
+            orderBy('testDate', 'asc')
+          );
+        } else if (selectedTeacher) {
+          // Only teacher selected
+          console.log("Fetching time series with only teacher filter");
+          testsRef = query(
+            testsCollection,
+            where('teacherId', '==', selectedTeacher),
+            ...constraints,
+            orderBy('testDate', 'asc')
+          );
+        } else {
+          // No specific filters
+          console.log("Fetching time series for all test results within date range");
+          testsRef = query(
+            testsCollection,
+            ...constraints,
+            orderBy('testDate', 'asc')
+          );
+        }
         
         console.log("Executing time series query");
         const testsSnapshot = await getDocs(testsRef);
@@ -372,7 +404,7 @@ export default function AnalyticsPage() {
         const testResults: TestData[] = [];
         testsSnapshot.forEach(doc => {
           const data = doc.data();
-          console.log("Processing time series document:", doc.id, data);
+          console.log("Processing time series document:", data);
           
           // Convert string grades to numbers if needed
           const testGrade = typeof data.testGrade === 'string' 
