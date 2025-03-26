@@ -1,4 +1,4 @@
-# B2B Language - English Teaching Tools
+# B2B Languages - English Teaching Tools
 
 A Next.js application for professional English language teaching resources targeted at business professionals.
 

@@ -23,10 +23,10 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-4xl tracking-tight font-extrabold text-[#8B4513] sm:text-5xl md:text-6xl">
-              B2B Language
+              B2B Languages
             </h1>
             <p className="mt-3 max-w-md mx-auto text-base text-[#A0522D] sm:text-lg md:mt-5 md:text-xl md:max-w-3xl">
-              Professional teaching tools for business English instructors
+              LET'S TALK BUSINESS: WE LOVE TO TEACH
             </p>
             <div className="mt-8 flex justify-center space-x-4">
               <Link
@@ -119,7 +119,7 @@ export default function Home() {
         <div className="container mx-auto px-6">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-6 md:mb-0">
-              <h3 className="text-xl font-bold">B2B Language</h3>
+              <h3 className="text-xl font-bold">B2B Languages</h3>
               <p className="text-gray-300 mt-2">Professional English teaching tools</p>
             </div>
             <div className="flex flex-col md:flex-row space-y-4 md:space-y-0 md:space-x-6">
@@ -131,7 +131,7 @@ export default function Home() {
             </div>
           </div>
           <div className="mt-8 pt-8 border-t border-gray-700 text-center text-gray-400 text-sm">
-            © {new Date().getFullYear()} B2B Language. All rights reserved.
+            © {new Date().getFullYear()} B2B Languages. All rights reserved.
           </div>
         </div>
       </footer>

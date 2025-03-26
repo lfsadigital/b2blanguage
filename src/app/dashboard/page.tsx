@@ -17,7 +17,7 @@ export default function Dashboard() {
     <DashboardShell>
       <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
       <p className="mt-1 text-sm text-gray-600">
-        Welcome to your B2B Language teaching dashboard
+        Welcome to your B2B Languages teaching dashboard
       </p>
 
       {/* Stats */}

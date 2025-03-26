@@ -8,7 +8,7 @@ import SignInButton from "../components/SignInButton";
 const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600', '700'] });
 
 export const metadata = {
-  title: 'B2B Language - English Teaching Tools',
+  title: 'B2B Languages - English Teaching Tools',
   description: 'Professional English language teaching resources for business professionals',
 };
 
@@ -30,7 +30,7 @@ export default function RootLayout({
                     className="flex-shrink-0 flex items-center"
                   >
                     <span className="text-[var(--primary)] font-bold text-2xl">B2B</span>
-                    <span className="text-[var(--foreground)] font-medium text-2xl ml-1">Language</span>
+                    <span className="text-[var(--foreground)] font-medium text-2xl ml-1">Languages</span>
                   </Link>
                   <div className="hidden sm:ml-8 sm:flex sm:space-x-8">
                     <Link
@@ -77,7 +77,7 @@ export default function RootLayout({
                 <div>
                   <div className="flex items-center">
                     <span className="text-white font-bold text-2xl">B2B</span>
-                    <span className="text-gray-300 font-medium text-2xl ml-1">Language</span>
+                    <span className="text-gray-300 font-medium text-2xl ml-1">Languages</span>
                   </div>
                   <p className="mt-4 text-gray-400">
                     Elevating business professionals through specialized language training
@@ -119,7 +119,7 @@ export default function RootLayout({
                 </div>
               </div>
               <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-gray-400">
-                &copy; {new Date().getFullYear()} B2B Language. All rights reserved.
+                &copy; {new Date().getFullYear()} B2B Languages. All rights reserved.
               </div>
             </div>
           </footer>

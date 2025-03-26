@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  /* B2B Language brand colors based on screenshot */
+  /* B2B Languages brand colors based on screenshot */
   --primary: #8B2020; /* Dark brown/burgundy */
   --primary-dark: #701A1A;
   --primary-light: #A62828;
