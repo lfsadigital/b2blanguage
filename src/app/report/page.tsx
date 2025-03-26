@@ -100,10 +100,17 @@ export default function ReportPage() {
   const [selectedManager, setSelectedManager] = useState<string>('');
   const [selectedOwner, setSelectedOwner] = useState<string>('');
   
-  // Date range
+  // Date range initialization with proper timezone handling
+  const now = new Date();
+  now.setHours(12, 0, 0, 0);
+
+  const oneMonthAgo = new Date();
+  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+  oneMonthAgo.setHours(12, 0, 0, 0);
+
   const [dateRange, setDateRange] = useState<DateRange>({
-    startDate: new Date(new Date().setMonth(new Date().getMonth() - 1)),
-    endDate: new Date()
+    startDate: oneMonthAgo,
+    endDate: now
   });
   
   // Add state for the performance data
@@ -156,7 +163,11 @@ export default function ReportPage() {
   
   // Format dates for inputs
   const formatDateForInput = (date: Date): string => {
-    return date.toISOString().split('T')[0];
+    // Ajusta o fuso horário para garantir que a data será exibida corretamente
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
   
   // Helper function to get students associated with a teacher
@@ -209,16 +220,28 @@ export default function ReportPage() {
   
   // Handle date range changes
   const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const dateStr = e.target.value;
+    
+    // Criar a nova data no fuso horário local
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const newDate = new Date(year, month - 1, day, 12, 0, 0); // Use meio-dia para evitar problemas de fuso
+    
     setDateRange(prev => ({
       ...prev,
-      startDate: new Date(e.target.value)
+      startDate: newDate
     }));
   };
   
   const handleEndDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const dateStr = e.target.value;
+    
+    // Criar a nova data no fuso horário local
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const newDate = new Date(year, month - 1, day, 12, 0, 0); // Use meio-dia para evitar problemas de fuso
+    
     setDateRange(prev => ({
       ...prev,
-      endDate: new Date(e.target.value)
+      endDate: newDate
     }));
   };
   
@@ -237,27 +260,33 @@ export default function ReportPage() {
         // Create a base query for the testResults collection
         const testsCollection = collection(db, 'testResults');
         
-        // Different query approaches based on selected filters
-        let testsRef;
-        let testResults: TestData[] = [];
-        
         // Convert date range to strings in YYYY-MM-DD format for string comparison
         const startDateStr = formatDateForInput(dateRange.startDate);
         const endDateStr = formatDateForInput(dateRange.endDate);
         
         console.log("Date range for query:", {
+          startDate: dateRange.startDate,
+          endDate: dateRange.endDate,
           startDateStr,
           endDateStr
         });
         
+        // Helper function to normalize dates for comparison
+        const normalizeDate = (dateStr: string): string => {
+          // Ensure format YYYY-MM-DD for comparison
+          const date = new Date(dateStr);
+          return formatDateForInput(date);
+        };
+        
         // We need to get all documents and filter manually since the testDate is stored as a string
-        testsRef = query(testsCollection);
+        const testsRef = query(testsCollection);
         
         console.log("Executing query for all test results");
         const testsSnapshot = await getDocs(testsRef);
         console.log(`Query returned ${testsSnapshot.docs.length} documents`);
         
         // Process results with manual filtering
+        const testResults: TestData[] = [];
         testsSnapshot.forEach(doc => {
           const data = doc.data();
           console.log("Document data:", data);
@@ -270,14 +299,26 @@ export default function ReportPage() {
           let testDate: Date;
           if (typeof data.testDate === 'string') {
             testDate = new Date(data.testDate);
+            // Ensure proper timezone handling
+            testDate.setHours(12, 0, 0, 0);
           } else if (data.testDate instanceof Timestamp) {
             testDate = data.testDate.toDate();
+            // Ensure proper timezone handling
+            testDate.setHours(12, 0, 0, 0);
           } else {
             // Default to current date if no valid date
             testDate = new Date();
+            testDate.setHours(12, 0, 0, 0);
           }
           
-          const testDateStr = testDate.toISOString().split('T')[0];
+          const testDateStr = formatDateForInput(testDate);
+          // Debug log to check date conversion
+          console.log("Date comparison:", {
+            test: testDateStr,
+            start: startDateStr,
+            end: endDateStr,
+            isInRange: testDateStr >= startDateStr && testDateStr <= endDateStr
+          });
           
           // Filter by date range
           const isInDateRange = testDateStr >= startDateStr && testDateStr <= endDateStr;
@@ -376,6 +417,13 @@ export default function ReportPage() {
         const startDateStr = formatDateForInput(dateRange.startDate);
         const endDateStr = formatDateForInput(dateRange.endDate);
         
+        console.log("Time series date range:", {
+          startDate: dateRange.startDate,
+          endDate: dateRange.endDate,
+          startDateStr,
+          endDateStr
+        });
+        
         // We need to get all documents and filter manually
         const testsRef = query(testsCollection);
         
@@ -396,14 +444,17 @@ export default function ReportPage() {
           let testDate: Date;
           if (typeof data.testDate === 'string') {
             testDate = new Date(data.testDate);
+            testDate.setHours(12, 0, 0, 0);
           } else if (data.testDate instanceof Timestamp) {
             testDate = data.testDate.toDate();
+            testDate.setHours(12, 0, 0, 0);
           } else {
             // Default to current date if no valid date
             testDate = new Date();
+            testDate.setHours(12, 0, 0, 0);
           }
           
-          const testDateStr = testDate.toISOString().split('T')[0];
+          const testDateStr = formatDateForInput(testDate);
           
           // Filter by date range
           const isInDateRange = testDateStr >= startDateStr && testDateStr <= endDateStr;
@@ -437,7 +488,7 @@ export default function ReportPage() {
               teacherId,
               testGrade,
               teacherGrade,
-              testDate: testDateStr
+              testDateStr
             });
           }
         });
@@ -543,6 +594,13 @@ export default function ReportPage() {
         const startDateStr = formatDateForInput(dateRange.startDate);
         const endDateStr = formatDateForInput(dateRange.endDate);
         
+        console.log("Rankings date range:", {
+          startDate: dateRange.startDate,
+          endDate: dateRange.endDate,
+          startDateStr,
+          endDateStr
+        });
+        
         // Get all test results
         const testsCollection = collection(db, 'testResults');
         const allTestsSnapshot = await getDocs(testsCollection);
@@ -565,14 +623,16 @@ export default function ReportPage() {
               let testDate: Date;
               if (typeof data.testDate === 'string') {
                 testDate = new Date(data.testDate);
+                testDate.setHours(12, 0, 0, 0);
               } else if (data.testDate instanceof Timestamp) {
                 testDate = data.testDate.toDate();
+                testDate.setHours(12, 0, 0, 0);
               } else {
                 // Skip if no valid date
                 return null;
               }
               
-              const testDateStr = testDate.toISOString().split('T')[0];
+              const testDateStr = formatDateForInput(testDate);
               
               // Filter by date range
               const isInDateRange = testDateStr >= startDateStr && testDateStr <= endDateStr;
