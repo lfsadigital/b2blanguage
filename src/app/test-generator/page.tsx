@@ -643,7 +643,7 @@ ${generatedContent.questions.map((q, idx) => {
         return;
       }
       
-      // Create PDF content with student name included
+      // Create PDF content with student name included and add Last Class Diary content
       const pdfContent = `
 ${generatedContent.subject} - Teaching Materials
 
@@ -685,6 +685,21 @@ Present Simple Tense for describing processes - Use present simple to describe h
 Pronunciation:
 Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion), the stress falls on the third syllable. Have students practice by clapping on the stressed syllable while saying tech-related words.`
 }
+
+===================== LAST CLASS DIARY =====================
+
+${lastClassDiary ? 
+  `Test Date: ${lastClassDiary.testDate}
+Upload Date: ${lastClassDiary.uploadDate}
+Test Grade: ${lastClassDiary.testGrade || 'Not provided'}
+Grade by Teacher: ${lastClassDiary.gradeByTeacher || 'Not provided'}
+
+For Next Class:
+${lastClassDiary.forNextClass || 'No recommendations provided'}
+
+Teacher Notes:
+${lastClassDiary.notes || 'No notes provided'}`
+  : 'No previous class diary entries found for this teacher and student combination.'}
 `;
 
       // Access the jsPDF library through the window
@@ -739,6 +754,21 @@ ${generatedContent.conversationTopics.map((topic, index) => `${index + 1}. ${top
 ===================== TEACHING TIPS =====================
 
 ${generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).join('\n\n')}
+
+===================== LAST CLASS DIARY =====================
+
+${lastClassDiary ? 
+  `Test Date: ${lastClassDiary.testDate}
+Upload Date: ${lastClassDiary.uploadDate}
+Test Grade: ${lastClassDiary.testGrade || 'Not provided'}
+Grade by Teacher: ${lastClassDiary.gradeByTeacher || 'Not provided'}
+
+For Next Class:
+${lastClassDiary.forNextClass || 'No recommendations provided'}
+
+Teacher Notes:
+${lastClassDiary.notes || 'No notes provided'}`
+  : 'No previous class diary entries found for this teacher and student combination.'}
 `;
 
       const element = document.createElement('a');
@@ -822,6 +852,21 @@ Present Simple Tense for describing processes - Use present simple to describe h
 Pronunciation:
 Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion), the stress falls on the third syllable. Have students practice by clapping on the stressed syllable while saying tech-related words.`
 }
+
+===================== LAST CLASS DIARY =====================
+
+${lastClassDiary ? 
+  `Test Date: ${lastClassDiary.testDate}
+Upload Date: ${lastClassDiary.uploadDate}
+Test Grade: ${lastClassDiary.testGrade || 'Not provided'}
+Grade by Teacher: ${lastClassDiary.gradeByTeacher || 'Not provided'}
+
+For Next Class:
+${lastClassDiary.forNextClass || 'No recommendations provided'}
+
+Teacher Notes:
+${lastClassDiary.notes || 'No notes provided'}`
+  : 'No previous class diary entries found for this teacher and student combination.'}
 `;
 
       // Access the jsPDF library through the window
