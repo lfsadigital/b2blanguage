@@ -4,12 +4,16 @@ import { Inter } from 'next/font/google';
 import { AuthProvider } from '../lib/contexts/AuthContext';
 import ProfileIndicator from "../components/ProfileIndicator";
 import SignInButton from "../components/SignInButton";
+import Logo from "../components/Logo";
 
 const inter = Inter({ subsets: ['latin'], weight: ['400', '500', '600', '700'] });
 
 export const metadata = {
   title: 'B2B Languages - English Teaching Tools',
   description: 'Professional English language teaching resources for business professionals',
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({
@@ -29,8 +33,8 @@ export default function RootLayout({
                     href="/" 
                     className="flex-shrink-0 flex items-center"
                   >
-                    <span className="text-[var(--primary)] font-bold text-2xl">B2B</span>
-                    <span className="text-[var(--foreground)] font-medium text-2xl ml-1">Languages</span>
+                    <Logo width={100} height={40} />
+                    <span className="text-[var(--foreground)] font-medium text-2xl ml-2">Languages</span>
                   </Link>
                   <div className="hidden sm:ml-8 sm:flex sm:space-x-8">
                     <Link
@@ -76,8 +80,8 @@ export default function RootLayout({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div>
                   <div className="flex items-center">
-                    <span className="text-white font-bold text-2xl">B2B</span>
-                    <span className="text-gray-300 font-medium text-2xl ml-1">Languages</span>
+                    <Logo width={80} height={30} variant="light" />
+                    <span className="text-gray-300 font-medium text-2xl ml-2">Languages</span>
                   </div>
                   <p className="mt-4 text-gray-400">
                     Elevating business professionals through specialized language training
