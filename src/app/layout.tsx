@@ -12,7 +12,7 @@ export const metadata = {
   title: 'B2B Languages - English Teaching Tools',
   description: 'Professional English language teaching resources for business professionals',
   icons: {
-    icon: '/images/use_this_one_white.svg',
+    icon: '/images/b2b-logo.svg',
   },
 };
 
@@ -33,7 +33,7 @@ export default function RootLayout({
                     href="/" 
                     className="flex-shrink-0 flex items-center"
                   >
-                    <Logo width={100} height={40} />
+                    <Logo width={120} height={40} />
                     <span className="text-[var(--primary)] font-bold text-2xl ml-2">Languages</span>
                   </Link>
                   <div className="hidden sm:ml-8 sm:flex sm:space-x-8">
@@ -80,7 +80,7 @@ export default function RootLayout({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                 <div>
                   <div className="flex items-center">
-                    <Logo width={100} height={40} variant="light" />
+                    <Logo width={120} height={40} variant="light" />
                     <span className="text-white font-bold text-2xl ml-2">Languages</span>
                   </div>
                   <p className="mt-4 text-gray-400">
