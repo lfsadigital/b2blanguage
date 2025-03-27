@@ -4,8 +4,8 @@
     "env": {}
   },
   "functions": {
-    "app/api/test-generator/teacher-tips/**": {
-      "maxDuration": 30
+    "app/api/test-generator/**": {
+      "maxDuration": 60
     }
   }
 } 
