@@ -37,6 +37,8 @@ const ensureValidStudentLevel = (level: string | undefined): StudentLevel => {
   return 'Beginner'; // Default fallback
 };
 
+const youtubeUrlPattern = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+/;
+
 export default function TestGeneratorForm({ 
   onSubmit, 
   isGenerating, 
@@ -56,7 +58,11 @@ export default function TestGeneratorForm({
     questionTypes: ['multiple-choice'], // Default selection
     numberOfQuestions: 5,
     additionalNotes: '',
+    useTranscriptApproach: false,
+    youtubeVideoId: ''
   });
+  const [testResult, setTestResult] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch teachers and students from Firestore
   useEffect(() => {
@@ -129,7 +135,7 @@ export default function TestGeneratorForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Find the student name if we have an ID
+    // Find the student name if we have an ID and it's not already set
     if (formData.studentId && !formData.studentName) {
       const student = students.find(s => s.id === formData.studentId);
       if (student) {
@@ -140,7 +146,43 @@ export default function TestGeneratorForm({
       }
     }
     
-    await onSubmit(formData);
+    // Check if it's a YouTube URL
+    const isYouTubeUrl = youtubeUrlPattern.test(formData.contentUrl);
+    
+    if (isYouTubeUrl) {
+      try {
+        // Extract video ID from YouTube URL
+        let youtubeVideoId = '';
+        const url = new URL(formData.contentUrl);
+        
+        if (url.hostname === 'youtu.be') {
+          youtubeVideoId = url.pathname.slice(1);
+        } else {
+          youtubeVideoId = url.searchParams.get('v') || '';
+        }
+        
+        if (!youtubeVideoId) {
+          throw new Error("Couldn't extract YouTube video ID");
+        }
+        
+        console.log("Processing YouTube video:", youtubeVideoId);
+        
+        // Use the two-step, more efficient process for YouTube videos
+        await onSubmit({
+          ...formData,
+          useTranscriptApproach: true,
+          youtubeVideoId
+        });
+        
+      } catch (youtubeError) {
+        console.error("YouTube processing error:", youtubeError);
+        // Fall back to standard approach
+        await onSubmit(formData);
+      }
+    } else {
+      // For non-YouTube content, use the standard approach
+      await onSubmit(formData);
+    }
   };
 
   const handleChange = (
