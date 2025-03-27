@@ -201,21 +201,90 @@ export default function TestGeneratorPage() {
   const handleSubmit = async (data: TestFormData) => {
     try {
       setIsGenerating(true);
+
+      // Save content URL for later use
+      setGeneratedContent(prev => ({
+        ...prev,
+        contentUrl: data.contentUrl
+      }));
       
-      // Make the API call to generate the test based on the URL
-      const response = await fetch('/api/test-generator/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          ...data,
-          // Ensure these parameters are explicitly passed
-          studentLevel: data.studentLevel,
-          questionTypes: data.questionTypes,
-          questionCount: data.numberOfQuestions
-        })
-      });
+      // First check if this is a YouTube URL with the transcript approach flag
+      const isTranscriptBased = data.useTranscriptApproach && data.youtubeVideoId;
+      
+      // Choose the appropriate API endpoint based on the type of content
+      let response;
+      
+      if (isTranscriptBased) {
+        console.log('Using transcript-based approach for YouTube video');
+        
+        try {
+          // Step 1: Get transcript
+          const transcriptResponse = await fetch('/api/test-generator/generate-from-transcript/transcript', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ videoId: data.youtubeVideoId }),
+          });
+          
+          if (!transcriptResponse.ok) {
+            throw new Error(`Failed to fetch transcript: ${await transcriptResponse.text()}`);
+          }
+          
+          const transcriptData = await transcriptResponse.json();
+          
+          if (!transcriptData.transcript) {
+            throw new Error("Failed to get transcript from YouTube");
+          }
+          
+          // Step 2: Generate test from transcript
+          response = await fetch('/api/test-generator/generate-from-transcript', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              transcript: transcriptData.transcript,
+              teacherName: data.professorName,
+              studentName: data.studentName,
+              studentLevel: data.studentLevel,
+              questionCount: data.numberOfQuestions,
+              questionTypes: data.questionTypes,
+            }),
+          });
+        } catch (transcriptError) {
+          console.error('Error with transcript-based approach:', transcriptError);
+          // Fall back to standard method
+          console.log('Falling back to standard approach');
+          
+          response = await fetch('/api/test-generator/generate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              ...data,
+              studentLevel: data.studentLevel,
+              questionTypes: data.questionTypes,
+              questionCount: data.numberOfQuestions
+            })
+          });
+        }
+      } else {
+        // Standard approach for non-YouTube URLs
+        response = await fetch('/api/test-generator/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            ...data,
+            studentLevel: data.studentLevel,
+            questionTypes: data.questionTypes,
+            questionCount: data.numberOfQuestions
+          })
+        });
+      }
       
       // Handle non-JSON responses properly
       const contentType = response.headers.get('content-type');
