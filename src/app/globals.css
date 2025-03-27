@@ -4,58 +4,76 @@
 
 :root {
   /* B2B Languages brand colors based on screenshot */
-  --primary: #8B2020; /* Dark brown/burgundy */
+  --primary: #8B2020;
   --primary-dark: #701A1A;
   --primary-light: #A62828;
-  --secondary: #000000; /* Black */
+  --secondary: #000000;
   --secondary-light: #333333;
-  --background: #8B2020; /* Dark brown background */
-  --foreground: #FFFFFF; /* White text */
+  --background: #FFFFFF;
+  --foreground: #1A1A1A;
   --card: #ffffff;
   --card-foreground: #000000;
-  --subtle: #E0E0E0; /* Light gray text */
-  --border: #DDDDDD;
-  --accent: #CB0000; /* Red accent/navigation underline */
-  --success: #29cc41; /* Keep success green */
-  --warning: #ff9f0a; /* Keep warning orange */
-  --error: #ff3b30; /* Keep error red */
-  --input-bg: #FFFFFF; /* White background for inputs */
-  --input-text: #333333; /* Dark text for inputs */
-  --question-text: #000000; /* Black text for questions */
+  --subtle: #6B7280;
+  --border: #E5E7EB;
+  --accent: #CB0000;
+  --success: #29cc41;
+  --warning: #ff9f0a;
+  --error: #ff3b30;
+  --input-bg: #F9FAFB;
+  --input-text: #1A1A1A;
+  --question-text: #1A1A1A;
+  
+  /* Minimalist theme additions */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --spacing-unit: 0.25rem;
 }
 
 @layer base {
   body {
-    @apply bg-[var(--background)] text-[var(--foreground)];
+    @apply bg-[var(--background)] text-[var(--foreground)] antialiased;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-medium tracking-tight text-[var(--foreground)];
   }
 }
 
 @layer components {
   .b2b-card {
-    @apply bg-white rounded-none shadow-md overflow-hidden border border-[var(--border)];
-    transition: all 0.3s ease;
+    @apply bg-white rounded-[var(--radius-md)] shadow-[var(--shadow-md)] border border-[var(--border)] p-6;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   .b2b-card:hover {
-    @apply shadow-lg;
+    @apply shadow-[var(--shadow-lg)];
+    transform: translateY(-2px);
   }
   
   .b2b-button {
-    @apply bg-[var(--primary)] text-white font-medium px-6 py-2;
-    transition: all 0.2s ease;
+    @apply bg-[var(--primary)] text-white font-medium px-6 py-2.5 rounded-[var(--radius-sm)] 
+           inline-flex items-center justify-center;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   .b2b-button:hover {
     @apply bg-[var(--primary-dark)];
+    transform: translateY(-1px);
   }
   
   .b2b-button-secondary {
-    @apply bg-[var(--secondary)] text-white font-medium px-6 py-2;
-    transition: all 0.2s ease;
+    @apply bg-[var(--secondary)] text-white font-medium px-6 py-2.5 rounded-[var(--radius-sm)]
+           inline-flex items-center justify-center;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   .b2b-button-secondary:hover {
     @apply bg-[var(--secondary-light)];
+    transform: translateY(-1px);
   }
   
   .b2b-gradient {
@@ -63,18 +81,94 @@
   }
   
   .b2b-heading {
-    @apply font-bold;
+    @apply font-medium tracking-tight;
   }
   
   .b2b-hero {
-    background-color: var(--secondary);
-    color: white;
+    @apply bg-[var(--secondary)] text-white py-16;
   }
 
-  /* Form container with white background */
   .form-container {
-    @apply bg-white rounded-xl shadow-md p-6 my-4;
+    @apply bg-white rounded-[var(--radius-lg)] shadow-[var(--shadow-md)] p-8 my-6 
+           border border-[var(--border)];
   }
+}
+
+/* Form Elements */
+input, textarea, select {
+  @apply bg-[var(--input-bg)] text-[var(--input-text)] rounded-[var(--radius-sm)] 
+         border border-[var(--border)] px-4 py-2.5 outline-none;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+input:focus, textarea:focus, select:focus {
+  @apply border-[var(--primary)] ring-2 ring-[var(--primary)] ring-opacity-20;
+}
+
+input::placeholder, textarea::placeholder {
+  @apply text-[var(--subtle)];
+}
+
+/* Labels */
+label, .label {
+  @apply text-[var(--foreground)] text-sm font-medium mb-2 block;
+}
+
+/* Question Types */
+.text-gray-800, .text-sm.font-medium {
+  @apply text-[var(--question-text)];
+}
+
+.text-xs.text-gray-600 {
+  @apply text-[var(--subtle)];
+}
+
+/* Buttons */
+.apple-button, 
+button[type="submit"],
+.generate-test-btn {
+  @apply bg-[var(--primary)] text-white rounded-[var(--radius-sm)] px-6 py-2.5
+         inline-flex items-center justify-center;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.apple-button:hover,
+button[type="submit"]:hover,
+.generate-test-btn:hover {
+  @apply bg-[var(--primary-dark)];
+  transform: translateY(-1px);
+}
+
+.apple-button[disabled],
+button[type="submit"][disabled],
+.generate-test-btn[disabled] {
+  @apply opacity-50 cursor-not-allowed;
+}
+
+/* Cards */
+.apple-card, .form-card {
+  @apply bg-white rounded-[var(--radius-lg)] shadow-[var(--shadow-md)] p-6
+         border border-[var(--border)];
+}
+
+/* Headings */
+.section-heading {
+  @apply text-[var(--foreground)] text-2xl font-medium tracking-tight mb-6;
+}
+
+/* Layout */
+.centered-button-container {
+  @apply flex justify-center items-center gap-4 mt-8;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out forwards;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -96,70 +190,12 @@ body {
   }
 }
 
-/* ENSURE DARK TEXT FOR INPUTS */
-input, textarea, select {
-  background-color: var(--input-bg) !important;
-  color: var(--input-text) !important;
-}
-
-input::placeholder, textarea::placeholder {
-  color: #666666 !important;
-}
-
 /* Style for labels on dark background */
 label, .label {
   color: var(--foreground) !important;
 }
 
-/* Make question type labels always dark/visible */
-.text-gray-800, .text-sm.font-medium {
-  color: var(--question-text) !important;
-}
-
 /* Make sure secondary question text is readable */
 .text-xs.text-gray-600 {
   color: #333333 !important;
-}
-
-/* ENSURE DARK BROWN BUTTONS WITH WHITE TEXT */
-.apple-button, 
-button[type="submit"],
-.generate-test-btn {
-  background-color: var(--primary) !important;
-  color: white !important;
-  @apply rounded-md;
-  opacity: 1 !important; /* Ensure no transparency when enabled */
-}
-
-.apple-button:hover,
-button[type="submit"]:hover {
-  background-color: var(--primary-dark) !important;
-}
-
-/* Only apply opacity to disabled buttons */
-.apple-button[disabled],
-button[type="submit"][disabled],
-.generate-test-btn[disabled] {
-  opacity: 0.5 !important;
-}
-
-/* Override text-xs color to be lighter on dark background */
-.text-xs {
-  color: var(--subtle) !important;
-}
-
-/* Style for form cards with white background */
-.apple-card, .form-card {
-  @apply bg-white rounded-xl shadow-md overflow-hidden;
-  color: #333333;
-}
-
-/* Style for section headings */
-.section-heading {
-  @apply text-white text-2xl font-bold mb-4;
-}
-
-/* Center button container */
-.centered-button-container {
-  @apply flex justify-center mt-8;
 }
