@@ -1,7 +1,7 @@
 {
   "version": 2,
   "functions": {
-    "api/test-generator/**": {
+    "src/app/api/test-generator/**": {
       "maxDuration": 60
     }
   }
