@@ -83,6 +83,9 @@ export default function TestGeneratorPage() {
     transcriptSource: undefined
   });
 
+  // Create a state variable to track if data has been saved
+  const [dataSaved, setDataSaved] = useState<boolean>(false);
+
   // Fetch current teacher from database
   useEffect(() => {
     const fetchCurrentTeacher = async () => {
@@ -492,19 +495,35 @@ export default function TestGeneratorPage() {
       }
       
       // Update all generated content at once
-      setGeneratedContent({
-        testTitle: `${data.questionTypes.join(', ')} Test for ${data.studentLevel} Level`,
-        testContent: `Test about ${testData.subject}`,
-        studentName: data.studentName || '',
-        teacherName: data.professorName || '',
-        testDate: new Date().toLocaleDateString(),
-        subject: testData.subject,
-        questions: parsedQuestions,
-        conversationTopics: conversationTopics,
-        teachingTips: teachingTips,
-        contentUrl: data.contentUrl,
-        transcriptSource: data.useTranscriptApproach ? data.youtubeVideoId : undefined
-      });
+      if (testData && testData.subject) {
+        // Fix any poorly formatted subjects with commas
+        let cleanSubject = testData.subject;
+        
+        // Check if subject contains excessive commas (a sign it's poorly formatted)
+        if (cleanSubject.split(',').length > 3) {
+          cleanSubject = cleanSubject.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
+        }
+        
+        // Use a properly formatted date
+        const formattedDate = new Date().toLocaleDateString();
+        
+        // Update state with API response
+        setGeneratedContent({
+          testTitle: '',
+          testContent: testData.test,
+          studentName: data.studentName || 'Student',
+          teacherName: data.professorName || currentTeacher?.displayName || 'Teacher',
+          testDate: formattedDate,
+          subject: cleanSubject, // Use the cleaned subject
+          questions: parsedQuestions,
+          conversationTopics: conversationTopics,
+          teachingTips: teachingTips,
+          contentUrl: data.contentUrl,
+          transcriptSource: testData.transcriptSource
+        });
+        
+        setDataSaved(false); // Reset the save flag
+      }
       
       // Fetch last class diary if we have both teacher and student IDs
       if (data.professorId && data.studentId) {
@@ -1149,21 +1168,24 @@ ${lastClassDiary.notes || 'No notes provided'}`
               />
               
               {/* Add TestDataSaver to save test data to Firebase */}
-              <TestDataSaver 
-                testResult={{
-                  subject: generatedContent.subject,
-                  questions: generatedContent.questions,
-                  transcriptSource: generatedContent.transcriptSource
-                }}
-                formData={{
-                  contentUrl: generatedContent.contentUrl,
-                  studentLevel: "Advanced", // Default value
-                  studentId: generatedContent.studentName, // Use student name as ID
-                  professorId: generatedContent.teacherName, // Use teacher name as ID
-                  numberOfQuestions: generatedContent.questions.length
-                }}
-                transcriptSource={generatedContent.transcriptSource || 'youtube-direct'}
-              />
+              {!dataSaved && (
+                <TestDataSaver 
+                  testResult={{
+                    subject: generatedContent.subject,
+                    questions: generatedContent.questions,
+                    transcriptSource: generatedContent.transcriptSource
+                  }}
+                  formData={{
+                    contentUrl: generatedContent.contentUrl,
+                    studentLevel: "Advanced", // Default value
+                    studentId: generatedContent.studentName, // Use student name as ID
+                    professorId: generatedContent.teacherName, // Use teacher name as ID
+                    numberOfQuestions: generatedContent.questions.length
+                  }}
+                  transcriptSource={generatedContent.transcriptSource || 'youtube-direct'}
+                  onSaveComplete={handleSaveComplete}
+                />
+              )}
             </div>
           </div>
         )}
@@ -1356,6 +1378,11 @@ ${lastClassDiary.notes || 'No notes provided'}`
         </div>
       </div>
     );
+  };
+
+  // In the TestDataSaver component, add a callback function to mark data as saved
+  const handleSaveComplete = () => {
+    setDataSaved(true);
   };
 
   return (

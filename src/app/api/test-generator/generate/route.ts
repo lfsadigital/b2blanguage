@@ -1340,7 +1340,7 @@ export async function POST(request: Request) {
       try {
         const { transcript, isYouTubeTranscript, source } = await getVideoTranscript(url);
         hasTimestamps = isYouTubeTranscript;
-        transcriptSource = source; // Store the source for later use
+        transcriptSource = source; // This is correct - source will contain the method
         
         if (transcript && transcript.length > 100) {
           contentInfo = `Video transcript: ${transcript}`;

@@ -10,9 +10,10 @@ interface TestDataSaverProps {
     numberOfQuestions?: number;
   };
   transcriptSource?: string;
+  onSaveComplete?: () => void;
 }
 
-export default function TestDataSaver({ testResult, formData, transcriptSource }: TestDataSaverProps) {
+export default function TestDataSaver({ testResult, formData, transcriptSource, onSaveComplete }: TestDataSaverProps) {
   useEffect(() => {
     const saveTestToFirebase = async () => {
       if (!testResult || !testResult.questions) return;
@@ -42,6 +43,10 @@ export default function TestDataSaver({ testResult, formData, transcriptSource }
         
         const result = await response.json();
         console.log('Firebase save result from TestDataSaver:', result);
+        
+        if (onSaveComplete) {
+          onSaveComplete();
+        }
       } catch (error) {
         console.error('Error saving to Firebase from TestDataSaver:', error);
       }
@@ -50,7 +55,7 @@ export default function TestDataSaver({ testResult, formData, transcriptSource }
     if (testResult) {
       saveTestToFirebase();
     }
-  }, [testResult, formData, transcriptSource]);
+  }, [testResult, formData, transcriptSource, onSaveComplete]);
 
   // This component doesn't render anything
   return null;
