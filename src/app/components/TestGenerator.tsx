@@ -94,6 +94,7 @@ export default function TestGenerator({ onSubmit }: TestGeneratorProps) {
             teacherId: formData.professorId || 'unknown',
             questionCount: formData.numberOfQuestions,
             isVideo: formData.contentUrl?.includes('youtube.com') || formData.contentUrl?.includes('youtu.be'),
+            transcriptSource: data.transcriptSource || 'test-generator-component',
             clientGenerated: true
           });
           

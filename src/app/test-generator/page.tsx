@@ -67,6 +67,8 @@ export default function TestGeneratorPage() {
     teachingTips: any[];
     // Add URL to the generatedContent state
     contentUrl: string;
+    // Add transcript source to the generatedContent state
+    transcriptSource?: string;
   }>({
     testTitle: '',
     testContent: '',
@@ -77,7 +79,8 @@ export default function TestGeneratorPage() {
     questions: [],
     conversationTopics: [],
     teachingTips: [],
-    contentUrl: ''
+    contentUrl: '',
+    transcriptSource: undefined
   });
 
   // Fetch current teacher from database
@@ -499,7 +502,8 @@ export default function TestGeneratorPage() {
         questions: parsedQuestions,
         conversationTopics: conversationTopics,
         teachingTips: teachingTips,
-        contentUrl: data.contentUrl
+        contentUrl: data.contentUrl,
+        transcriptSource: data.useTranscriptApproach ? data.youtubeVideoId : undefined
       });
       
       // Fetch last class diary if we have both teacher and student IDs
@@ -1148,7 +1152,8 @@ ${lastClassDiary.notes || 'No notes provided'}`
               <TestDataSaver 
                 testResult={{
                   subject: generatedContent.subject,
-                  questions: generatedContent.questions
+                  questions: generatedContent.questions,
+                  transcriptSource: generatedContent.transcriptSource
                 }}
                 formData={{
                   contentUrl: generatedContent.contentUrl,
@@ -1157,6 +1162,7 @@ ${lastClassDiary.notes || 'No notes provided'}`
                   professorId: generatedContent.teacherName, // Use teacher name as ID
                   numberOfQuestions: generatedContent.questions.length
                 }}
+                transcriptSource={generatedContent.transcriptSource || 'youtube-direct'}
               />
             </div>
           </div>

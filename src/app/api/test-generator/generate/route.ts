@@ -1058,11 +1058,12 @@ async function extractSubject(url: string, content: string): Promise<string> {
             const titleMatch = html.match(/<title>([^<]+)<\/title>/);
             if (titleMatch && titleMatch[1]) {
               let title = titleMatch[1].replace(' - YouTube', '').trim();
-              // Clean up the title
+              // Clean up the title - this is the improved part
               title = title
                 .replace(/^\d+\s*[-:]\s*/, '') // Remove leading numbers like "1 - " or "1: "
                 .replace(/\s*\|.*$/, '')       // Remove pipe and anything after
                 .replace(/^(welcome|hi|hello|hey)\s+to\s+/i, '') // Remove common intro phrases
+                .replace(/[,\s]+/g, ' ')       // Replace multiple commas and spaces with a single space
                 .trim();
               
               logger.log(`Extracted YouTube title: ${title}`);
@@ -1094,10 +1095,11 @@ async function extractSubject(url: string, content: string): Promise<string> {
           
           if (titleMatch && titleMatch[1]) {
             let title = titleMatch[1].trim();
-            // Clean up the title
+            // Clean up the title - improved cleaning
             title = title
               .replace(/\s*\|.*$/, '')       // Remove pipe and anything after
               .replace(/\s*-.*$/, '')        // Remove dash and anything after (often site names)
+              .replace(/[,\s]+/g, ' ')       // Replace multiple commas and spaces with a single space
               .trim();
             
             logger.log(`Extracted article title: ${title}`);
@@ -1116,14 +1118,14 @@ async function extractSubject(url: string, content: string): Promise<string> {
         // Take first 200 chars of content for a quick subject extraction
         const cleanedContent = content
           .replace(/\[\d+:\d+\]/g, '')  // Remove timestamps
-          .substring(0, 200);  // Take a reasonable chunk to analyze
+          .substring(0, 300);  // Take a larger chunk to analyze
         
         const response = await openai.chat.completions.create({
           model: "gpt-3.5-turbo",
           messages: [
             {
               role: "system",
-              content: "Create a brief, descriptive title (3-7 words) for an English language test based on this content."
+              content: "Create a brief, descriptive title (3-7 words) for an English language test based on this content. Use plain text without commas between words."
             },
             {
               role: "user",
@@ -1134,7 +1136,15 @@ async function extractSubject(url: string, content: string): Promise<string> {
           max_tokens: 30,
         });
         
-        const generatedSubject = response.choices[0].message.content?.trim();
+        let generatedSubject = response.choices[0].message.content?.trim() || '';
+        
+        // Further clean up the generated subject
+        generatedSubject = generatedSubject
+          .replace(/^"(.+)"$/, '$1')   // Remove quotes
+          .replace(/[,\s]+/g, ' ')     // Replace multiple commas and spaces with a single space
+          .replace(/^Title:?\s*/i, '') // Remove "Title:" prefix if present
+          .trim();
+          
         if (generatedSubject && generatedSubject.length > 3) {
           logger.log(`Generated subject: ${generatedSubject}`);
           return generatedSubject;
@@ -1153,6 +1163,7 @@ async function extractSubject(url: string, content: string): Promise<string> {
       const cleanSubject = firstFewSentences
         .substring(0, 60)
         .replace(/\[[\d:]+\]/g, '') // Remove timestamps
+        .replace(/[,\s]+/g, ' ')    // Replace multiple commas and spaces with a single space
         .trim();
       
       return cleanSubject;
@@ -1577,7 +1588,8 @@ export async function POST(request: Request) {
         questions: questions,
         answers: answers,
         subject: extractedSubject,
-        firebaseSaveAttempted: true // Add flag to response
+        transcriptSource: transcriptSource,
+        firebaseSaveAttempted: true 
       }),
       { 
         status: 200,

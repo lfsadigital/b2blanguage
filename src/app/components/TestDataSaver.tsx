@@ -9,9 +9,10 @@ interface TestDataSaverProps {
     professorId?: string;
     numberOfQuestions?: number;
   };
+  transcriptSource?: string;
 }
 
-export default function TestDataSaver({ testResult, formData }: TestDataSaverProps) {
+export default function TestDataSaver({ testResult, formData, transcriptSource }: TestDataSaverProps) {
   useEffect(() => {
     const saveTestToFirebase = async () => {
       if (!testResult || !testResult.questions) return;
@@ -32,6 +33,7 @@ export default function TestDataSaver({ testResult, formData }: TestDataSaverPro
             teacherId: formData.professorId || 'unknown',
             questionCount: formData.numberOfQuestions || 0,
             isVideo: formData.contentUrl?.includes('youtube.com') || formData.contentUrl?.includes('youtu.be'),
+            transcriptSource: transcriptSource || testResult.transcriptSource || 'client-component',
             savedFrom: 'TestDataSaver-component',
             clientTimestamp: new Date().toISOString(),
             displaySuccess: true
@@ -48,7 +50,7 @@ export default function TestDataSaver({ testResult, formData }: TestDataSaverPro
     if (testResult) {
       saveTestToFirebase();
     }
-  }, [testResult, formData]);
+  }, [testResult, formData, transcriptSource]);
 
   // This component doesn't render anything
   return null;
