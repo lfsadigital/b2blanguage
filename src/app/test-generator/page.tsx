@@ -44,6 +44,11 @@ export default function TestGeneratorPage() {
   const [currentTeacher, setCurrentTeacher] = useState<{id: string; displayName: string} | null>(null);
   const [lastClassDiary, setLastClassDiary] = useState<LastClassDiaryEntry | null>(null);
   const [isLoadingDiary, setIsLoadingDiary] = useState(false);
+  const [generationProgress, setGenerationProgress] = useState<{ step: string; message: string; progress: number }>({
+    step: 'initial',
+    message: 'Initializing...',
+    progress: 0
+  });
 
   // Single state for all generated content
   const [generatedContent, setGeneratedContent] = useState<{
@@ -201,7 +206,8 @@ export default function TestGeneratorPage() {
   const handleSubmit = async (data: TestFormData) => {
     try {
       setIsGenerating(true);
-
+      let response;
+      
       // Save content URL for later use
       setGeneratedContent(prev => ({
         ...prev,
@@ -211,14 +217,21 @@ export default function TestGeneratorPage() {
       // First check if this is a YouTube URL with the transcript approach flag
       const isTranscriptBased = data.useTranscriptApproach && data.youtubeVideoId;
       
-      // Choose the appropriate API endpoint based on the type of content
-      let response;
+      // Check if it's a YouTube URL and potentially long
+      const isYouTubeUrl = /youtube\.com|youtu\.be/.test(data.contentUrl);
       
+      // Choose the appropriate API endpoint based on the type of content
       if (isTranscriptBased) {
         console.log('Using transcript-based approach for YouTube video');
         
         try {
           // Step 1: Get transcript
+          setGenerationProgress({
+            step: 'test',
+            message: 'Fetching YouTube transcript...',
+            progress: 10
+          });
+          
           const transcriptResponse = await fetch('/api/test-generator/generate-from-transcript/transcript', {
             method: 'POST',
             headers: {
@@ -238,24 +251,97 @@ export default function TestGeneratorPage() {
           }
           
           // Step 2: Generate test from transcript
-          response = await fetch('/api/test-generator/generate-from-transcript', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              transcript: transcriptData.transcript,
-              teacherName: data.professorName,
-              studentName: data.studentName,
-              studentLevel: data.studentLevel,
-              questionCount: data.numberOfQuestions,
-              questionTypes: data.questionTypes,
-            }),
+          setGenerationProgress({
+            step: 'test',
+            message: 'Generating test from transcript...',
+            progress: 30
           });
+          
+          // Use optimized parameters for faster processing
+          const requestBody = {
+            transcript: transcriptData.transcript,
+            teacherName: data.professorName,
+            studentName: data.studentName,
+            studentLevel: data.studentLevel,
+            questionTypes: data.questionTypes,
+            questionCount: data.numberOfQuestions
+          };
+          
+          // Set up timeout handling
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 240000); // 4 minute timeout
+          
+          try {
+            response = await fetch('/api/test-generator/generate-from-transcript', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(requestBody),
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            // Handle non-JSON responses properly
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+              const text = await response.text();
+              console.error('Non-JSON response:', text);
+              
+              // If it's a timeout, try fallback
+              if (text.includes('FUNCTION_INVOCATION_TIMEOUT')) {
+                throw new Error('Function invocation timeout. Trying fallback approach...');
+              }
+              
+              throw new Error(`API returned non-JSON response: ${text.substring(0, 100)}...`);
+            }
+            
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || 'Failed to generate test');
+            }
+            
+            // No need to return or reassign, response is already set
+          } catch (timeoutError) {
+            clearTimeout(timeoutId);
+            console.error('Transcript approach failed with timeout:', timeoutError);
+            console.log('Falling back to standard approach with transcript content');
+            
+            // Fallback: Use the standard approach but with the transcript content as input
+            setGenerationProgress({
+              step: 'test',
+              message: 'Trying alternative approach with transcript...',
+              progress: 40
+            });
+            
+            const fallbackBody = {
+              ...data,
+              contentUrl: `Transcript: ${transcriptData.transcript.substring(0, 6000)}...`,
+              studentLevel: data.studentLevel,
+              questionTypes: data.questionTypes,
+              questionCount: data.numberOfQuestions
+            };
+            
+            // No signal/timeout for fallback to avoid abortion
+            response = await fetch('/api/test-generator/generate', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(fallbackBody)
+            });
+          }
         } catch (transcriptError) {
           console.error('Error with transcript-based approach:', transcriptError);
           // Fall back to standard method
           console.log('Falling back to standard approach');
+          
+          setGenerationProgress({
+            step: 'test',
+            message: 'Trying standard approach...',
+            progress: 30
+          });
           
           response = await fetch('/api/test-generator/generate', {
             method: 'POST',

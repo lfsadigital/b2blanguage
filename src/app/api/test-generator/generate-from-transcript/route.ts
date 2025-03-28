@@ -10,10 +10,12 @@ const openai = process.env.OPENAI_API_KEY
 
 interface TranscriptRequest {
   transcript: string;
-  contentUrl: string;
+  contentUrl?: string;
+  teacherName?: string;
+  studentName?: string;
   studentLevel: string;
   questionTypes: string[];
-  numberOfQuestions: number;
+  questionCount: number;
 }
 
 export async function POST(request: Request) {
@@ -42,8 +44,14 @@ export async function POST(request: Request) {
         );
       }
       
+      // Limit transcript size to reduce processing time
+      const MAX_TRANSCRIPT_LENGTH = 10000;
+      const transcript = data.transcript.length > MAX_TRANSCRIPT_LENGTH 
+        ? data.transcript.substring(0, MAX_TRANSCRIPT_LENGTH) + "... [transcript truncated for processing]"
+        : data.transcript;
+      
       // Extract a subject from the transcript (first few sentences)
-      const firstFewSentences = data.transcript.split(/[.!?]/).slice(0, 3).join('. ');
+      const firstFewSentences = transcript.split(/[.!?]/).slice(0, 3).join('. ');
       let subject = 'Video Content';
       
       if (firstFewSentences.length > 10) {
@@ -55,30 +63,33 @@ export async function POST(request: Request) {
       }
       
       // Generate the test using the transcript
-      const contentInfo = `Video transcript: ${data.transcript}`;
+      const contentInfo = `Video transcript: ${transcript}`;
+      const contentUrl = data.contentUrl || "https://www.youtube.com/";
       
       console.log("Generating test with OpenAI...");
+      
+      // Use a more performance-optimized approach
       const completion = await openai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-3.5-turbo-1106", // Using 3.5 instead of 4 for speed
         messages: [
           {
             role: "system",
-            content: "You are an English language teacher creating tests for business professionals."
+            content: "You are an English language teacher creating tests for business professionals. Generate a test based on the provided transcript. Be concise and focused."
           },
           {
             role: "user",
             content: generateTestPrompt(
-              data.contentUrl,
+              contentUrl,
               contentInfo,
               {
-                professorName: '',
+                professorName: data.teacherName || '',
                 professorId: '',
-                studentName: '',
+                studentName: data.studentName || '',
                 studentId: '',
-                contentUrl: data.contentUrl,
+                contentUrl: contentUrl,
                 studentLevel: data.studentLevel as StudentLevel,
                 questionTypes: data.questionTypes.map(type => type as QuestionType),
-                numberOfQuestions: data.numberOfQuestions,
+                numberOfQuestions: data.questionCount || 5, // Default to 5 if not specified
                 additionalNotes: "This test is based on a client-extracted transcript."
               },
               subject,
@@ -91,7 +102,8 @@ export async function POST(request: Request) {
             )
           }
         ],
-        temperature: 0.7,
+        temperature: 0.5, // Lower temperature for faster, more consistent results
+        max_tokens: 2500, // Limit response size
       });
       
       const result = completion.choices[0].message.content;
