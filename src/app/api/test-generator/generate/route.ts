@@ -14,6 +14,9 @@ import { generateTestPrompt } from '@/app/lib/prompts/test-generator/main-test';
 import { generateContentExtractionPrompt, contentExtractionSystemMessage } from '@/app/lib/prompts/test-generator/content-extraction';
 import { logger } from '@/app/lib/utils/logger';
 import { saveTestGenerationData } from '@/lib/firebase/firebaseUtils';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
 
 // Supadata API Key (will be moved to environment variables)
 const SUPADATA_API_KEY = process.env.SUPADATA_API_KEY || '';
@@ -1178,6 +1181,41 @@ async function extractSubject(url: string, content: string): Promise<string> {
   }
 }
 
+// Direct Firebase data saving function (without going through a helper)
+async function saveTestData(data: any): Promise<string> {
+  try {
+    // Initialize Firebase directly to ensure it works in the API route
+    const firebaseConfig = {
+      apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+      authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+      storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+      appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+    };
+
+    // Initialize or get existing app
+    const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+    const db = getFirestore(app);
+    
+    // Add a timestamp
+    const dataWithTimestamp = {
+      ...data,
+      timestamp: serverTimestamp(),
+      savedAt: new Date().toISOString()
+    };
+    
+    // Add to the test data collection
+    const testDataCollection = collection(db, 'testGenerationData');
+    const docRef = await addDoc(testDataCollection, dataWithTimestamp);
+    logger.log(`Test data saved with ID: ${docRef.id}`);
+    return docRef.id;
+  } catch (error) {
+    logger.error('Error saving test data directly:', error);
+    return 'error';
+  }
+}
+
 export async function POST(request: Request) {
   // Version identifier for deployment verification
   logger.log("=== TEST GENERATOR API v1.2.1 (DEBUG BUILD) ===");
@@ -1418,22 +1456,46 @@ export async function POST(request: Request) {
 
     // Log test generation data to Firebase
     try {
-      await saveTestGenerationData({
-        url: url,
-        transcript: contentText.substring(0, 10000), // Limit to 10k chars to avoid Firestore limits
-        subject: extractedSubject,
-        testQuestions: questions,
-        studentLevel: formData.studentLevel,
-        studentId: formData.studentId,
-        teacherId: formData.professorId,
-        questionCount: formData.numberOfQuestions,
-        isVideo: isVideo,
-        processingTime: processingTime,
-        errors: errors.length > 0 ? errors : undefined
-      });
-    } catch (logError) {
-      // Don't fail the request if logging fails
-      logger.error('Error logging test generation data:', logError);
+      // Try both approaches to save data
+      try {
+        // Try using the helper
+        const helperResult = await saveTestGenerationData({
+          url: url,
+          transcript: contentText.substring(0, 10000), // Limit to 10k chars to avoid Firestore limits
+          subject: extractedSubject,
+          testQuestions: questions,
+          studentLevel: formData.studentLevel,
+          studentId: formData.studentId,
+          teacherId: formData.professorId,
+          questionCount: formData.numberOfQuestions,
+          isVideo: isVideo,
+          processingTime: processingTime,
+          errors: errors.length > 0 ? errors : undefined
+        });
+        
+        // Also try direct method
+        const directResult = await saveTestData({
+          url: url,
+          transcript: contentText.substring(0, 10000), // Limit to 10k chars
+          subject: extractedSubject,
+          testQuestions: questions,
+          studentLevel: formData.studentLevel,
+          studentId: formData.studentId,
+          teacherId: formData.professorId,
+          questionCount: formData.numberOfQuestions,
+          isVideo: isVideo,
+          processingTime: processingTime,
+          saveMethod: 'direct',
+          errors: errors.length > 0 ? errors : undefined
+        });
+        
+        logger.log(`Test data saved with helper ID: ${helperResult}, direct ID: ${directResult}`);
+      } catch (logError) {
+        // Don't fail the request if logging fails
+        logger.error('Error logging test generation data:', logError);
+      }
+    } catch (error) {
+      logger.error('Error logging test generation data:', error);
     }
 
     return new NextResponse(
@@ -1456,16 +1518,35 @@ export async function POST(request: Request) {
 
     // Try to log the error to Firebase even if test generation failed
     try {
-      await saveTestGenerationData({
-        url: "error-generating-test",
-        subject: "Error",
-        testQuestions: "Error generating test: " + (error as Error).message,
-        studentLevel: "unknown",
-        questionCount: 0,
-        isVideo: false,
-        processingTime: Date.now() - startTime,
-        errors: errors
-      });
+      // Try both approaches
+      try {
+        const helperResult = await saveTestGenerationData({
+          url: "error-generating-test",
+          subject: "Error",
+          testQuestions: "Error generating test: " + (error as Error).message,
+          studentLevel: "unknown",
+          questionCount: 0,
+          isVideo: false,
+          processingTime: Date.now() - startTime,
+          errors: errors
+        });
+
+        const directResult = await saveTestData({
+          url: "error-generating-test",
+          subject: "Error",
+          testQuestions: "Error generating test: " + (error as Error).message,
+          studentLevel: "unknown",
+          questionCount: 0,
+          isVideo: false,
+          processingTime: Date.now() - startTime,
+          saveMethod: 'direct',
+          errors: errors
+        });
+        
+        logger.log(`Error data saved with helper ID: ${helperResult}, direct ID: ${directResult}`);
+      } catch (innnerError) {
+        logger.error('Error saving test error data with helper:', innnerError);
+      }
     } catch (logError) {
       // Just continue if logging fails
       logger.error('Error logging test generation error:', logError);
