@@ -74,6 +74,17 @@ export default function TestGeneratorPage() {
     contentUrl: ''
   });
 
+  // Add a more detailed progress state
+  const [generationProgress, setGenerationProgress] = useState<{
+    step: 'idle' | 'test' | 'conversation' | 'tips' | 'complete' | 'error';
+    message: string;
+    progress: number; // 0-100
+  }>({
+    step: 'idle',
+    message: '',
+    progress: 0
+  });
+
   // Fetch current teacher from database
   useEffect(() => {
     const fetchCurrentTeacher = async () => {
@@ -202,47 +213,165 @@ export default function TestGeneratorPage() {
     try {
       setIsGenerating(true);
       
-      // Make the API call to generate the test based on the URL
-      const response = await fetch('/api/test-generator/generate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          ...data,
-          // Ensure these parameters are explicitly passed
-          studentLevel: data.studentLevel,
-          questionTypes: data.questionTypes,
-          questionCount: data.numberOfQuestions
-        })
+      // Check if it's a YouTube URL and potentially long
+      const isYouTubeUrl = /youtube\.com|youtu\.be/.test(data.contentUrl);
+      if (isYouTubeUrl) {
+        // Extract video ID
+        let videoId = '';
+        try {
+          const url = new URL(data.contentUrl);
+          if (url.hostname === 'youtu.be') {
+            videoId = url.pathname.slice(1);
+          } else {
+            videoId = url.searchParams.get('v') || '';
+          }
+
+          // Show warning for potentially long videos
+          if (videoId) {
+            setGenerationProgress({
+              step: 'test',
+              message: 'Analyzing YouTube video length...',
+              progress: 5
+            });
+            
+            try {
+              // Fetch video info to check duration (just a warning, won't block)
+              const videoInfoResponse = await fetch(`https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=contentDetails&key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8`);
+              const videoInfo = await videoInfoResponse.json();
+              
+              if (videoInfo.items && videoInfo.items[0] && videoInfo.items[0].contentDetails) {
+                const duration = videoInfo.items[0].contentDetails.duration; // PT10M30S format
+                // Parse duration string
+                const minutes = duration.match(/(\d+)M/);
+                if (minutes && parseInt(minutes[1]) > 10) {
+                  const confirmed = window.confirm(
+                    'This YouTube video appears to be longer than 10 minutes. Processing long videos may take more time or time out. Would you like to continue?'
+                  );
+                  if (!confirmed) {
+                    setIsGenerating(false);
+                    setGenerationProgress({
+                      step: 'idle',
+                      message: '',
+                      progress: 0
+                    });
+                    return;
+                  }
+                }
+              }
+            } catch (e) {
+              // Ignore errors in video duration check, just proceed
+              console.error("Couldn't check video duration:", e);
+            }
+          }
+        } catch (e) {
+          // Ignore URL parsing errors, just proceed
+          console.error("Couldn't parse YouTube URL:", e);
+        }
+      }
+      
+      // Step 1: Generate the test first (primary content)
+      setGenerationProgress({
+        step: 'test',
+        message: 'Generating test questions...',
+        progress: 10
       });
       
-      // Handle non-JSON responses properly
-      const contentType = response.headers.get('content-type');
-      if (!contentType || !contentType.includes('application/json')) {
-        const text = await response.text();
-        console.error('Non-JSON response:', text);
-        throw new Error(`API returned non-JSON response: ${text.substring(0, 100)}...`);
+      console.log("Step 1: Generating test...");
+      let testData;
+      let retryCount = 0;
+      const maxRetries = 2;
+
+      while (retryCount <= maxRetries) {
+        try {
+          setGenerationProgress(prev => ({
+            ...prev,
+            message: retryCount > 0 ? `Retrying test generation (attempt ${retryCount + 1}/${maxRetries + 1})...` : 'Generating test questions...',
+            progress: 10 + (retryCount * 5)
+          }));
+
+          const response = await fetch('/api/test-generator/generate', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              ...data,
+              // Ensure these parameters are explicitly passed
+              studentLevel: data.studentLevel,
+              questionTypes: data.questionTypes,
+              questionCount: data.numberOfQuestions
+            })
+          });
+          
+          // Handle non-JSON responses properly
+          const contentType = response.headers.get('content-type');
+          if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            console.error('Non-JSON response:', text);
+            
+            // Check for timeout errors specifically
+            if (text.includes('FUNCTION_INVOCATION_TIMEOUT')) {
+              if (retryCount < maxRetries) {
+                console.log(`Timeout detected, retrying (${retryCount + 1}/${maxRetries})...`);
+                retryCount++;
+                // Exponential backoff
+                await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+                continue;
+              } else {
+                throw new Error("The test generation timed out. The video might be too long or complex. Please try a shorter video or different content.");
+              }
+            }
+            
+            throw new Error(`API returned non-JSON response: ${text.substring(0, 100)}...`);
+          }
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Failed to generate test');
+          }
+          
+          testData = await response.json();
+          
+          // In case no test data was returned
+          if (!testData || !testData.questions) {
+            throw new Error('No test content was generated. Please try again or use a different URL.');
+          }
+          
+          console.log('API response data:', testData);
+          setGenerationProgress({
+            step: 'conversation',
+            message: 'Test questions created successfully!',
+            progress: 40
+          });
+          break; // Success, exit the retry loop
+        } catch (error) {
+          if (error instanceof Error && error.message.includes('timed out') && retryCount < maxRetries) {
+            console.log(`Error encountered, retrying (${retryCount + 1}/${maxRetries})...`, error);
+            retryCount++;
+            // Exponential backoff
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+          } else {
+            setGenerationProgress({
+              step: 'error',
+              message: error instanceof Error ? error.message : 'Unknown error',
+              progress: 0
+            });
+            throw error; // Re-throw if not a timeout or max retries reached
+          }
+        }
       }
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to generate test');
-      }
-      
-      const testData = await response.json();
-      
-      // In case no test data was returned
-      if (!testData || !testData.questions) {
-        throw new Error('No test content was generated. Please try again or use a different URL.');
-      }
-      
-      console.log('API response data:', testData);
-      
+
       // Extract questions from the generated test
       const parsedQuestions = parseQuestions(testData.questions);
       
-      // Get conversation topics
+      // Step 2: Get conversation topics only after test is successfully generated
+      console.log("Step 2: Generating conversation topics...");
+      setGenerationProgress({
+        step: 'conversation',
+        message: 'Generating conversation topics...',
+        progress: 60
+      });
+      
       let conversationTopics = [];
       try {
         const conversationResponse = await fetch('/api/test-generator/conversation', {
@@ -266,6 +395,11 @@ export default function TestGeneratorPage() {
               .filter((q: string) => q.trim().length > 0);
           }
         }
+        setGenerationProgress({
+          step: 'tips',
+          message: 'Conversation topics created!',
+          progress: 80
+        });
       } catch (error) {
         console.error('Error fetching conversation topics:', error);
         // Fallback conversation topics
@@ -276,9 +410,21 @@ export default function TestGeneratorPage() {
           "How might these concepts be applied in different industries?",
           "What skills would be necessary to succeed in this area?"
         ];
+        setGenerationProgress({
+          step: 'tips',
+          message: 'Using default conversation topics (error in generation)',
+          progress: 80
+        });
       }
       
-      // Get teaching tips
+      // Step 3: Get teaching tips only after conversation topics
+      console.log("Step 3: Generating teaching tips...");
+      setGenerationProgress({
+        step: 'tips',
+        message: 'Generating teaching tips...',
+        progress: 90
+      });
+      
       let teachingTips = [];
       try {
         const tipsResponse = await fetch('/api/test-generator/teacher-tips', {
@@ -332,7 +478,14 @@ export default function TestGeneratorPage() {
         ];
       }
       
-      // Update all generated content at once
+      // Step 4: Update all generated content at once
+      console.log("Step 4: Updating UI with generated content...");
+      setGenerationProgress({
+        step: 'complete',
+        message: 'All content generated successfully!',
+        progress: 100
+      });
+      
       setGeneratedContent({
         testTitle: `${data.questionTypes.join(', ')} Test for ${data.studentLevel} Level`,
         testContent: `Test about ${testData.subject}`,
@@ -346,15 +499,33 @@ export default function TestGeneratorPage() {
         contentUrl: data.contentUrl
       });
       
-      // Fetch last class diary if we have both teacher and student IDs
+      // Step 5: Fetch last class diary if we have both teacher and student IDs
       if (data.professorId && data.studentId) {
+        console.log("Step 5: Fetching last class diary...");
         await fetchLastClassDiary(data.professorId, data.studentId);
       }
       
       setTestGenerated(true);
     } catch (error) {
       console.error('Error generating content:', error);
-      alert(`Error: ${error instanceof Error ? error.message : 'Failed to generate content'}`);
+      // Provide more specific error messages to the user
+      setGenerationProgress({
+        step: 'error',
+        message: error instanceof Error ? error.message : 'Unknown error occurred',
+        progress: 0
+      });
+      
+      if (error instanceof Error) {
+        if (error.message.includes('timed out')) {
+          alert('Error: The operation timed out. The video might be too long or complex. Please try a shorter video or different content.');
+        } else if (error.message.includes('FUNCTION_INVOCATION_TIMEOUT')) {
+          alert('Error: The server took too long to process the request. Please try again with shorter content.');
+        } else {
+          alert(`Error: ${error.message}`);
+        }
+      } else {
+        alert('Failed to generate content. Please try again or use different content.');
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -901,12 +1072,38 @@ ${lastClassDiary.notes || 'No notes provided'}`
     return (
       <div className="bg-white rounded-lg shadow-lg overflow-hidden">
         {!testGenerated ? (
-          <TestGeneratorForm 
-            onSubmit={handleSubmit} 
-            isGenerating={isGenerating} 
-            defaultTeacherName={currentTeacher?.displayName || user?.displayName || ''}
-            currentTeacher={currentTeacher}
-          />
+          <div>
+            {isGenerating && (
+              <div className="p-4 border-b border-gray-200">
+                <div className="mb-2 flex justify-between items-center">
+                  <h3 className="font-medium text-gray-900">
+                    {generationProgress.step === 'error' ? 'Error' : 'Generating Test'}
+                  </h3>
+                  <span className="text-sm font-medium text-gray-700">
+                    {generationProgress.progress}%
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div 
+                    className={`h-2.5 rounded-full ${generationProgress.step === 'error' ? 'bg-red-500' : 'bg-[#8B4513]'}`} 
+                    style={{ width: `${generationProgress.progress}%` }}
+                  ></div>
+                </div>
+                <p className="mt-2 text-sm text-gray-600">{generationProgress.message}</p>
+                {generationProgress.step === 'error' && (
+                  <p className="mt-1 text-sm text-red-600">
+                    There was an error generating your test. Please try again or use different content.
+                  </p>
+                )}
+              </div>
+            )}
+            <TestGeneratorForm 
+              onSubmit={handleSubmit} 
+              isGenerating={isGenerating} 
+              defaultTeacherName={currentTeacher?.displayName || user?.displayName || ''}
+              currentTeacher={currentTeacher}
+            />
+          </div>
         ) : (
           <div className="p-6">
             {/* Tabs for Test and Export */}
