@@ -13,7 +13,7 @@ import { generateTestPrompt } from '@/app/lib/prompts/test-generator/main-test';
 import { generateContentExtractionPrompt, contentExtractionSystemMessage } from '@/app/lib/prompts/test-generator/content-extraction';
 
 // Supadata API Key (will be moved to environment variables)
-const SUPADATA_API_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IjEifQ.eyJpc3MiOiJuYWRsZXMiLCJpYXQiOiIxNzQyNzYwMzA0IiwicHVycG9zZSI6ImFwaV9hdXRoZW50aWNhdGlvbiIsInN1YiI6ImU1OWI0Y2MyZWNmNzQwOTBhZTgzN2ZmZWQ3NjY3NjkyIn0.0ee3lode52dXvdaQKVC79oaAyNDdftSciOzP2-GeFXI';
+const SUPADATA_API_KEY = process.env.SUPADATA_API_KEY || '';
 
 const execAsync = promisify(exec);
 

@@ -236,7 +236,7 @@ export default function TestGeneratorPage() {
             
             try {
               // Fetch video info to check duration (just a warning, won't block)
-              const videoInfoResponse = await fetch(`https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=contentDetails&key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8`);
+              const videoInfoResponse = await fetch(`https://www.googleapis.com/youtube/v3/videos?id=${videoId}&part=contentDetails&key=${process.env.NEXT_PUBLIC_YOUTUBE_API_KEY || ''}`);
               const videoInfo = await videoInfoResponse.json();
               
               if (videoInfo.items && videoInfo.items[0] && videoInfo.items[0].contentDetails) {
