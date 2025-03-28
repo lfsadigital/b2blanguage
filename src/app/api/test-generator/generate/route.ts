@@ -13,7 +13,7 @@ import { generateTestPrompt } from '@/app/lib/prompts/test-generator/main-test';
 import { generateContentExtractionPrompt, contentExtractionSystemMessage } from '@/app/lib/prompts/test-generator/content-extraction';
 
 // Supadata API Key (will be moved to environment variables)
-const SUPADATA_API_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsImtpZCI6IjEifQ.eyJpc3MiOiJuYWRsZXMiLCJpYXQiOiIxNzQyNzYwMzA0IiwicHVycG9zZSI6ImFwaV9hdXRoZW50aWNhdGlvbiIsInN1YiI6ImU1OWI0Y2MyZWNmNzQwOTBhZTgzN2ZmZWQ3NjY3NjkyIn0.0ee3lode52dXvdaQKVC79oaAyNDdftSciOzP2-GeFXI';
+const SUPADATA_API_KEY = process.env.SUPADATA_API_KEY || '';
 
 const execAsync = promisify(exec);
 
@@ -862,7 +862,65 @@ async function getTranscriptWithSupadata(videoId: string): Promise<{ transcript:
   }
 }
 
-// Now modify the getVideoTranscript function to use Supadata first
+/**
+ * Get YouTube transcript using our custom service
+ */
+async function getTranscriptWithCustomService(videoId: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
+  try {
+    console.log(`[Custom Service] Fetching transcript for video ID: ${videoId}`);
+    
+    // Set up timeout handling with AbortController
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      console.log('[Custom Service] Request timed out, aborting...');
+      controller.abort();
+    }, 30000); // 30 second timeout
+    
+    try {
+      // Call our custom transcript API service
+      const response = await fetch(`${process.env.TRANSCRIPT_API_URL}/api/transcript`, {
+        method: 'POST',
+        headers: {
+          'x-api-key': process.env.TRANSCRIPT_API_KEY || '',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ videoId }),
+        signal: controller.signal
+      });
+      
+      // Clear the timeout since request completed
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[Custom Service] API Error (${response.status}): ${errorText}`);
+        throw new Error(`Custom API error: ${response.status} ${errorText}`);
+      }
+      
+      const data = await response.json();
+      
+      if (!data.success || !data.transcript) {
+        throw new Error('No transcript returned from custom API');
+      }
+      
+      console.log(`[Custom Service] Successfully retrieved transcript (${data.transcript.length} chars)`);
+      
+      return {
+        transcript: data.transcript,
+        isYouTubeTranscript: true
+      };
+    } catch (error: any) {
+      clearTimeout(timeoutId);
+      if (error.name === 'AbortError') {
+        throw new Error('Custom API request timed out');
+      }
+      throw error;
+    }
+  } catch (error) {
+    console.error(`[Custom Service] Error fetching transcript:`, error);
+    throw error;
+  }
+}
 
 async function getVideoTranscript(url: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
   try {
@@ -883,12 +941,23 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
     console.log(`Video ID: ${videoId}`);
     
     // Track all errors for better debugging
+    let customApiError: Error | null = null;
     let supadataError: Error | null = null;
     let directError: Error | null = null;
     let ytError = null;
     let whisperError = null;
     
-    // Method 1: Try Supadata API first (most reliable)
+    // Method 1: Try Custom API first
+    try {
+      console.log('Attempting to get transcript via Custom API...');
+      return await getTranscriptWithCustomService(videoId);
+    } catch (error) {
+      console.log('Custom API failed with error:', error);
+      customApiError = error as Error;
+      console.log('Falling back to Supadata API...');
+    }
+    
+    // Method 2: Try Supadata API as fallback
     try {
       console.log('Attempting to get transcript via Supadata API...');
       return await getTranscriptWithSupadata(videoId);
@@ -898,7 +967,7 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
       console.log('Falling back to direct method...');
     }
     
-    // Method 2: Try our direct fetching method
+    // Method 3: Try our direct fetching method
     try {
       console.log('Attempting direct method to get YouTube captions...');
       return await fetchYouTubeTranscriptDirect(videoId);
@@ -908,7 +977,7 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
       console.log('Falling back to YouTube transcript library...');
     }
     
-    // Method 3: Try original YouTube transcript method
+    // Method 4: Try original YouTube transcript method
     try {
       console.log('Attempting to get YouTube captions via library...');
       const transcript = await YoutubeTranscript.fetchTranscript(videoId);
@@ -928,7 +997,7 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
       ytError = error;
       console.log('Falling back to Whisper transcription...');
       
-      // Method 4: Try Whisper transcription
+      // Method 5: Try Whisper transcription
       try {
         const whisperTranscript = await getVideoTranscriptWithWhisper(url);
         return { transcript: whisperTranscript, isYouTubeTranscript: false };
@@ -937,7 +1006,7 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
         whisperError = wError;
         
         // No more fallbacks - all methods failed
-        throw new Error(`All transcript methods failed. Supadata error: ${supadataError ? supadataError.message : 'N/A'}, Direct method error: ${directError ? directError.message : 'N/A'}, YouTube error: ${ytError.message}, Whisper error: ${whisperError.message}`);
+        throw new Error(`All transcript methods failed. Custom API error: ${customApiError ? customApiError.message : 'N/A'}, Supadata error: ${supadataError ? supadataError.message : 'N/A'}, Direct method error: ${directError ? directError.message : 'N/A'}, YouTube error: ${ytError.message}, Whisper error: ${whisperError.message}`);
       }
     }
   } catch (error) {
