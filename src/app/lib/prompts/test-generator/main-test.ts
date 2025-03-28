@@ -10,7 +10,7 @@ export const generateTestPrompt = (
 ): string => `You are an expert English teacher creating a language proficiency test for Brazilian students. 
 Your task is to create an English test based ONLY on the provided content, focusing primarily on assessing English language skills (grammar, vocabulary, comprehension) rather than subject knowledge.
 
-IMPORTANT: Only use information that is explicitly provided in the content. DO NOT make up or invent any facts, information, or data that is not present in the content. Stick strictly to what's in the provided text.
+DO NOT make up or invent any facts, information, or data that is not present in the content. Stick strictly to what's in the provided text.
 
 Remember that this is primarily an ENGLISH TEST - use the content as material to test language skills, not to test knowledge about the subject itself.
 
@@ -69,6 +69,3 @@ IMPORTANT FORMATTING REQUIREMENTS:
 7. For the answer section, only include the question number and the answer, not the full question
    Example: "1) B" or "2) The correct answer discusses..."
    
-ENSURE that all questions focus on English language skills using the content as context, rather than testing very specific knowledge about the content subject.
-
-REMINDER: Never make up or invent information not present in the content.`; 
