@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { TestFormData } from '@/app/lib/types';
+import { TestFormData, StudentLevel, QuestionType } from '@/app/lib/types';
 import { YoutubeTranscript } from 'youtube-transcript';
 import { exec } from 'child_process';
 import { promisify } from 'util';
@@ -1169,6 +1169,8 @@ async function extractSubject(url: string, content: string): Promise<string> {
 // Direct Firebase data saving function (without going through a helper)
 async function saveTestData(data: any): Promise<string> {
   try {
+    console.log('Starting direct Firebase save with data:', JSON.stringify(data).substring(0, 200) + '...');
+    
     // Initialize Firebase directly to ensure it works in the API route
     const firebaseConfig = {
       apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -1179,24 +1181,52 @@ async function saveTestData(data: any): Promise<string> {
       appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
     };
 
+    console.log('Firebase config loaded:', firebaseConfig.projectId);
+
     // Initialize or get existing app
     const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-    const db = getFirestore(app);
+    console.log('Firebase app initialized');
     
-    // Add a timestamp
+    const db = getFirestore(app);
+    console.log('Firestore instance obtained');
+    
+    // Add a timestamp and cleanup the data
+    const safeData = { ...data };
+    
+    // Remove any undefined values that might cause issues
+    Object.keys(safeData).forEach(key => {
+      if (safeData[key] === undefined) {
+        delete safeData[key];
+      }
+    });
+    
     const dataWithTimestamp = {
-      ...data,
+      ...safeData,
       timestamp: serverTimestamp(),
-      savedAt: new Date().toISOString()
+      savedAt: new Date().toISOString(),
+      saveTimestamp: Date.now()
     };
+    
+    console.log('Data prepared with timestamp');
     
     // Add to the test data collection
     const testDataCollection = collection(db, 'testGenerationData');
+    console.log('Collection reference created');
+    
+    console.log('Attempting to add document...');
     const docRef = await addDoc(testDataCollection, dataWithTimestamp);
-    logger.log(`Test data saved with ID: ${docRef.id}`);
+    console.log(`Test data saved successfully with ID: ${docRef.id}`);
     return docRef.id;
   } catch (error) {
-    logger.error('Error saving test data directly:', error);
+    console.error('Detailed error saving test data directly:', error);
+    
+    // Try to log more details about the error
+    if (error instanceof Error) {
+      console.error(`Error name: ${error.name}`);
+      console.error(`Error message: ${error.message}`);
+      console.error(`Error stack: ${error.stack}`);
+    }
+    
     return 'error';
   }
 }
@@ -1247,6 +1277,23 @@ export async function POST(request: Request) {
       );
     }
     
+    // Validate and provide defaults for form data
+    if (!formData.questionTypes) {
+      formData.questionTypes = ['multiple-choice', 'open-ended'] as QuestionType[]; // Default question types
+    }
+
+    if (!formData.studentLevel) {
+      formData.studentLevel = 'Medium' as StudentLevel; // Default student level
+    }
+
+    if (!formData.numberOfQuestions) {
+      formData.numberOfQuestions = 5; // Default number of questions
+    }
+
+    // Ensure professorName and studentName are set
+    formData.professorName = formData.professorName || 'Teacher';
+    formData.studentName = formData.studentName || 'Student';
+
     const url = formData.contentUrl;
     const today = new Date().toLocaleDateString('en-US', {
       year: 'numeric',
@@ -1440,57 +1487,97 @@ export async function POST(request: Request) {
     const processingTime = endTime - startTime;
     logger.log(`Test generation completed in ${processingTime}ms`);
 
-    // Log test generation data to Firebase
+    // Make Firebase logging more explicit and wait for completion
     try {
-      // Try both approaches to save data
+      console.log('\n\n=== FIREBASE LOGGING ATTEMPT ===');
+      console.log(`URL: ${url}`);
+      console.log(`Subject: ${extractedSubject}`);
+      console.log(`Test questions length: ${questions?.length || 0}`);
+      console.log(`Is video: ${isVideo}`);
+      console.log(`Transcript source: ${transcriptSource}`);
+      
+      // Store the content in a variable first to ensure proper logging if it's undefined
+      const content = contentText ? contentText.substring(0, 10000) : 'No content available';
+      const testData = {
+        url: url,
+        transcript: content.substring(0, 5000), // Limit to 5k chars to avoid Firestore limits
+        subject: extractedSubject || 'Unknown Subject',
+        testQuestions: questions || 'No questions generated',
+        studentLevel: formData.studentLevel || 'Unknown',
+        studentId: formData.studentId || 'Unknown',
+        teacherId: formData.professorId || 'Unknown',
+        questionCount: formData.numberOfQuestions || 0,
+        isVideo: isVideo,
+        processingTime: processingTime,
+        transcriptSource: transcriptSource,
+        errors: errors.length > 0 ? errors : undefined,
+        savedFromRoute: 'test-generator-explicit',
+        version: '1.3.0',
+        timestamp: new Date().toISOString(), // Add explicit timestamp
+        sentToFirebase: true // Flag to check if data was properly constructed
+      };
+      
+      console.log('Firebase test data prepared, attempting to save...');
+      
+      // Use direct save method first with await
       try {
-        // Try using the helper
-        const helperResult = await saveTestGenerationData({
-          url: url,
-          transcript: contentText.substring(0, 10000), // Limit to 10k chars to avoid Firestore limits
-          subject: extractedSubject,
-          testQuestions: questions,
-          studentLevel: formData.studentLevel,
-          studentId: formData.studentId,
-          teacherId: formData.professorId,
-          questionCount: formData.numberOfQuestions,
-          isVideo: isVideo,
-          processingTime: processingTime,
-          transcriptSource: transcriptSource, // Add the source
-          errors: errors.length > 0 ? errors : undefined
-        });
+        console.log('Saving with direct method first...');
+        const directData = {
+          ...testData,
+          saveMethod: 'direct-primary'
+        };
+        const directResult = await saveTestData(directData);
+        console.log(`Direct save result: ${directResult}`);
         
-        // Also try direct method
-        const directResult = await saveTestData({
-          url: url,
-          transcript: contentText.substring(0, 10000), // Limit to 10k chars
-          subject: extractedSubject,
-          testQuestions: questions,
-          studentLevel: formData.studentLevel,
-          studentId: formData.studentId,
-          teacherId: formData.professorId,
-          questionCount: formData.numberOfQuestions,
-          isVideo: isVideo,
-          processingTime: processingTime,
-          saveMethod: 'direct',
-          transcriptSource: transcriptSource, // Add the source
-          errors: errors.length > 0 ? errors : undefined
-        });
+        if (directResult === 'error') {
+          throw new Error('Direct save returned error status');
+        }
+      } catch (directError) {
+        console.error('Failed to save with direct method:', directError);
         
-        logger.log(`Test data saved with helper ID: ${helperResult}, direct ID: ${directResult}`);
-      } catch (innnerError) {
-        logger.error('Error saving test data with helper:', innnerError);
+        // If direct method fails, try a very simple object
+        try {
+          console.log('Trying minimal data save...');
+          const minimalData = {
+            url: url,
+            subject: extractedSubject || 'Unknown',
+            saveMethod: 'minimal',
+            savedAt: new Date().toISOString()
+          };
+          const minimalResult = await saveTestData(minimalData);
+          console.log(`Minimal save result: ${minimalResult}`);
+        } catch (minimalError) {
+          console.error('Even minimal save failed:', minimalError);
+        }
       }
+      
+      // Then try the helper method
+      try {
+        console.log('Saving with helper method...');
+        const helperResult = await saveTestGenerationData(testData);
+        console.log(`Helper save result: ${helperResult}`);
+        
+        if (helperResult === 'error') {
+          console.error('Helper method returned error status');
+        }
+      } catch (helperError) {
+        console.error('Failed to save with helper method:', helperError);
+      }
+      
+      console.log('Firebase save operations completed');
+      console.log('=== END FIREBASE LOGGING ATTEMPT ===\n\n');
     } catch (error) {
-      logger.error('Error logging test generation data:', error);
+      console.error('Error in main Firebase saving block:', error);
     }
 
+    // Return response only after Firebase save attempts are complete
     return new NextResponse(
       JSON.stringify({ 
         test: generatedTest,
         questions: questions,
         answers: answers,
-        subject: extractedSubject
+        subject: extractedSubject,
+        firebaseSaveAttempted: true // Add flag to response
       }),
       { 
         status: 200,

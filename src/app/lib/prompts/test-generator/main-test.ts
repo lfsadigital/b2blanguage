@@ -25,12 +25,12 @@ Content URL: ${url}
 ${contentInfo}
 
 Test information:
-- Professor: ${formData.professorName}
-- Student: ${formData.studentName}
-- Student Level: ${formData.studentLevel}
-- Question Types: ${formData.questionTypes.join(', ')}
-- Number of Questions: ${formData.numberOfQuestions}
-- Additional Notes: ${formData.additionalNotes}
+- Professor: ${formData.professorName || 'Not specified'}
+- Student: ${formData.studentName || 'Not specified'}
+- Student Level: ${formData.studentLevel || 'Intermediate'}
+- Question Types: ${formData.questionTypes ? formData.questionTypes.join(', ') : 'multiple-choice, open-ended'}
+- Number of Questions: ${formData.numberOfQuestions || 5}
+- Additional Notes: ${formData.additionalNotes || 'None'}
 - Test Subject: ${extractedSubject}
 - Date: ${today}
 
@@ -39,8 +39,8 @@ ${videoInstructions}
 IMPORTANT FORMATTING REQUIREMENTS:
 
 1. Format the test header as follows:
-   Professor: ${formData.professorName}
-   Student: ${formData.studentName}
+   Professor: ${formData.professorName || 'Not specified'}
+   Student: ${formData.studentName || 'Not specified'}
    Test about ${extractedSubject}
    Date: ${today}
    
@@ -59,8 +59,8 @@ IMPORTANT FORMATTING REQUIREMENTS:
 5. After all questions, include a divider line "---" on its own line
 
 6. After the divider, format the answer key header the same way:
-   Professor: 
-   Student: 
+   Professor: ${formData.professorName || 'Not specified'}
+   Student: ${formData.studentName || 'Not specified'}
    Test about ${extractedSubject}
    Date: ${today}
    

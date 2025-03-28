@@ -17,6 +17,7 @@ import {
   DocumentDuplicateIcon,
   ClipboardDocumentIcon
 } from '@heroicons/react/24/outline';
+import TestDataSaver from '@/app/components/TestDataSaver';
 
 // Interface for the last class diary entry
 interface LastClassDiaryEntry {
@@ -1141,6 +1142,21 @@ ${lastClassDiary.notes || 'No notes provided'}`
                     </div>
                   </div>
                 }
+              />
+              
+              {/* Add TestDataSaver to save test data to Firebase */}
+              <TestDataSaver 
+                testResult={{
+                  subject: generatedContent.subject,
+                  questions: generatedContent.questions
+                }}
+                formData={{
+                  contentUrl: generatedContent.contentUrl,
+                  studentLevel: "Advanced", // Default value
+                  studentId: generatedContent.studentName, // Use student name as ID
+                  professorId: generatedContent.teacherName, // Use teacher name as ID
+                  numberOfQuestions: generatedContent.questions.length
+                }}
               />
             </div>
           </div>
