@@ -1587,7 +1587,7 @@ export async function POST(request: Request) {
         test: generatedTest,
         questions: questions,
         answers: answers,
-        subject: extractedSubject,
+        subject: extractedSubject.replace(/,/g, ' ').replace(/\s+/g, ' ').trim(), // Clean subject before returning
         transcriptSource: transcriptSource,
         firebaseSaveAttempted: true 
       }),

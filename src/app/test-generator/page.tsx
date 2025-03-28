@@ -496,11 +496,12 @@ export default function TestGeneratorPage() {
       
       // Update all generated content at once
       if (testData && testData.subject) {
-        // Fix any poorly formatted subjects with commas
+        // Fix poorly formatted subjects with commas - use a more aggressive approach
         let cleanSubject = testData.subject;
         
-        // Check if subject contains excessive commas (a sign it's poorly formatted)
-        if (cleanSubject.split(',').length > 3) {
+        // Check if subject contains any commas (we'll clean it regardless)
+        if (cleanSubject.includes(',')) {
+          // Replace all commas with spaces and normalize whitespace
           cleanSubject = cleanSubject.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
         }
         
@@ -510,11 +511,11 @@ export default function TestGeneratorPage() {
         // Update state with API response
         setGeneratedContent({
           testTitle: '',
-          testContent: testData.test,
+          testContent: cleanTestContent(testData.test),
           studentName: data.studentName || 'Student',
           teacherName: data.professorName || currentTeacher?.displayName || 'Teacher',
           testDate: formattedDate,
-          subject: cleanSubject, // Use the cleaned subject
+          subject: cleanSubject,
           questions: parsedQuestions,
           conversationTopics: conversationTopics,
           teachingTips: teachingTips,
@@ -1075,6 +1076,21 @@ ${lastClassDiary.notes || 'No notes provided'}`
     }
   };
 
+  // Add a helper function to clean test content
+  const cleanTestContent = (content: string): string => {
+    // Check if the content contains a header section we want to remove
+    if (!content) return '';
+    
+    // Find the index of "Questions:" which separates header from questions
+    const questionsIndex = content.indexOf('Questions:');
+    if (questionsIndex > 0) {
+      // Return only the questions part (including "Questions:" label)
+      return content.substring(questionsIndex);
+    }
+    
+    return content;
+  };
+
   // Render test content
   const renderTestContent = () => {
     return (
@@ -1125,8 +1141,6 @@ ${lastClassDiary.notes || 'No notes provided'}`
                 subject={generatedContent.subject}
                 content={
                   <div className="space-y-6">
-                    <p className="text-gray-800">{generatedContent.testContent}</p>
-                    
                     <div className="mt-6">
                       <h2 className="text-lg font-semibold text-gray-900">Questions:</h2>
                       
