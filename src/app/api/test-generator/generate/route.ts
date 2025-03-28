@@ -1288,7 +1288,7 @@ export async function POST(request: Request) {
         }
       ],
       temperature: 0.7,
-      max_tokens: 2000,
+      max_tokens: 4000,
     });
 
     const generatedTest = completion.choices[0].message.content;
