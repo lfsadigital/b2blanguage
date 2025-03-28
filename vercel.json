@@ -1,9 +1,3 @@
 {
-  "version": 2,
-  "functions": {
-    "app/api/test-generator/**": {
-      "maxDuration": 300,
-      "memory": 1024
-    }
-  }
-} 
+  "version": 2
+}
