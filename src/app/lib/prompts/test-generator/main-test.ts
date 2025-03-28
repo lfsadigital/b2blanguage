@@ -68,4 +68,4 @@ IMPORTANT FORMATTING REQUIREMENTS:
    
 7. For the answer section, only include the question number and the answer, not the full question
    Example: "1) B" or "2) The correct answer discusses..."
-   
+   `;
