@@ -4,10 +4,19 @@
   "build": {
     "env": {}
   },
+  "buildCommand": "npm run build",
   "functions": {
     "app/api/test-generator/**": {
       "maxDuration": 300,
       "memory": 1024
     }
+  },
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/(.*)", "dest": "/$1" }
+  ],
+  "github": {
+    "enabled": true,
+    "silent": false
   }
 } 

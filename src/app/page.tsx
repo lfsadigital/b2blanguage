@@ -161,6 +161,19 @@ export default function Home() {
           </div>
         </div>
       </footer>
+
+      <div className="mt-6 mb-16 flex justify-center">
+        <Link
+          href="/test-generator"
+          className="transform rounded-xl bg-gradient-to-r from-yellow-600 to-yellow-500 px-4 py-3 font-medium text-white transition-all hover:opacity-90 hover:shadow-lg"
+        >
+          Go to Test Generator
+        </Link>
+      </div>
+
+      <div className="mb-8 text-center">
+        <p className="text-gray-500 text-sm">Version: 2025.03.28 - Latest Build</p>
+      </div>
     </div>
   );
 }
