@@ -28,6 +28,9 @@ const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
+// Add a transcriptSource variable to track which API was used
+let transcriptSource = "none";
+
 async function getArticleContent(url: string): Promise<string> {
   logger.log(`Fetching article content from: ${url}`);
   try {
@@ -245,7 +248,7 @@ async function getVideoTranscriptWithWhisper(url: string): Promise<string> {
 }
 
 // Add this new helper function near the top of the file after the other imports
-async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
+async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcript: string, isYouTubeTranscript: boolean, source: string }> {
   try {
     logger.log(`Attempting direct YouTube transcript fetch for video ID: ${videoId}`);
     
@@ -695,7 +698,8 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
     
     return { 
       transcript: formattedTranscript,
-      isYouTubeTranscript: true
+      isYouTubeTranscript: true,
+      source: 'youtube-direct'
     };
   } catch (error) {
     logger.error(`Error in direct YouTube transcript fetch:`, error);
@@ -706,13 +710,13 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
 /**
  * Get YouTube transcript using Supadata API
  */
-async function getTranscriptWithSupadata(videoId: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
+async function getTranscriptWithSupadata(videoId: string): Promise<{ transcript: string, isYouTubeTranscript: boolean, source: string }> {
   try {
     logger.log(`Fetching transcript for video ID: ${videoId}`);
     
     const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
     
-    // Set up timeout handling with AbortController (8 seconds to stay under Vercel's 10s limit)
+    // Set up timeout handling
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
       logger.log(`Request timed out, aborting...`);
@@ -720,16 +724,14 @@ async function getTranscriptWithSupadata(videoId: string): Promise<{ transcript:
     }, 8000);
     
     try {
-      // Try with URL parameter and text=true for plaintext response (recommended in docs)
       const response = await fetch(`https://api.supadata.ai/v1/youtube/transcript?url=${encodeURIComponent(youtubeUrl)}&text=true`, {
         headers: {
-          'x-api-key': SUPADATA_API_KEY,
+          'Authorization': `Bearer ${SUPADATA_API_KEY}`,
           'Content-Type': 'application/json'
         },
         signal: controller.signal
       });
       
-      // Clear the timeout since request completed
       clearTimeout(timeoutId);
       
       if (!response.ok) {
@@ -747,54 +749,44 @@ async function getTranscriptWithSupadata(videoId: string): Promise<{ transcript:
             langController.abort();
           }, 8000);
           
-          try {
-            const langResponse = await fetch(`https://api.supadata.ai/v1/youtube/transcript?url=${encodeURIComponent(youtubeUrl)}&text=true&lang=en`, {
-              headers: {
-                'x-api-key': SUPADATA_API_KEY,
-                'Content-Type': 'application/json'
-              },
-              signal: langController.signal
-            });
-            
-            // Clear the timeout
-            clearTimeout(langTimeoutId);
-            
-            if (!langResponse.ok) {
-              throw new Error(`Supadata API error with explicit language: ${langResponse.status}`);
-            }
-            
-            const langData = await langResponse.json();
-            
-            if (!langData.content || typeof langData.content !== 'string' || langData.content.length === 0) {
-              throw new Error('No transcript content returned with explicit language');
-            }
-            
-            // Format the plain text into our timestamp format (approximate)
-            const lines = langData.content.split('\n');
-            const formattedTranscript = lines.map((line: string, index: number) => 
-              `[${formatTimestamp(index * 5)}] ${line}`
-            ).join(' ');
-            
-            return {
-              transcript: formattedTranscript,
-              isYouTubeTranscript: true
-            };
-          } catch (langError: unknown) {
-            // Clear any pending timeout if there was an error
-            clearTimeout(langTimeoutId);
-            
-            // Handle timeout errors specifically
-            if (langError instanceof Error && langError.name === 'AbortError') {
-              throw new Error('Supadata API language-specific request timed out');
-            }
-            throw langError;
+          const langResponse = await fetch(`https://api.supadata.ai/v1/youtube/transcript?url=${encodeURIComponent(youtubeUrl)}&text=true&lang=en`, {
+            headers: {
+              'Authorization': `Bearer ${SUPADATA_API_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            signal: langController.signal
+          });
+          
+          clearTimeout(langTimeoutId);
+          
+          if (!langResponse.ok) {
+            throw new Error(`API Error (${langResponse.status}): ${await langResponse.text()}`);
           }
+          
+          const langData = await langResponse.json();
+          if (!langData.content || langData.content.length === 0) {
+            throw new Error('No transcript content returned with explicit language');
+          }
+          
+          // Use the same formatting for both plain text and structured formats
+          const lines = typeof langData.content === 'string' 
+            ? langData.content.split('\n')
+            : [];
+          
+          const formattedTranscript = lines.map((line: string, index: number) =>
+            `[${index}] ${line}`
+          ).join(' ');
+          
+          return {
+            transcript: formattedTranscript,
+            isYouTubeTranscript: true,
+            source: 'supadata-lang'
+          };
         }
         
-        throw new Error(`Supadata API error: ${response.status} ${errorText}`);
+        throw new Error(`API Error: ${response.status} ${errorText}`);
       }
       
-      // Handle successful response
       const data = await response.json();
       
       if (!data.content || typeof data.content !== 'string' || data.content.length === 0) {
@@ -808,75 +800,62 @@ async function getTranscriptWithSupadata(videoId: string): Promise<{ transcript:
           structController.abort();
         }, 8000);
         
-        try {
-          const structuredResponse = await fetch(`https://api.supadata.ai/v1/youtube/transcript?url=${encodeURIComponent(youtubeUrl)}`, {
-            headers: {
-              'x-api-key': SUPADATA_API_KEY,
-              'Content-Type': 'application/json'
-            },
-            signal: structController.signal
-          });
-          
-          // Clear the timeout
-          clearTimeout(structTimeoutId);
-          
-          if (!structuredResponse.ok) {
-            throw new Error(`Supadata API error with structured format: ${structuredResponse.status}`);
-          }
-          
-          const structuredData = await structuredResponse.json();
-          
-          if (!structuredData.content || !Array.isArray(structuredData.content) || structuredData.content.length === 0) {
-            throw new Error('No transcript segments available in structured format');
-          }
-          
-          // Format the structured response
-          const formattedTranscript = structuredData.content
-            .map((segment: any) => {
-              const timestamp = segment.offset ? segment.offset / 1000 : 0;
-              return `[${formatTimestamp(timestamp)}] ${segment.text}`;
-            })
-            .join(' ');
-          
-          logger.log(`Successfully retrieved structured transcript (${structuredData.content.length} segments)`);
-          
-          return {
-            transcript: formattedTranscript,
-            isYouTubeTranscript: true
-          };
-        } catch (structError: unknown) {
-          // Clear any pending timeout if there was an error
-          clearTimeout(structTimeoutId);
-          
-          // Handle timeout errors specifically
-          if (structError instanceof Error && structError.name === 'AbortError') {
-            throw new Error('Supadata API structured format request timed out');
-          }
-          throw structError;
+        const structuredResponse = await fetch(`https://api.supadata.ai/v1/youtube/transcript?url=${encodeURIComponent(youtubeUrl)}`, {
+          headers: {
+            'Authorization': `Bearer ${SUPADATA_API_KEY}`,
+            'Content-Type': 'application/json'
+          },
+          signal: structController.signal
+        });
+        
+        clearTimeout(structTimeoutId);
+        
+        if (!structuredResponse.ok) {
+          throw new Error(`API Error (Structured): ${structuredResponse.status} ${await structuredResponse.text()}`);
         }
+        
+        const structuredData = await structuredResponse.json();
+        
+        if (!structuredData.content || !Array.isArray(structuredData.content) || structuredData.content.length === 0) {
+          throw new Error('No transcript segments available in structured format');
+        }
+        
+        const formattedTranscript = structuredData.content
+          .map((segment: any, index: number) => {
+            const time = segment.offset ? Math.floor(segment.offset / 1000) : index;
+            const minutes = Math.floor(time / 60);
+            const seconds = time % 60;
+            return `[${minutes}:${seconds.toString().padStart(2, '0')}] ${segment.text}`;
+          })
+          .join(' ');
+        
+        logger.log(`Successfully retrieved structured transcript (${structuredData.content.length} segments)`);
+        
+        return {
+          transcript: formattedTranscript,
+          isYouTubeTranscript: true,
+          source: 'supadata-structured'
+        };
       }
       
-      // Format the plain text into our timestamp format (approximate)
+      // Plain text format handling
       const lines = data.content.split('\n');
-      const formattedTranscript = lines.map((line: string, index: number) => 
-        `[${formatTimestamp(index * 5)}] ${line}`
+      
+      const formattedTranscript = lines.map((line: string, index: number) =>
+        // Create timestamp-like markers for each line to make it look like standard YouTube transcript
+        `[${index}] ${line}`
       ).join(' ');
       
       logger.log(`Successfully retrieved plain text transcript (${lines.length} lines)`);
       
       return {
         transcript: formattedTranscript,
-        isYouTubeTranscript: true
+        isYouTubeTranscript: true,
+        source: 'supadata-text'
       };
-    } catch (fetchError: unknown) {
-      // Clear any pending timeout if there was an error
+    } catch (error) {
       clearTimeout(timeoutId);
-      
-      // Handle timeout errors specifically
-      if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-        throw new Error('Supadata API request timed out');
-      }
-      throw fetchError;
+      throw error;
     }
   } catch (error) {
     logger.error(`Error fetching transcript:`, error);
@@ -887,7 +866,7 @@ async function getTranscriptWithSupadata(videoId: string): Promise<{ transcript:
 /**
  * Get YouTube transcript using our custom service
  */
-async function getTranscriptWithCustomService(videoId: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
+async function getTranscriptWithCustomService(videoId: string): Promise<{ transcript: string, isYouTubeTranscript: boolean, source: string }> {
   try {
     logger.log(`Fetching transcript for video ID: ${videoId}`);
     
@@ -929,7 +908,8 @@ async function getTranscriptWithCustomService(videoId: string): Promise<{ transc
       
       return {
         transcript: data.transcript,
-        isYouTubeTranscript: true
+        isYouTubeTranscript: true,
+        source: 'digitalocean'
       };
     } catch (error: any) {
       clearTimeout(timeoutId);
@@ -944,7 +924,7 @@ async function getTranscriptWithCustomService(videoId: string): Promise<{ transc
   }
 }
 
-async function getVideoTranscript(url: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
+async function getVideoTranscript(url: string): Promise<{ transcript: string, isYouTubeTranscript: boolean, source: string }> {
   try {
     logger.log(`Getting transcript for ${url}...`);
     // Extract video ID from URL
@@ -1012,7 +992,8 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
       // Join all transcript parts with timestamps
       return { 
         transcript: transcript.map(part => `[${formatTimestamp(part.offset)}] ${part.text}`).join(' '),
-        isYouTubeTranscript: true
+        isYouTubeTranscript: true,
+        source: 'youtube-transcript-api'
       };
     } catch (error: any) {
       logger.log('YouTube transcript API failed with error:', error);
@@ -1022,7 +1003,11 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
       // Method 5: Try Whisper transcription
       try {
         const whisperTranscript = await getVideoTranscriptWithWhisper(url);
-        return { transcript: whisperTranscript, isYouTubeTranscript: false };
+        return { 
+          transcript: whisperTranscript,
+          isYouTubeTranscript: false,
+          source: 'whisper'
+        };
       } catch (wError: any) {
         logger.error('Whisper transcription also failed:', wError);
         whisperError = wError;
@@ -1295,8 +1280,9 @@ export async function POST(request: Request) {
     if (url.includes('youtube.com') || url.includes('youtu.be')) {
       isVideo = true;
       try {
-        const { transcript, isYouTubeTranscript } = await getVideoTranscript(url);
+        const { transcript, isYouTubeTranscript, source } = await getVideoTranscript(url);
         hasTimestamps = isYouTubeTranscript;
+        transcriptSource = source; // Store the source for later use
         
         if (transcript && transcript.length > 100) {
           contentInfo = `Video transcript: ${transcript}`;
@@ -1470,6 +1456,7 @@ export async function POST(request: Request) {
           questionCount: formData.numberOfQuestions,
           isVideo: isVideo,
           processingTime: processingTime,
+          transcriptSource: transcriptSource, // Add the source
           errors: errors.length > 0 ? errors : undefined
         });
         
@@ -1486,13 +1473,13 @@ export async function POST(request: Request) {
           isVideo: isVideo,
           processingTime: processingTime,
           saveMethod: 'direct',
+          transcriptSource: transcriptSource, // Add the source
           errors: errors.length > 0 ? errors : undefined
         });
         
         logger.log(`Test data saved with helper ID: ${helperResult}, direct ID: ${directResult}`);
-      } catch (logError) {
-        // Don't fail the request if logging fails
-        logger.error('Error logging test generation data:', logError);
+      } catch (innnerError) {
+        logger.error('Error saving test data with helper:', innnerError);
       }
     } catch (error) {
       logger.error('Error logging test generation data:', error);

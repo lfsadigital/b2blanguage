@@ -594,6 +594,8 @@ export interface TestGenerationData {
   isVideo: boolean;        // Whether it was a video or article
   processingTime?: number; // How long it took to generate everything (ms)
   errors?: string[];       // Any errors that occurred during generation
+  transcriptSource?: string; // The source of the transcript (digitalocean, supadata, etc.)
+  saveMethod?: string;     // How the data was saved (direct, helper)
 }
 
 /**
