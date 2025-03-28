@@ -7,10 +7,12 @@ import { promisify } from 'util';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
+import crypto from 'crypto';
 import youtubeDl from 'youtube-dl-exec';
 import { generateSubjectExtractionPrompt } from '@/app/lib/prompts/test-generator/subject-extraction';
 import { generateTestPrompt } from '@/app/lib/prompts/test-generator/main-test';
 import { generateContentExtractionPrompt, contentExtractionSystemMessage } from '@/app/lib/prompts/test-generator/content-extraction';
+import { logger } from '@/app/lib/utils/logger';
 
 // Supadata API Key (will be moved to environment variables)
 const SUPADATA_API_KEY = process.env.SUPADATA_API_KEY || '';
@@ -23,7 +25,7 @@ const openai = process.env.OPENAI_API_KEY
   : null;
 
 async function getArticleContent(url: string): Promise<string> {
-  console.log(`Fetching article content from: ${url}`);
+  logger.log(`Fetching article content from: ${url}`);
   try {
     // First try using Vercel's built-in fetch
     const response = await fetch(url, {
@@ -34,23 +36,23 @@ async function getArticleContent(url: string): Promise<string> {
     });
     
     if (!response.ok) {
-      console.error(`Failed to fetch article: HTTP ${response.status}`);
+      logger.error(`Failed to fetch article: HTTP ${response.status}`);
       throw new Error(`HTTP error: ${response.status}`);
     }
     
     const html = await response.text();
-    console.log(`Received HTML content of length: ${html.length}`);
+    logger.log(`Received HTML content of length: ${html.length}`);
     
     if (html.length < 1000) {
-      console.log('HTML content might be too short, possibly blocked or empty:', html.substring(0, 200));
+      logger.log('HTML content might be too short, possibly blocked or empty:', html.substring(0, 200));
     }
     
     return processHtmlContent(html);
   } catch (error) {
-    console.error('Error with direct fetch approach:', error);
+    logger.error('Error with direct fetch approach:', error);
     
     // Try another method if direct fetch fails - sometimes CORS or other issues prevent direct fetching
-    console.log('Attempting alternative article extraction method...');
+    logger.log('Attempting alternative article extraction method...');
     
     try {
       // We'll use an external API service that specializes in content extraction
@@ -59,7 +61,7 @@ async function getArticleContent(url: string): Promise<string> {
         ? `https://${process.env.VERCEL_URL}/api/proxy`
         : 'http://localhost:3000/api/proxy';
       
-      console.log(`Using proxy at ${proxyUrl} to fetch content`);
+      logger.log(`Using proxy at ${proxyUrl} to fetch content`);
       
       const proxyResponse = await fetch(proxyUrl, {
         method: 'POST',
@@ -78,15 +80,15 @@ async function getArticleContent(url: string): Promise<string> {
       const proxyData = await proxyResponse.json();
       
       if (!proxyData.success) {
-        console.error('Proxy fetch failed:', proxyData.error);
+        logger.error('Proxy fetch failed:', proxyData.error);
         throw new Error(`Proxy fetch failed: ${proxyData.error}`);
       }
       
-      console.log(`Proxy successful, received body of length: ${proxyData.bodyLength}`);
+      logger.log(`Proxy successful, received body of length: ${proxyData.bodyLength}`);
       
       return processHtmlContent(proxyData.body);
     } catch (proxyError) {
-      console.error('Proxy approach also failed:', proxyError);
+      logger.error('Proxy approach also failed:', proxyError);
       throw new Error(`All direct extraction methods failed: ${(error as Error).message}. Proxy error: ${(proxyError as Error).message}`);
     }
   }
@@ -101,15 +103,31 @@ function processHtmlContent(html: string): string {
                    .replace(/\s+/g, ' ')
                    .trim();
   
-  console.log(`Extracted text content of length: ${text.length}`);
+  logger.log(`Extracted text content of length: ${text.length}`);
   
   if (!text || text.length < 100) {
-    console.error('Article content is too short or empty after extraction');
+    logger.error('Article content is too short or empty after extraction');
     throw new Error('Article content is too short or empty');
   }
   
-  // Take a larger portion for better context
-  return text.substring(0, 6000); // Increased from 4000 to 6000
+  // Process content based on length
+  const maxLength = 6000;
+  
+  // For very long content, take beginning + middle + end for better context
+  if (text.length > maxLength * 1.5) {
+    const beginning = text.substring(0, Math.floor(maxLength * 0.4));
+    const middle = text.substring(
+      Math.floor(text.length/2 - maxLength * 0.3), 
+      Math.floor(text.length/2 + maxLength * 0.3)
+    );
+    const end = text.substring(text.length - Math.floor(maxLength * 0.4));
+    
+    logger.log(`Content too long (${text.length} chars), using segmented approach`);
+    return `${beginning}...[content truncated]...${middle}...[content truncated]...${end}`;
+  }
+  
+  // For regular content, just take the beginning up to maxLength
+  return text.substring(0, maxLength);
 }
 
 async function getArticleContentFallback(url: string): Promise<string> {
@@ -117,7 +135,7 @@ async function getArticleContentFallback(url: string): Promise<string> {
     throw new Error('OpenAI API key is not configured for fallback content extraction');
   }
   
-  console.log(`Using OpenAI to extract content from URL: ${url}`);
+  logger.log(`Using OpenAI to extract content from URL: ${url}`);
   
   try {
     const completion = await openai.chat.completions.create({
@@ -142,10 +160,10 @@ async function getArticleContentFallback(url: string): Promise<string> {
       throw new Error('Unable to extract article content - AI could not access the content');
     }
     
-    console.log(`Successfully extracted content using OpenAI: ${extractedContent.length} characters`);
+    logger.log(`Successfully extracted content using OpenAI: ${extractedContent.length} characters`);
     return extractedContent;
   } catch (error) {
-    console.error('Error using OpenAI to extract content:', error);
+    logger.error('Error using OpenAI to extract content:', error);
     throw new Error(`OpenAI content extraction failed: ${(error as Error).message}`);
   }
 }
@@ -155,80 +173,80 @@ async function getVideoTranscriptWithWhisper(url: string): Promise<string> {
     throw new Error('OpenAI API key is not configured');
   }
   
+  // Create a temp directory - use /tmp which is writable in Vercel
+  const tempDir = '/tmp';
+  const randomId = crypto.randomBytes(8).toString('hex');
+  const tmpDir = path.join(tempDir, `yt-${randomId}`);
+  let outputFile = path.join(tmpDir, `audio_${randomId}.mp3`);
+  
   try {
-    // Create a temp directory - use /tmp which is writable in Vercel
-    const tempDir = '/tmp';
-    const randomId = Math.random().toString(36).substring(2, 15);
-    const tmpDir = path.join(tempDir, `yt-${randomId}`);
-    
-    // Debug trace for deployment verification (23-Mar-2024)
-    console.log(`[DEBUG v1.2.0] Starting YouTube download process for ${url}`);
+    // Debug trace for deployment verification
+    logger.log(`Starting YouTube download process for ${url}`);
     
     try {
       fs.mkdirSync(tmpDir, { recursive: true });
     } catch (error) {
-      console.error(`Error creating temp directory: ${error}`);
+      logger.error(`Error creating temp directory: ${error}`);
     }
     
-    console.log(`Created temp directory: ${tmpDir}`);
-    const outputFile = path.join(tmpDir, `audio_${randomId}.mp3`);
+    logger.log(`Created temp directory: ${tmpDir}`);
     
     // Download audio from YouTube using youtube-dl-exec with minimal options
-    console.log(`Downloading audio from ${url} using youtube-dl-exec (simpler config)...`);
+    logger.log(`Downloading audio from ${url} using youtube-dl-exec...`);
     
-    try {
-      // Use simpler options for better Vercel compatibility
-      await youtubeDl(url, {
-        extractAudio: true,
-        audioFormat: 'mp3',
-        output: outputFile,
-        noWarnings: true
-      });
-      
-      console.log(`Checking for downloaded file at: ${outputFile}`);
-      
-      // Check if file exists and has size
-      if (!fs.existsSync(outputFile) || fs.statSync(outputFile).size === 0) {
-        throw new Error(`Downloaded audio file is empty or does not exist at path: ${outputFile}`);
-      }
-      
-      console.log(`Audio downloaded to ${outputFile}. Size: ${fs.statSync(outputFile).size} bytes`);
-      console.log('Transcribing with Whisper...');
-      
-      // Use OpenAI's Whisper API for transcription
-      const transcription = await openai.audio.transcriptions.create({
-        file: fs.createReadStream(outputFile),
-        model: "whisper-1",
-      });
-      
-      // Clean up temp files
-      try {
-        fs.unlinkSync(outputFile);
-        fs.rmdirSync(tmpDir);
-      } catch (e) {
-        console.error('Error cleaning up temp files:', e);
-      }
-      
-      console.log('Transcription completed successfully');
-      return transcription.text;
-    } catch (error) {
-      console.error('Detailed error info:', error);
-      // Try alternative YouTube transcript method
-      throw new Error(`Failed to download/process YouTube audio: ${(error as Error).message}`);
+    // Use simpler options for better Vercel compatibility
+    await youtubeDl(url, {
+      extractAudio: true,
+      audioFormat: 'mp3',
+      output: outputFile,
+      noWarnings: true
+    });
+    
+    logger.log(`Checking for downloaded file at: ${outputFile}`);
+    
+    // Check if file exists and has size
+    if (!fs.existsSync(outputFile) || fs.statSync(outputFile).size === 0) {
+      throw new Error(`Downloaded audio file is empty or does not exist at path: ${outputFile}`);
     }
+    
+    logger.log(`Audio downloaded to ${outputFile}. Size: ${fs.statSync(outputFile).size} bytes`);
+    logger.log('Transcribing with Whisper...');
+    
+    // Use OpenAI's Whisper API for transcription
+    const transcription = await openai.audio.transcriptions.create({
+      file: fs.createReadStream(outputFile),
+      model: "whisper-1",
+    });
+    
+    logger.log('Transcription completed successfully');
+    return transcription.text;
   } catch (error) {
-    console.error('Error transcribing with Whisper:', error);
+    logger.error('Error transcribing with Whisper:', error);
     throw new Error('Failed to transcribe with Whisper: ' + (error as Error).message);
+  } finally {
+    // Always clean up temp files, even if errors occur
+    try {
+      if (fs.existsSync(outputFile)) {
+        fs.unlinkSync(outputFile);
+        logger.log(`Cleaned up temp file: ${outputFile}`);
+      }
+      if (fs.existsSync(tmpDir)) {
+        fs.rmdirSync(tmpDir);
+        logger.log(`Cleaned up temp directory: ${tmpDir}`);
+      }
+    } catch (cleanupError) {
+      logger.error('Error cleaning up temp files:', cleanupError);
+    }
   }
 }
 
 // Add this new helper function near the top of the file after the other imports
 async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
   try {
-    console.log(`[DEBUG] Attempting direct YouTube transcript fetch for video ID: ${videoId}`);
+    logger.log(`Attempting direct YouTube transcript fetch for video ID: ${videoId}`);
     
     // Fetch the YouTube video page with proper headers
-    console.log(`[DEBUG] Fetching YouTube page with video ID: ${videoId}`);
+    logger.log(`Fetching YouTube page with video ID: ${videoId}`);
     const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
@@ -242,19 +260,19 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
     });
     
     if (!response.ok) {
-      console.log(`[DEBUG] Failed to fetch YouTube page: ${response.status}`);
+      logger.log(`Failed to fetch YouTube page: ${response.status}`);
       throw new Error(`Failed to fetch YouTube page: ${response.status}`);
     }
     
     const html = await response.text();
-    console.log(`[DEBUG] Received YouTube page HTML (${html.length} chars)`);
+    logger.log(`Received YouTube page HTML (${html.length} chars)`);
     
     // Save first 1000 and last 1000 chars for debugging
-    console.log(`[DEBUG] HTML start: ${html.substring(0, 1000)}`);
-    console.log(`[DEBUG] HTML end: ${html.substring(html.length - 1000)}`);
+    logger.log(`HTML start: ${html.substring(0, 1000)}`);
+    logger.log(`HTML end: ${html.substring(html.length - 1000)}`);
     
     // Try multiple approaches to find caption data
-    console.log(`[DEBUG] Starting caption URL extraction attempts`);
+    logger.log(`Starting caption URL extraction attempts`);
     
     // Approach 1: Check for timedtext in various formats
     let captionUrl = null;
@@ -268,21 +286,21 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
     ];
     
     for (const pattern of patterns) {
-      console.log(`[DEBUG] Trying caption pattern: ${pattern}`);
+      logger.log(`Trying caption pattern: ${pattern}`);
       const match = html.match(pattern);
       if (match) {
         captionUrl = match[1] || match[0];
         captionUrl = captionUrl.replace(/\\u0026/g, '&').replace(/\\/g, '');
-        console.log(`[DEBUG] Found caption URL with pattern: ${captionUrl}`);
+        logger.log(`Found caption URL with pattern: ${captionUrl}`);
         break;
       } else {
-        console.log(`[DEBUG] Pattern did not match`);
+        logger.log(`Pattern did not match`);
       }
     }
     
     // Approach 2: Check for inner JSON data
     if (!captionUrl) {
-      console.log(`[DEBUG] Trying to extract caption URL from embedded JSON data...`);
+      logger.log(`Trying to extract caption URL from embedded JSON data...`);
       
       // Look for player_response or ytInitialPlayerResponse in the HTML
       const dataMatch = html.match(/ytInitialPlayerResponse\s*=\s*({.+?});/) || 
@@ -290,31 +308,31 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
                         html.match(/"player_response":"(.+?)"/);
                         
       if (dataMatch) {
-        console.log(`[DEBUG] Found data match: ${dataMatch[0].substring(0, 100)}...`);
+        logger.log(`Found data match: ${dataMatch[0].substring(0, 100)}...`);
         try {
           const jsonStr = dataMatch[1].replace(/\\(.)/g, "$1"); // Basic unescaping
-          console.log(`[DEBUG] Parsed JSON string length: ${jsonStr.length}`);
+          logger.log(`Parsed JSON string length: ${jsonStr.length}`);
           
           const data = JSON.parse(dataMatch[1].includes('{') ? dataMatch[1] : jsonStr);
-          console.log(`[DEBUG] Successfully parsed JSON data`);
+          logger.log(`Successfully parsed JSON data`);
           
           // Log available properties for debugging
-          console.log(`[DEBUG] Top-level properties in data: ${Object.keys(data).join(', ')}`);
+          logger.log(`Top-level properties in data: ${Object.keys(data).join(', ')}`);
           
           if (data.captions) {
-            console.log(`[DEBUG] Found captions object in data`);
+            logger.log(`Found captions object in data`);
           } else {
-            console.log(`[DEBUG] No captions object found in data`);
+            logger.log(`No captions object found in data`);
           }
           
           if (data.playerResponse) {
-            console.log(`[DEBUG] Found playerResponse object in data`);
+            logger.log(`Found playerResponse object in data`);
           }
           
           // Check if there's a captionTracks property anywhere in the data
           const jsonString = JSON.stringify(data);
           if (jsonString.includes('captionTracks')) {
-            console.log(`[DEBUG] Found captionTracks somewhere in the data`);
+            logger.log(`Found captionTracks somewhere in the data`);
             
             // Find all occurrences of captionTracks
             const captionTracksIndices = [];
@@ -324,13 +342,13 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
               idx = jsonString.indexOf('captionTracks', idx + 1);
             }
             
-            console.log(`[DEBUG] Found captionTracks at indices: ${captionTracksIndices.join(', ')}`);
+            logger.log(`Found captionTracks at indices: ${captionTracksIndices.join(', ')}`);
             
             // Extract snippets around these occurrences
             for (let i = 0; i < captionTracksIndices.length; i++) {
               const idx = captionTracksIndices[i];
               const snippet = jsonString.substring(Math.max(0, idx - 50), Math.min(jsonString.length, idx + 200));
-              console.log(`[DEBUG] Caption context ${i}: ${snippet}`);
+              logger.log(`Caption context ${i}: ${snippet}`);
             }
           }
           
@@ -340,59 +358,59 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
           
           // Log what we found
           if (captions) {
-            console.log(`[DEBUG] Found captions array with ${captions.length} items`);
+            logger.log(`Found captions array with ${captions.length} items`);
           } else {
-            console.log(`[DEBUG] Captions not found in standard locations`);
+            logger.log(`Captions not found in standard locations`);
           }
           
           // Look in alternate locations for captions data
           if (!captions && data?.playerConfig?.captions) {
-            console.log(`[DEBUG] Trying playerConfig.captions location`);
+            logger.log(`Trying playerConfig.captions location`);
             captions = data.playerConfig.captions.playerCaptionsTracklistRenderer?.captionTracks;
             if (captions) {
-              console.log(`[DEBUG] Found captions in playerConfig`);
+              logger.log(`Found captions in playerConfig`);
             }
           }
           
           // Try to find captions in the playerResponse
           if (!captions && data?.playerResponse) {
-            console.log(`[DEBUG] Trying to parse nested playerResponse`);
+            logger.log(`Trying to parse nested playerResponse`);
             try {
               const playerResponse = typeof data.playerResponse === 'string' 
                 ? JSON.parse(data.playerResponse) 
                 : data.playerResponse;
               
-              console.log(`[DEBUG] playerResponse properties: ${Object.keys(playerResponse).join(', ')}`);
+              logger.log(`playerResponse properties: ${Object.keys(playerResponse).join(', ')}`);
               
               if (playerResponse.captions) {
-                console.log(`[DEBUG] Found captions in playerResponse`);
+                logger.log(`Found captions in playerResponse`);
               }
               
               captions = playerResponse?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
               
               if (captions) {
-                console.log(`[DEBUG] Successfully extracted captions from playerResponse`);
+                logger.log(`Successfully extracted captions from playerResponse`);
               }
             } catch (e) {
-              console.log(`[DEBUG] Error parsing nested playerResponse:`, e);
+              logger.log(`Error parsing nested playerResponse:`, e);
             }
           }
           
           // Additional search in playerConfig structure
           if (!captions && data?.playerConfig?.audioConfig?.captionList) {
-            console.log(`[DEBUG] Trying audioConfig.captionList location`);
+            logger.log(`Trying audioConfig.captionList location`);
             captions = data.playerConfig.audioConfig.captionList;
             if (captions) {
-              console.log(`[DEBUG] Found captions in audioConfig`);
+              logger.log(`Found captions in audioConfig`);
             }
           }
                           
           if (captions && captions.length > 0) {
-            console.log(`[DEBUG] Processing ${captions.length} caption tracks`);
+            logger.log(`Processing ${captions.length} caption tracks`);
             
             // Log all caption tracks for debugging
             captions.forEach((track: any, index: number) => {
-              console.log(`[DEBUG] Caption track ${index}:`, 
+              logger.log(`Caption track ${index}:`, 
                 `kind=${track.kind || 'N/A'}`, 
                 `name=${track.name?.simpleText || track.name || 'N/A'}`,
                 `baseUrl length=${track.baseUrl ? track.baseUrl.length : 0}`);
@@ -402,52 +420,52 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
             const autoCaption = captions.find((track: { kind: string, baseUrl: string }) => track.kind === 'asr');
             if (autoCaption) {
               captionUrl = autoCaption.baseUrl;
-              console.log(`[DEBUG] Found auto-generated caption URL: ${captionUrl}`);
+              logger.log(`Found auto-generated caption URL: ${captionUrl}`);
             } else {
               // Fall back to first available caption
               captionUrl = captions[0].baseUrl;
-              console.log(`[DEBUG] Found caption URL in JSON data: ${captionUrl}`);
+              logger.log(`Found caption URL in JSON data: ${captionUrl}`);
             }
           } else {
-            console.log(`[DEBUG] No caption tracks found in JSON data`);
+            logger.log(`No caption tracks found in JSON data`);
           }
         } catch (jsonError) {
-          console.error(`[DEBUG] Error parsing JSON data from HTML:`, jsonError);
+          logger.error(`Error parsing JSON data from HTML:`, jsonError);
         }
       } else {
-        console.log(`[DEBUG] No JSON data match found in HTML`);
+        logger.log(`No JSON data match found in HTML`);
       }
     }
     
     // Additional search for timedtext using simplified approach
     if (!captionUrl) {
-      console.log(`[DEBUG] Trying simplified timedtext search`);
+      logger.log(`Trying simplified timedtext search`);
       // Simply look for text matching timedtext with video ID
       if (html.includes(`timedtext?v=${videoId}`)) {
-        console.log(`[DEBUG] Found basic timedtext reference for video ID`);
+        logger.log(`Found basic timedtext reference for video ID`);
         
         // Extract minimal working URL
         const basicUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=json3`;
-        console.log(`[DEBUG] Generated basic caption URL: ${basicUrl}`);
+        logger.log(`Generated basic caption URL: ${basicUrl}`);
         
         // Verify if this URL works by making a request
         try {
           const testResponse = await fetch(basicUrl);
           if (testResponse.ok) {
-            console.log(`[DEBUG] Basic caption URL is valid`);
+            logger.log(`Basic caption URL is valid`);
             captionUrl = basicUrl;
           } else {
-            console.log(`[DEBUG] Basic caption URL returned ${testResponse.status}`);
+            logger.log(`Basic caption URL returned ${testResponse.status}`);
           }
         } catch (e) {
-          console.log(`[DEBUG] Error testing basic caption URL:`, e);
+          logger.log(`Error testing basic caption URL:`, e);
         }
       }
     }
     
     // If no caption URL found after all attempts
     if (!captionUrl) {
-      console.log(`[DEBUG] No caption URL found after all attempts`);
+      logger.log(`No caption URL found after all attempts`);
       
       // Search for specific indicators that captions exist but couldn't be accessed
       const hasCaptionsIndicator = html.includes('"hasCaptions":true') || 
@@ -455,13 +473,13 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
                                 html.includes('{"captionTracks":');
                                 
       if (hasCaptionsIndicator) {
-        console.log(`[DEBUG] Found indicators that captions exist but couldn't be accessed`);
+        logger.log(`Found indicators that captions exist but couldn't be accessed`);
       }
       
       // Check for a specific indicator that captions are disabled
       if (html.includes('"playerCaptionsTracklistRenderer":{}') || 
           html.includes('"captionTracks":[]')) {
-        console.log(`[DEBUG] Found explicit indicators that captions are disabled`);
+        logger.log(`Found explicit indicators that captions are disabled`);
         throw new Error('Captions are disabled for this video');
       }
       
@@ -469,18 +487,18 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
     }
     
     captionUrl = decodeURIComponent(captionUrl);
-    console.log(`[DEBUG] Processing transcript URL: ${captionUrl}`);
+    logger.log(`Processing transcript URL: ${captionUrl}`);
     
     // Add parameters if they're not present (lang, format, etc.)
     if (!captionUrl.includes('&lang=')) {
       // Check if there's a tlang parameter already
       if (!captionUrl.includes('&tlang=')) {
-        console.log(`[DEBUG] Adding lang parameter`);
+        logger.log(`Adding lang parameter`);
         captionUrl += '&lang=en';
       }
     }
     if (!captionUrl.includes('&fmt=')) {
-      console.log(`[DEBUG] Adding fmt parameter`);
+      logger.log(`Adding fmt parameter`);
       captionUrl += '&fmt=json3';
     }
     
@@ -494,7 +512,7 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
         ? captionUrl.replace(/&fmt=[^&]+/, '&fmt=json3') 
         : captionUrl + '&fmt=json3';
         
-      console.log(`[DEBUG] Trying JSON format: ${jsonUrl}`);
+      logger.log(`Trying JSON format: ${jsonUrl}`);
       const jsonResponse = await fetch(jsonUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
@@ -502,23 +520,23 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
       });
       
       if (jsonResponse.ok) {
-        console.log(`[DEBUG] JSON response OK, status: ${jsonResponse.status}`);
+        logger.log(`JSON response OK, status: ${jsonResponse.status}`);
         const jsonData = await jsonResponse.json();
-        console.log(`[DEBUG] JSON data parsed successfully`);
+        logger.log(`JSON data parsed successfully`);
         
         if (jsonData.events && jsonData.events.length > 0) {
-          console.log(`[DEBUG] Found ${jsonData.events.length} JSON events`);
+          logger.log(`Found ${jsonData.events.length} JSON events`);
           transcriptData = jsonData;
           format = 'json';
         } else {
-          console.log(`[DEBUG] JSON data doesn't contain events or is empty`);
+          logger.log(`JSON data doesn't contain events or is empty`);
         }
       } else {
-        console.log(`[DEBUG] JSON response failed with status: ${jsonResponse.status}`);
+        logger.log(`JSON response failed with status: ${jsonResponse.status}`);
       }
     } catch (jsonError) {
-      console.log(`[DEBUG] JSON format failed with error:`, jsonError);
-      console.log(`[DEBUG] Falling back to XML format`);
+      logger.log(`JSON format failed with error:`, jsonError);
+      logger.log(`Falling back to XML format`);
     }
     
     // If JSON failed, try XML format
@@ -527,7 +545,7 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
         ? captionUrl.replace(/&fmt=[^&]+/, '&fmt=srv1') 
         : captionUrl + '&fmt=srv1';
         
-      console.log(`[DEBUG] Trying XML format: ${xmlUrl}`);
+      logger.log(`Trying XML format: ${xmlUrl}`);
       const xmlResponse = await fetch(xmlUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
@@ -535,21 +553,21 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
       });
       
       if (!xmlResponse.ok) {
-        console.log(`[DEBUG] XML response failed with status: ${xmlResponse.status}`);
+        logger.log(`XML response failed with status: ${xmlResponse.status}`);
         throw new Error(`Failed to fetch transcript: ${xmlResponse.status}`);
       }
       
       transcriptData = await xmlResponse.text();
-      console.log(`[DEBUG] XML data retrieved, length: ${transcriptData.length}`);
+      logger.log(`XML data retrieved, length: ${transcriptData.length}`);
     }
     
     // Try a direct YouTube API request if we still don't have data
     if (!transcriptData) {
-      console.log(`[DEBUG] All caption format attempts failed, trying direct API request`);
+      logger.log(`All caption format attempts failed, trying direct API request`);
       
       // Create a very basic YouTube API URL for captions
       const directApiUrl = `https://www.youtube.com/api/timedtext?v=${videoId}&lang=en&fmt=srv3&xorb=2&xobt=3&xovt=3`;
-      console.log(`[DEBUG] Making direct API request: ${directApiUrl}`);
+      logger.log(`Making direct API request: ${directApiUrl}`);
       
       try {
         const directResponse = await fetch(directApiUrl, {
@@ -561,33 +579,33 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
         });
         
         if (directResponse.ok) {
-          console.log(`[DEBUG] Direct API request successful`);
+          logger.log(`Direct API request successful`);
           const directData = await directResponse.text();
           
           if (directData && directData.length > 100) {
-            console.log(`[DEBUG] Direct API data retrieved, length: ${directData.length}`);
+            logger.log(`Direct API data retrieved, length: ${directData.length}`);
             transcriptData = directData;
             format = 'xml'; // Assume XML format for this request
           } else {
-            console.log(`[DEBUG] Direct API returned empty or too short data: ${directData}`);
+            logger.log(`Direct API returned empty or too short data: ${directData}`);
           }
         } else {
-          console.log(`[DEBUG] Direct API request failed: ${directResponse.status}`);
+          logger.log(`Direct API request failed: ${directResponse.status}`);
         }
       } catch (directError) {
-        console.log(`[DEBUG] Direct API request error:`, directError);
+        logger.log(`Direct API request error:`, directError);
       }
     }
     
     // If we still don't have data, try with some hardcoded language options
     if (!transcriptData) {
-      console.log(`[DEBUG] Trying with specific language options`);
+      logger.log(`Trying with specific language options`);
       const languagesToTry = ['en', 'en-US', 'en-GB', 'pt', 'pt-BR', 'es', 'fr', ''];
       
       for (const lang of languagesToTry) {
         try {
           const langUrl = `https://www.youtube.com/api/timedtext?v=${videoId}${lang ? `&lang=${lang}` : ''}&fmt=json3`;
-          console.log(`[DEBUG] Trying language: ${lang || 'default'} with URL: ${langUrl}`);
+          logger.log(`Trying language: ${lang || 'default'} with URL: ${langUrl}`);
           
           const langResponse = await fetch(langUrl, {
             headers: {
@@ -598,31 +616,31 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
           if (langResponse.ok) {
             const langData = await langResponse.json();
             if (langData.events && langData.events.length > 0) {
-              console.log(`[DEBUG] Found working language: ${lang || 'default'}`);
+              logger.log(`Found working language: ${lang || 'default'}`);
               transcriptData = langData;
               format = 'json';
               break;
             } else {
-              console.log(`[DEBUG] No events found for language: ${lang || 'default'}`);
+              logger.log(`No events found for language: ${lang || 'default'}`);
             }
           } else {
-            console.log(`[DEBUG] Failed for language: ${lang || 'default'} with status: ${langResponse.status}`);
+            logger.log(`Failed for language: ${lang || 'default'} with status: ${langResponse.status}`);
           }
         } catch (langError) {
-          console.log(`[DEBUG] Error trying language ${lang || 'default'}:`, langError);
+          logger.log(`Error trying language ${lang || 'default'}:`, langError);
         }
       }
     }
     
     // If we still don't have transcript data after all attempts
     if (!transcriptData) {
-      console.log(`[DEBUG] All caption retrieval methods failed`);
+      logger.log(`All caption retrieval methods failed`);
       throw new Error('Could not retrieve caption data after multiple attempts');
     }
     
     // Parse based on the format we got
     const segments = [];
-    console.log(`[DEBUG] Parsing transcript data in ${format} format`);
+    logger.log(`Parsing transcript data in ${format} format`);
     
     if (format === 'json') {
       // Parse JSON format
@@ -658,25 +676,25 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
     }
     
     if (segments.length === 0) {
-      console.log(`[DEBUG] No transcript segments found after parsing`);
+      logger.log(`No transcript segments found after parsing`);
       throw new Error('No transcript segments found');
     }
     
-    console.log(`[DEBUG] Parsed ${segments.length} transcript segments`);
+    logger.log(`Parsed ${segments.length} transcript segments`);
     
     // Format the transcript with timestamps
     const formattedTranscript = segments.map(
       part => `[${formatTimestamp(part.start)}] ${part.text}`
     ).join(' ');
     
-    console.log(`[DEBUG] Final transcript length: ${formattedTranscript.length}`);
+    logger.log(`Final transcript length: ${formattedTranscript.length}`);
     
     return { 
       transcript: formattedTranscript,
       isYouTubeTranscript: true
     };
   } catch (error) {
-    console.error(`[DEBUG] Error in direct YouTube transcript fetch:`, error);
+    logger.error(`Error in direct YouTube transcript fetch:`, error);
     throw error;
   }
 }
@@ -686,14 +704,14 @@ async function fetchYouTubeTranscriptDirect(videoId: string): Promise<{ transcri
  */
 async function getTranscriptWithSupadata(videoId: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
   try {
-    console.log(`[Supadata] Fetching transcript for video ID: ${videoId}`);
+    logger.log(`Fetching transcript for video ID: ${videoId}`);
     
     const youtubeUrl = `https://www.youtube.com/watch?v=${videoId}`;
     
     // Set up timeout handling with AbortController (8 seconds to stay under Vercel's 10s limit)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      console.log('[Supadata] Request timed out, aborting...');
+      logger.log(`Request timed out, aborting...`);
       controller.abort();
     }, 8000);
     
@@ -712,16 +730,16 @@ async function getTranscriptWithSupadata(videoId: string): Promise<{ transcript:
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[Supadata] API Error (${response.status}): ${errorText}`);
+        logger.error(`API Error (${response.status}): ${errorText}`);
         
         // If language might be the issue, try again with explicit English
         if (response.status === 404 || errorText.includes('language')) {
-          console.log('[Supadata] Trying with explicit language parameter (en)...');
+          logger.log(`Trying with explicit language parameter (en)...`);
           
           // Set up a new timeout for the second request
           const langController = new AbortController();
           const langTimeoutId = setTimeout(() => {
-            console.log('[Supadata] Language-specific request timed out, aborting...');
+            logger.log(`Language-specific request timed out, aborting...`);
             langController.abort();
           }, 8000);
           
@@ -777,12 +795,12 @@ async function getTranscriptWithSupadata(videoId: string): Promise<{ transcript:
       
       if (!data.content || typeof data.content !== 'string' || data.content.length === 0) {
         // If plain text is empty, try with structured format
-        console.log('[Supadata] Plain text content empty, trying structured format...');
+        logger.log(`Plain text content empty, trying structured format...`);
         
         // Set up a new timeout for the structured format request
         const structController = new AbortController();
         const structTimeoutId = setTimeout(() => {
-          console.log('[Supadata] Structured format request timed out, aborting...');
+          logger.log(`Structured format request timed out, aborting...`);
           structController.abort();
         }, 8000);
         
@@ -816,7 +834,7 @@ async function getTranscriptWithSupadata(videoId: string): Promise<{ transcript:
             })
             .join(' ');
           
-          console.log(`[Supadata] Successfully retrieved structured transcript (${structuredData.content.length} segments)`);
+          logger.log(`Successfully retrieved structured transcript (${structuredData.content.length} segments)`);
           
           return {
             transcript: formattedTranscript,
@@ -840,7 +858,7 @@ async function getTranscriptWithSupadata(videoId: string): Promise<{ transcript:
         `[${formatTimestamp(index * 5)}] ${line}`
       ).join(' ');
       
-      console.log(`[Supadata] Successfully retrieved plain text transcript (${lines.length} lines)`);
+      logger.log(`Successfully retrieved plain text transcript (${lines.length} lines)`);
       
       return {
         transcript: formattedTranscript,
@@ -857,7 +875,7 @@ async function getTranscriptWithSupadata(videoId: string): Promise<{ transcript:
       throw fetchError;
     }
   } catch (error) {
-    console.error(`[Supadata] Error fetching transcript:`, error);
+    logger.error(`Error fetching transcript:`, error);
     throw error;
   }
 }
@@ -867,12 +885,12 @@ async function getTranscriptWithSupadata(videoId: string): Promise<{ transcript:
  */
 async function getTranscriptWithCustomService(videoId: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
   try {
-    console.log(`[Custom Service] Fetching transcript for video ID: ${videoId}`);
+    logger.log(`Fetching transcript for video ID: ${videoId}`);
     
     // Set up timeout handling with AbortController
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
-      console.log('[Custom Service] Request timed out, aborting...');
+      logger.log(`Request timed out, aborting...`);
       controller.abort();
     }, 30000); // 30 second timeout
     
@@ -893,7 +911,7 @@ async function getTranscriptWithCustomService(videoId: string): Promise<{ transc
       
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[Custom Service] API Error (${response.status}): ${errorText}`);
+        logger.error(`API Error (${response.status}): ${errorText}`);
         throw new Error(`Custom API error: ${response.status} ${errorText}`);
       }
       
@@ -903,7 +921,7 @@ async function getTranscriptWithCustomService(videoId: string): Promise<{ transc
         throw new Error('No transcript returned from custom API');
       }
       
-      console.log(`[Custom Service] Successfully retrieved transcript (${data.transcript.length} chars)`);
+      logger.log(`Successfully retrieved transcript (${data.transcript.length} chars)`);
       
       return {
         transcript: data.transcript,
@@ -917,14 +935,14 @@ async function getTranscriptWithCustomService(videoId: string): Promise<{ transc
       throw error;
     }
   } catch (error) {
-    console.error(`[Custom Service] Error fetching transcript:`, error);
+    logger.error(`Error fetching transcript:`, error);
     throw error;
   }
 }
 
 async function getVideoTranscript(url: string): Promise<{ transcript: string, isYouTubeTranscript: boolean }> {
   try {
-    console.log(`Getting transcript for ${url}...`);
+    logger.log(`Getting transcript for ${url}...`);
     // Extract video ID from URL
     let videoId = '';
     if (url.includes('youtube.com/watch')) {
@@ -938,7 +956,7 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
       throw new Error('Could not extract video ID from URL');
     }
     
-    console.log(`Video ID: ${videoId}`);
+    logger.log(`Video ID: ${videoId}`);
     
     // Track all errors for better debugging
     let customApiError: Error | null = null;
@@ -949,60 +967,60 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
     
     // Method 1: Try Custom API first
     try {
-      console.log('Attempting to get transcript via Custom API...');
+      logger.log('Attempting to get transcript via Custom API...');
       return await getTranscriptWithCustomService(videoId);
     } catch (error) {
-      console.log('Custom API failed with error:', error);
+      logger.log('Custom API failed with error:', error);
       customApiError = error as Error;
-      console.log('Falling back to Supadata API...');
+      logger.log('Falling back to Supadata API...');
     }
     
     // Method 2: Try Supadata API as fallback
     try {
-      console.log('Attempting to get transcript via Supadata API...');
+      logger.log('Attempting to get transcript via Supadata API...');
       return await getTranscriptWithSupadata(videoId);
     } catch (error) {
-      console.log('Supadata API failed with error:', error);
+      logger.log('Supadata API failed with error:', error);
       supadataError = error as Error;
-      console.log('Falling back to direct method...');
+      logger.log('Falling back to direct method...');
     }
     
     // Method 3: Try our direct fetching method
     try {
-      console.log('Attempting direct method to get YouTube captions...');
+      logger.log('Attempting direct method to get YouTube captions...');
       return await fetchYouTubeTranscriptDirect(videoId);
     } catch (error) {
-      console.log('Direct caption fetch method failed with error:', error);
+      logger.log('Direct caption fetch method failed with error:', error);
       directError = error as Error;
-      console.log('Falling back to YouTube transcript library...');
+      logger.log('Falling back to YouTube transcript library...');
     }
     
     // Method 4: Try original YouTube transcript method
     try {
-      console.log('Attempting to get YouTube captions via library...');
+      logger.log('Attempting to get YouTube captions via library...');
       const transcript = await YoutubeTranscript.fetchTranscript(videoId);
       
       if (!transcript || transcript.length === 0) {
         throw new Error('No transcript available for this video');
       }
       
-      console.log('Successfully retrieved YouTube captions!');
+      logger.log('Successfully retrieved YouTube captions!');
       // Join all transcript parts with timestamps
       return { 
         transcript: transcript.map(part => `[${formatTimestamp(part.offset)}] ${part.text}`).join(' '),
         isYouTubeTranscript: true
       };
     } catch (error: any) {
-      console.log('YouTube transcript API failed with error:', error);
+      logger.log('YouTube transcript API failed with error:', error);
       ytError = error;
-      console.log('Falling back to Whisper transcription...');
+      logger.log('Falling back to Whisper transcription...');
       
       // Method 5: Try Whisper transcription
       try {
         const whisperTranscript = await getVideoTranscriptWithWhisper(url);
         return { transcript: whisperTranscript, isYouTubeTranscript: false };
       } catch (wError: any) {
-        console.error('Whisper transcription also failed:', wError);
+        logger.error('Whisper transcription also failed:', wError);
         whisperError = wError;
         
         // No more fallbacks - all methods failed
@@ -1010,7 +1028,7 @@ async function getVideoTranscript(url: string): Promise<{ transcript: string, is
       }
     }
   } catch (error) {
-    console.error('Error getting video transcript:', error);
+    logger.error('Error getting video transcript:', error);
     throw new Error('Failed to get video transcript: ' + (error as Error).message);
   }
 }
@@ -1048,11 +1066,11 @@ async function extractSubject(url: string, content: string): Promise<string> {
         
         const generatedSubject = response.choices[0].message.content?.trim();
         if (generatedSubject && generatedSubject.length > 3) {
-          console.log(`Generated subject: ${generatedSubject}`);
+          logger.log(`Generated subject: ${generatedSubject}`);
           return generatedSubject;
         }
       } catch (aiError) {
-        console.error('Error generating subject with AI:', aiError);
+        logger.error('Error generating subject with AI:', aiError);
         // Continue with fallback methods
       }
     }
@@ -1082,19 +1100,19 @@ async function extractSubject(url: string, content: string): Promise<string> {
     // Default
     return 'Content Analysis';
   } catch (error) {
-    console.error('Error extracting subject:', error);
+    logger.error('Error extracting subject:', error);
     return 'Content Analysis';
   }
 }
 
 export async function POST(request: Request) {
   // Version identifier for deployment verification
-  console.log("=== TEST GENERATOR API v1.2.1 (DEBUG BUILD) ===");
+  logger.log("=== TEST GENERATOR API v1.2.1 (DEBUG BUILD) ===");
   
   try {
     // Check if OpenAI client is available
     if (!openai) {
-      console.error("API ERROR: OpenAI API key is not configured");
+      logger.error("API ERROR: OpenAI API key is not configured");
       return new NextResponse(
         JSON.stringify({ error: "OpenAI API key is not configured" }),
         { 
@@ -1106,14 +1124,14 @@ export async function POST(request: Request) {
       );
     }
     
-    console.log("Starting test generation request processing...");
+    logger.log("Starting test generation request processing...");
     let formData: TestFormData;
     
     try {
       formData = await request.json();
-      console.log(`Received form data with contentUrl: ${formData.contentUrl?.substring(0, 30)}...`);
+      logger.log(`Received form data with contentUrl: ${formData.contentUrl?.substring(0, 30)}...`);
     } catch (parseError) {
-      console.error("Failed to parse request JSON:", parseError);
+      logger.error("Failed to parse request JSON:", parseError);
       return new NextResponse(
         JSON.stringify({ error: "Invalid request data format" }),
         { 
@@ -1133,7 +1151,7 @@ export async function POST(request: Request) {
     });
 
     if (!url) {
-      console.error("Missing contentUrl in request");
+      logger.error("Missing contentUrl in request");
       return new NextResponse(
         JSON.stringify({ error: 'Content URL is required' }),
         { 
@@ -1176,7 +1194,7 @@ export async function POST(request: Request) {
           );
         }
       } catch (error) {
-        console.error('Error getting video transcript:', error);
+        logger.error('Error getting video transcript:', error);
         return new NextResponse(
           JSON.stringify({ error: `Unable to transcribe video: ${(error as Error).message}` }),
           { 
@@ -1192,16 +1210,16 @@ export async function POST(request: Request) {
         let articleContent;
         
         try {
-          console.log('Trying direct method to get article content...');
+          logger.log('Trying direct method to get article content...');
           articleContent = await getArticleContent(url);
         } catch (directError) {
-          console.error('Direct method failed, trying fallback for article content:', directError);
+          logger.error('Direct method failed, trying fallback for article content:', directError);
           
           try {
             articleContent = await getArticleContentFallback(url);
           } catch (fallbackError) {
             // Do not generate content about the URL - that's not acceptable
-            console.error('All extraction methods failed, we cannot process this URL:', fallbackError);
+            logger.error('All extraction methods failed, we cannot process this URL:', fallbackError);
             throw new Error('Unable to extract real content from this URL. Please try a different article URL or a YouTube video instead.');
           }
         }
@@ -1222,7 +1240,7 @@ export async function POST(request: Request) {
           );
         }
       } catch (error) {
-        console.error('All article content methods failed:', error);
+        logger.error('All article content methods failed:', error);
         return new NextResponse(
           JSON.stringify({ error: `Unable to extract content from URL: ${(error as Error).message}` }),
           { 
@@ -1249,12 +1267,12 @@ export async function POST(request: Request) {
     }
 
     // Step 1: Extract subject from content (as a separate step)
-    console.log('Extracting subject from content...');
+    logger.log('Extracting subject from content...');
     try {
       extractedSubject = await extractSubject(url, contentText);
-      console.log(`Extracted subject: "${extractedSubject}"`);
+      logger.log(`Extracted subject: "${extractedSubject}"`);
     } catch (subjectError) {
-      console.error('Error during subject extraction:', subjectError);
+      logger.error('Error during subject extraction:', subjectError);
       extractedSubject = 'English Language Test';
     }
 
@@ -1274,7 +1292,7 @@ export async function POST(request: Request) {
     );
 
     // Step 2: Generate the test based on content and extracted subject
-    console.log('Generating test...');
+    logger.log('Generating test...');
     const completion = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
@@ -1317,7 +1335,7 @@ export async function POST(request: Request) {
       }
     );
   } catch (error) {
-    console.error('Error generating test:', error);
+    logger.error('Error generating test:', error);
     return new NextResponse(
       JSON.stringify({ error: `Failed to generate test: ${(error as Error).message}` }),
       { 

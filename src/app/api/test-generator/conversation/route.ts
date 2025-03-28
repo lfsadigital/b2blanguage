@@ -1,72 +1,93 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { generateConversationPrompt } from '@/app/lib/prompts/test-generator/conversation';
+import { logger } from '@/app/lib/utils/logger';
 
 // Only initialize OpenAI client if API key is available
 const openai = process.env.OPENAI_API_KEY 
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 
+// System message for conversation generation
+const conversationSystemMessage = "You are an expert English teacher creating conversation starters for Brazilian students learning English. Your questions should be clear, engaging, and appropriate for the student's level.";
+
 export async function POST(request: Request) {
   try {
     // Check if OpenAI client is available
     if (!openai) {
-      return NextResponse.json(
-        { error: "OpenAI API key is not configured" },
-        { status: 500 }
+      logger.error("API ERROR: OpenAI API key is not configured");
+      return new NextResponse(
+        JSON.stringify({ error: "OpenAI API key is not configured" }),
+        { 
+          status: 500,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
       );
     }
 
-    const { contentUrl, subject, studentLevel } = await request.json();
+    const { transcript, subject: providedSubject } = await request.json();
     
-    // IMPORTANT: We should ONLY proceed if we have a valid subject from the main content extraction
-    // This ensures we don't generate content based solely on URLs when content extraction failed
-    if (!subject) {
-      console.error('No valid subject provided - this indicates content extraction failed');
-      return NextResponse.json(
-        { error: "Cannot generate conversation questions without valid content extraction" },
-        { status: 400 }
+    if (!transcript) {
+      return new NextResponse(
+        JSON.stringify({ error: 'Transcript is required' }),
+        { 
+          status: 400,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
       );
     }
     
-    // Use the subject that was provided from the successful content extraction
-    const topicSubject = subject;
+    // Use provided subject or a default
+    const topicSubject = providedSubject || 'English conversation practice';
+    logger.log(`Using subject: "${topicSubject}" for conversation questions`);
     
-    console.log(`Using subject: "${topicSubject}" for conversation questions`);
-
-    const prompt = generateConversationPrompt(topicSubject, studentLevel);
-
-    console.log('Generating conversation questions...');
+    // Generate conversation questions
+    logger.log('Generating conversation questions...');
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system",
-          content: "You are an expert English teacher creating conversation starters for Brazilian students learning English. Your questions should be clear, engaging, and appropriate for the student's level."
+          content: conversationSystemMessage
         },
         {
           role: "user",
-          content: prompt
+          content: generateConversationPrompt(transcript, topicSubject)
         }
       ],
       temperature: 0.7,
       max_tokens: 500,
     });
 
-    const conversationQuestions = completion.choices[0].message.content;
+    const generatedQuestions = completion.choices[0].message.content;
     
-    if (!conversationQuestions) {
+    if (!generatedQuestions) {
       throw new Error('Failed to generate conversation questions');
     }
 
-    return NextResponse.json({ 
-      conversationQuestions
-    });
+    return new NextResponse(
+      JSON.stringify({ questions: generatedQuestions }),
+      { 
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
   } catch (error) {
-    console.error('Error generating conversation questions:', error);
-    return NextResponse.json(
-      { error: `Failed to generate conversation questions: ${(error as Error).message}` },
-      { status: 500 }
+    logger.error('Error generating conversation questions:', error);
+    return new NextResponse(
+      JSON.stringify({ error: `Failed to generate conversation questions: ${(error as Error).message}` }),
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
     );
   }
 } 
