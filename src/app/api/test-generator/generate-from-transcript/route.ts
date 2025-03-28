@@ -15,7 +15,7 @@ interface TranscriptRequest {
   studentName?: string;
   studentLevel: string;
   questionTypes: string[];
-  questionCount: number;
+  numberOfQuestions: number;
 }
 
 export async function POST(request: Request) {
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
                 contentUrl: contentUrl,
                 studentLevel: data.studentLevel as StudentLevel,
                 questionTypes: data.questionTypes.map(type => type as QuestionType),
-                numberOfQuestions: data.questionCount || 5, // Default to 5 if not specified
+                numberOfQuestions: data.numberOfQuestions || 5,
                 additionalNotes: "This test is based on a client-extracted transcript."
               },
               subject,

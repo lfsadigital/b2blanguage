@@ -264,7 +264,7 @@ export default function TestGeneratorPage() {
             studentName: data.studentName,
             studentLevel: data.studentLevel,
             questionTypes: data.questionTypes,
-            questionCount: data.numberOfQuestions
+            numberOfQuestions: data.numberOfQuestions
           };
           
           // Set up timeout handling
@@ -320,7 +320,7 @@ export default function TestGeneratorPage() {
               contentUrl: `Transcript: ${transcriptData.transcript.substring(0, 6000)}...`,
               studentLevel: data.studentLevel,
               questionTypes: data.questionTypes,
-              questionCount: data.numberOfQuestions
+              numberOfQuestions: data.numberOfQuestions
             };
             
             // No signal/timeout for fallback to avoid abortion
@@ -352,7 +352,7 @@ export default function TestGeneratorPage() {
               ...data,
               studentLevel: data.studentLevel,
               questionTypes: data.questionTypes,
-              questionCount: data.numberOfQuestions
+              numberOfQuestions: data.numberOfQuestions
             })
           });
         }
@@ -367,7 +367,7 @@ export default function TestGeneratorPage() {
             ...data,
             studentLevel: data.studentLevel,
             questionTypes: data.questionTypes,
-            questionCount: data.numberOfQuestions
+            numberOfQuestions: data.numberOfQuestions
           })
         });
       }
