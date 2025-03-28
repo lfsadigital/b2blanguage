@@ -29,7 +29,7 @@ Test information:
 - Student: ${formData.studentName || 'Not specified'}
 - Student Level: ${formData.studentLevel || 'Intermediate'}
 - Question Types: ${formData.questionTypes ? formData.questionTypes.join(', ') : 'multiple-choice, open-ended'}
-- Number of Questions: ${formData.numberOfQuestions || 5}
+- Number of Questions: ${formData.numberOfQuestions || 5} (IMPORTANT: You MUST create EXACTLY this number of questions, no more, no less)
 - Additional Notes: ${formData.additionalNotes || 'None'}
 - Test Subject: ${extractedSubject}
 - Date: ${today}

@@ -634,6 +634,7 @@ export default function TestGeneratorPage() {
               size: 24,
             }),
           ],
+          spacing: { after: 200 },
         }),
         new docx.Paragraph({
           children: [
@@ -642,6 +643,7 @@ export default function TestGeneratorPage() {
               size: 24,
             }),
           ],
+          spacing: { after: 200 },
         }),
         new docx.Paragraph({
           children: [
@@ -650,6 +652,7 @@ export default function TestGeneratorPage() {
               size: 24,
             }),
           ],
+          spacing: { after: 200 },
         }),
         new docx.Paragraph({
           children: [
@@ -658,6 +661,7 @@ export default function TestGeneratorPage() {
               size: 24,
             }),
           ],
+          spacing: { after: 200 },
         }),
         new docx.Paragraph({
           children: [
@@ -666,33 +670,19 @@ export default function TestGeneratorPage() {
               size: 24,
             }),
           ],
+          spacing: { after: 400 },
         }),
-        // Spacer
-        new docx.Paragraph({
-          children: [new docx.TextRun({ text: " ", size: 24 })],
-        }),
-        // Test content
-        new docx.Paragraph({
-          children: [
-            new docx.TextRun({
-              text: generatedContent.testContent,
-              size: 24,
-            }),
-          ],
-        }),
-        // Spacer
-        new docx.Paragraph({
-          children: [new docx.TextRun({ text: " ", size: 24 })],
-        }),
+        
         // Questions header
         new docx.Paragraph({
           children: [
             new docx.TextRun({
               text: "Questions:",
-              size: 24,
+              size: 28,
               bold: true,
             }),
           ],
+          spacing: { after: 400 },
         }),
       ];
       
@@ -705,8 +695,10 @@ export default function TestGeneratorPage() {
               new docx.TextRun({
                 text: `${idx + 1}) ${q.question}${q.reference ? ` [Ref: ${q.reference}]` : ''}`,
                 size: 24,
+                bold: true,
               }),
             ],
+            spacing: { after: 200 },
           })
         );
         
@@ -721,6 +713,8 @@ export default function TestGeneratorPage() {
                     size: 24,
                   }),
                 ],
+                spacing: { after: 200 },
+                indent: { left: 720 }, // Indent options for better readability
               })
             );
           });
@@ -730,6 +724,7 @@ export default function TestGeneratorPage() {
         documentParagraphs.push(
           new docx.Paragraph({
             children: [new docx.TextRun({ text: " ", size: 24 })],
+            spacing: { after: 200 },
           })
         );
       });
@@ -737,9 +732,6 @@ export default function TestGeneratorPage() {
       // Add URL reference at the bottom if available
       if (generatedContent.contentUrl) {
         documentParagraphs.push(
-          new docx.Paragraph({
-            children: [new docx.TextRun({ text: "\n", size: 24 })],
-          }),
           new docx.Paragraph({
             children: [
               new docx.TextRun({
@@ -749,6 +741,7 @@ export default function TestGeneratorPage() {
                 color: "888888"
               }),
             ],
+            spacing: { after: 200 },
           })
         );
       }
@@ -775,17 +768,14 @@ export default function TestGeneratorPage() {
       });
     } catch (error) {
       console.error('Error exporting to Word:', error);
-      alert('There was an error exporting to Word. Falling back to text file.');
+      alert('There was an error exporting to Word document. Falling back to text file.');
       
       // Fallback to plain text if document generation fails
-      const docContent = `
-Student: ${generatedContent.studentName}
+      const docContent = `Student: ${generatedContent.studentName}
 Teacher: ${generatedContent.teacherName}
 Subject: ${generatedContent.subject}
 Date: ${generatedContent.testDate}
 Grade: _______________
-
-${generatedContent.testContent}
 
 Questions:
 ${generatedContent.questions.map((q, idx) => {
@@ -799,16 +789,15 @@ ${generatedContent.questions.map((q, idx) => {
   }
   
   return questionText;
-}).join('\n\n')}
-`;
+}).join('\n\n')}`;
 
       const element = document.createElement('a');
-      const file = new Blob([docContent], {type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+      const file = new Blob([docContent], {type: 'text/plain'});
       element.href = URL.createObjectURL(file);
       
       const formattedDate = generatedContent.testDate.replace(/\//g, '-');
       const fileName = `${generatedContent.studentName.replace(/\s+/g, '_').toLowerCase()}_${formattedDate}`;
-      element.download = `${fileName}.docx`;
+      element.download = `${fileName}.txt`;
       
       document.body.appendChild(element);
       element.click();

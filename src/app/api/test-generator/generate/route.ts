@@ -1512,7 +1512,7 @@ export async function POST(request: Request) {
       const testData = {
         url: url,
         transcript: content.substring(0, 5000), // Limit to 5k chars to avoid Firestore limits
-        subject: extractedSubject || 'Unknown Subject',
+        subject: extractedSubject || 'Unknown',
         testQuestions: questions || 'No questions generated',
         studentLevel: formData.studentLevel || 'Unknown',
         studentId: formData.studentId || 'Unknown',
@@ -1587,7 +1587,20 @@ export async function POST(request: Request) {
         test: generatedTest,
         questions: questions,
         answers: answers,
-        subject: extractedSubject.replace(/,/g, ' ').replace(/\s+/g, ' ').trim(), // Clean subject before returning
+        subject: extractedSubject
+          .replace(/,/g, ' ')
+          .replace(/\s+/g, ' ')
+          .replace(/^(how|what|why|when)\s+/i, '')  // Remove starting question words
+          .replace(/^(the|a|an)\s+/i, '')           // Remove starting articles
+          .replace(/\s+(the|a|an)\s+/gi, ' ')       // Replace articles in the middle with spaces
+          .replace(/\s+in\s+/gi, ' ')               // Clean up common prepositions
+          .replace(/\s+of\s+/gi, ' ')
+          .replace(/\s+with\s+/gi, ' ')
+          .replace(/\s+for\s+/gi, ' ')
+          .replace(/\s+to\s+/gi, ' ')
+          .replace(/\s+and\s+/gi, ' ')
+          .replace(/\s+/g, ' ')                     // Clean up multiple spaces again
+          .trim(),
         transcriptSource: transcriptSource,
         firebaseSaveAttempted: true 
       }),
