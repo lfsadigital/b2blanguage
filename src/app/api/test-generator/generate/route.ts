@@ -1599,6 +1599,7 @@ export async function POST(request: Request) {
           .replace(/\s+for\s+/gi, ' ')
           .replace(/\s+to\s+/gi, ' ')
           .replace(/\s+and\s+/gi, ' ')
+          .replace(/\s+(and|or|but|so|yet|nor)\s*$/i, '')  // Remove conjunctions at the end
           .replace(/\s+/g, ' ')                     // Clean up multiple spaces again
           .trim(),
         transcriptSource: transcriptSource,

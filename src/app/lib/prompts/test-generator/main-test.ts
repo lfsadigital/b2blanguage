@@ -66,6 +66,10 @@ IMPORTANT FORMATTING REQUIREMENTS:
    
    Answers:
    
-7. For the answer section, only include the question number and the answer, not the full question
-   Example: "1) B" or "2) The correct answer discusses..."
+7. For the answer section:
+   - For multiple-choice questions: Only include the question number and the letter answer (e.g., "1) B")
+   - For true/false questions: Only include the question number and "True" or "False" (e.g., "7) True")
+   - For open-ended questions: Include a VERY brief answer of MAXIMUM 8 WORDS (e.g., "3) Key characteristics of effective communication")
+   
+8. DO NOT include phrases like "This is an open-ended question about..." in your answers. Keep answers direct and concise.
    `;

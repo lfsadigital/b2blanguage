@@ -814,7 +814,7 @@ ${generatedContent.questions.map((q, idx) => {
       
       // Create PDF content with student name included and add Last Class Diary content
       const pdfContent = `
-${generatedContent.subject} - Teaching Materials
+Subject: ${generatedContent.subject} - Teaching Materials
 
 Student: ${generatedContent.studentName}
 Teacher: ${generatedContent.teacherName}
@@ -829,7 +829,7 @@ ${generatedContent.questions.map((q, idx) => {
   } else if (q.type === 'true-false') {
     return `${idx + 1}) Answer: ${q.correctAnswer !== undefined ? (q.correctAnswer ? 'True' : 'False') : 'True'}`;
   } else {
-    return `${idx + 1}) Sample answer: This is an open-ended question about ${q.question.substring(0, 30)}...`;
+    return `${idx + 1}) Brief answer: ${q.question.substring(0, 30)}...`;
   }
 }).join('\n')}
 
@@ -898,7 +898,7 @@ ${lastClassDiary.notes || 'No notes provided'}`
       
       // Fallback to plain text if PDF generation fails
       const pdfContent = `
-${generatedContent.subject} - Teaching Materials
+Subject: ${generatedContent.subject} - Teaching Materials
 
 Student: ${generatedContent.studentName}
 Teacher: ${generatedContent.teacherName}
@@ -912,7 +912,7 @@ ${generatedContent.questions.map((q, idx) => {
   } else if (q.type === 'true-false') {
     return `${idx + 1}) Answer: ${q.correctAnswer !== undefined ? (q.correctAnswer ? 'True' : 'False') : 'True'}`;
   } else {
-    return `${idx + 1}) Sample answer: This is an open-ended question about ${q.question.substring(0, 30)}...`;
+    return `${idx + 1}) Brief answer: ${q.question.substring(0, 30)}...`;
   }
 }).join('\n')}
 
@@ -964,7 +964,7 @@ ${lastClassDiary.notes || 'No notes provided'}`
       
       // Create PDF content with both test questions and materials
       const pdfContent = `
-${generatedContent.subject}
+Subject: ${generatedContent.subject}
 
 Student: ${generatedContent.studentName}
 Teacher: ${generatedContent.teacherName}
@@ -996,7 +996,7 @@ ${generatedContent.questions.map((q, idx) => {
   } else if (q.type === 'true-false') {
     return `${idx + 1}) Answer: ${q.correctAnswer !== undefined ? (q.correctAnswer ? 'True' : 'False') : 'True'}`;
   } else {
-    return `${idx + 1}) Sample answer: This is an open-ended question about ${q.question.substring(0, 30)}...`;
+    return `${idx + 1}) Brief answer: ${q.question.substring(0, 30)}...`;
   }
 }).join('\n')}
 
