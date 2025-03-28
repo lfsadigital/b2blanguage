@@ -574,3 +574,72 @@ export const updateAllExistingRelationships = async (): Promise<void> => {
     throw error;
   }
 };
+
+/**
+ * Saves test generation data to Firestore for analysis and debugging
+ * This helps track AI outputs, transcripts, and other data for improving test generation
+ */
+export interface TestGenerationData {
+  url: string;             // The original URL provided by the user
+  transcript?: string;     // The extracted transcript or article content
+  subject: string;         // The subject extracted or generated
+  testQuestions: string;   // The generated test questions
+  conversationTopics?: string; // The generated conversation topics
+  teachingTips?: string;   // The generated teaching tips
+  studentLevel: string;    // The student level (beginner, medium, advanced)
+  studentId?: string;      // The student ID (if available)
+  teacherId?: string;      // The teacher ID (if available)
+  questionCount: number;   // The number of questions requested
+  timestamp: any;          // Server timestamp for when it was saved
+  isVideo: boolean;        // Whether it was a video or article
+  processingTime?: number; // How long it took to generate everything (ms)
+  errors?: string[];       // Any errors that occurred during generation
+}
+
+/**
+ * Save test generation data to Firestore for analysis
+ * This is helpful for debugging issues with AI outputs and transcripts
+ */
+export const saveTestGenerationData = async (data: Omit<TestGenerationData, 'timestamp'>): Promise<string> => {
+  try {
+    const testDataCollection = collection(db, 'testGenerationData');
+    
+    // Add server timestamp
+    const docWithTimestamp = {
+      ...data,
+      timestamp: serverTimestamp()
+    };
+    
+    // Save to Firestore
+    const docRef = await addDoc(testDataCollection, docWithTimestamp);
+    return docRef.id;
+  } catch (error) {
+    console.error('Error saving test generation data:', error);
+    // Don't throw - this is non-critical logging
+    return 'error';
+  }
+};
+
+/**
+ * Retrieve test generation data for analysis
+ * @param limit Maximum number of records to retrieve
+ */
+export const getTestGenerationData = async (limit: number = 100): Promise<TestGenerationData[]> => {
+  try {
+    const testDataCollection = collection(db, 'testGenerationData');
+    const q = query(testDataCollection);
+    const querySnapshot = await getDocs(q);
+    
+    const data = querySnapshot.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data() as TestGenerationData
+      }))
+      .slice(0, limit);
+    
+    return data as TestGenerationData[];
+  } catch (error) {
+    console.error('Error getting test generation data:', error);
+    return [];
+  }
+};

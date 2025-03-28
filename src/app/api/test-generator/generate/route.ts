@@ -13,6 +13,7 @@ import { generateSubjectExtractionPrompt } from '@/app/lib/prompts/test-generato
 import { generateTestPrompt } from '@/app/lib/prompts/test-generator/main-test';
 import { generateContentExtractionPrompt, contentExtractionSystemMessage } from '@/app/lib/prompts/test-generator/content-extraction';
 import { logger } from '@/app/lib/utils/logger';
+import { saveTestGenerationData } from '@/lib/firebase/firebaseUtils';
 
 // Supadata API Key (will be moved to environment variables)
 const SUPADATA_API_KEY = process.env.SUPADATA_API_KEY || '';
@@ -1043,25 +1044,106 @@ function formatTimestamp(seconds: number): string {
 // Extract a meaningful subject from the URL or content
 async function extractSubject(url: string, content: string): Promise<string> {
   try {
-    // First, try using the OpenAI to generate a concise subject
+    // For YouTube videos, try to extract the title from the page
+    if (url.includes('youtube.com') || url.includes('youtu.be')) {
+      try {
+        // Extract video ID
+        let videoId = '';
+        if (url.includes('youtube.com/watch')) {
+          const urlObj = new URL(url);
+          videoId = urlObj.searchParams.get('v') || '';
+        } else if (url.includes('youtu.be/')) {
+          videoId = url.split('youtu.be/')[1].split('?')[0];
+        }
+        
+        if (videoId) {
+          // Fetch the YouTube page to get the title
+          const response = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36'
+            }
+          });
+          
+          if (response.ok) {
+            const html = await response.text();
+            // Try to extract title from meta tags
+            const titleMatch = html.match(/<title>([^<]+)<\/title>/);
+            if (titleMatch && titleMatch[1]) {
+              let title = titleMatch[1].replace(' - YouTube', '').trim();
+              // Clean up the title
+              title = title
+                .replace(/^\d+\s*[-:]\s*/, '') // Remove leading numbers like "1 - " or "1: "
+                .replace(/\s*\|.*$/, '')       // Remove pipe and anything after
+                .replace(/^(welcome|hi|hello|hey)\s+to\s+/i, '') // Remove common intro phrases
+                .trim();
+              
+              logger.log(`Extracted YouTube title: ${title}`);
+              return title;
+            }
+          }
+        }
+      } catch (error) {
+        logger.error('Error fetching YouTube title:', error);
+        // Continue with fallback methods
+      }
+    }
+    
+    // For articles, try to extract title from HTML
+    if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
+      try {
+        const response = await fetch(url, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+          }
+        });
+        
+        if (response.ok) {
+          const html = await response.text();
+          // Try to extract title from meta tags
+          const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/) || 
+                            html.match(/<meta[^>]*property="og:title"[^>]*content="([^"]+)"/) ||
+                            html.match(/<meta[^>]*name="twitter:title"[^>]*content="([^"]+)"/);
+          
+          if (titleMatch && titleMatch[1]) {
+            let title = titleMatch[1].trim();
+            // Clean up the title
+            title = title
+              .replace(/\s*\|.*$/, '')       // Remove pipe and anything after
+              .replace(/\s*-.*$/, '')        // Remove dash and anything after (often site names)
+              .trim();
+            
+            logger.log(`Extracted article title: ${title}`);
+            return title;
+          }
+        }
+      } catch (error) {
+        logger.error('Error fetching article title:', error);
+        // Continue with fallback methods
+      }
+    }
+
+    // Fallback to OpenAI if title extraction failed and API key is available
     if (openai) {
       try {
-        const subjectPrompt = generateSubjectExtractionPrompt(content);
+        // Take first 200 chars of content for a quick subject extraction
+        const cleanedContent = content
+          .replace(/\[\d+:\d+\]/g, '')  // Remove timestamps
+          .substring(0, 200);  // Take a reasonable chunk to analyze
         
         const response = await openai.chat.completions.create({
           model: "gpt-3.5-turbo",
           messages: [
             {
               role: "system",
-              content: "You are an expert at identifying main topics and themes in content."
+              content: "Create a brief, descriptive title (3-7 words) for an English language test based on this content."
             },
             {
               role: "user",
-              content: subjectPrompt
+              content: cleanedContent
             }
           ],
           temperature: 0.3,
-          max_tokens: 50,
+          max_tokens: 30,
         });
         
         const generatedSubject = response.choices[0].message.content?.trim();
@@ -1075,22 +1157,13 @@ async function extractSubject(url: string, content: string): Promise<string> {
       }
     }
     
-    // Try to extract title from URL if it's YouTube
-    if (url.includes('youtube.com') || url.includes('youtu.be')) {
-      // Get the title part from the URL if available
-      const titleMatch = url.match(/title=([^&]+)/);
-      if (titleMatch && titleMatch[1]) {
-        return decodeURIComponent(titleMatch[1]).replace(/\+/g, ' ');
-      }
-    }
-    
-    // Fallback: Extract likely subject from the first few sentences
-    const firstFewSentences = content.split(/[.!?]/).slice(0, 3).join('. ');
+    // Last fallback: Extract likely subject from the first few sentences
+    const firstFewSentences = content.split(/[.!?]/).slice(0, 2).join('. ');
     
     if (firstFewSentences.length > 10) {
       // Try to extract a cleaner subject
       const cleanSubject = firstFewSentences
-        .substring(0, 100)
+        .substring(0, 60)
         .replace(/\[[\d:]+\]/g, '') // Remove timestamps
         .trim();
       
@@ -1098,10 +1171,10 @@ async function extractSubject(url: string, content: string): Promise<string> {
     }
     
     // Default
-    return 'Content Analysis';
+    return 'English Language Test';
   } catch (error) {
     logger.error('Error extracting subject:', error);
-    return 'Content Analysis';
+    return 'English Language Test';
   }
 }
 
@@ -1109,10 +1182,17 @@ export async function POST(request: Request) {
   // Version identifier for deployment verification
   logger.log("=== TEST GENERATOR API v1.2.1 (DEBUG BUILD) ===");
   
+  // Start timing the request for performance tracking
+  const startTime = Date.now();
+  
+  // Track errors for logging purposes
+  const errors: string[] = [];
+  
   try {
     // Check if OpenAI client is available
     if (!openai) {
       logger.error("API ERROR: OpenAI API key is not configured");
+      errors.push("OpenAI API key not configured");
       return new NextResponse(
         JSON.stringify({ error: "OpenAI API key is not configured" }),
         { 
@@ -1132,6 +1212,7 @@ export async function POST(request: Request) {
       logger.log(`Received form data with contentUrl: ${formData.contentUrl?.substring(0, 30)}...`);
     } catch (parseError) {
       logger.error("Failed to parse request JSON:", parseError);
+      errors.push(`Request parse error: ${(parseError as Error).message}`);
       return new NextResponse(
         JSON.stringify({ error: "Invalid request data format" }),
         { 
@@ -1152,6 +1233,7 @@ export async function POST(request: Request) {
 
     if (!url) {
       logger.error("Missing contentUrl in request");
+      errors.push("Missing contentUrl in request");
       return new NextResponse(
         JSON.stringify({ error: 'Content URL is required' }),
         { 
@@ -1183,6 +1265,7 @@ export async function POST(request: Request) {
           contentText = transcript; // Store for subject extraction
           hasContent = true;
         } else {
+          errors.push("Video transcript too short or empty");
           return new NextResponse(
             JSON.stringify({ error: 'Video transcript is too short or empty' }),
             { 
@@ -1195,6 +1278,7 @@ export async function POST(request: Request) {
         }
       } catch (error) {
         logger.error('Error getting video transcript:', error);
+        errors.push(`Transcript error: ${(error as Error).message}`);
         return new NextResponse(
           JSON.stringify({ error: `Unable to transcribe video: ${(error as Error).message}` }),
           { 
@@ -1214,12 +1298,14 @@ export async function POST(request: Request) {
           articleContent = await getArticleContent(url);
         } catch (directError) {
           logger.error('Direct method failed, trying fallback for article content:', directError);
+          errors.push(`Direct content extraction failed: ${(directError as Error).message}`);
           
           try {
             articleContent = await getArticleContentFallback(url);
           } catch (fallbackError) {
             // Do not generate content about the URL - that's not acceptable
             logger.error('All extraction methods failed, we cannot process this URL:', fallbackError);
+            errors.push(`Fallback content extraction failed: ${(fallbackError as Error).message}`);
             throw new Error('Unable to extract real content from this URL. Please try a different article URL or a YouTube video instead.');
           }
         }
@@ -1229,6 +1315,7 @@ export async function POST(request: Request) {
           contentText = articleContent; // Store for subject extraction
           hasContent = true;
         } else {
+          errors.push("Article content too short or empty");
           return new NextResponse(
             JSON.stringify({ error: 'Article content is too short or empty' }),
             { 
@@ -1241,6 +1328,7 @@ export async function POST(request: Request) {
         }
       } catch (error) {
         logger.error('All article content methods failed:', error);
+        errors.push(`Content extraction error: ${(error as Error).message}`);
         return new NextResponse(
           JSON.stringify({ error: `Unable to extract content from URL: ${(error as Error).message}` }),
           { 
@@ -1255,6 +1343,7 @@ export async function POST(request: Request) {
     
     // Verify we have content before proceeding
     if (!hasContent) {
+      errors.push("No content extracted");
       return new NextResponse(
         JSON.stringify({ error: 'No content was extracted from the provided URL' }),
         { 
@@ -1273,6 +1362,7 @@ export async function POST(request: Request) {
       logger.log(`Extracted subject: "${extractedSubject}"`);
     } catch (subjectError) {
       logger.error('Error during subject extraction:', subjectError);
+      errors.push(`Subject extraction error: ${(subjectError as Error).message}`);
       extractedSubject = 'English Language Test';
     }
 
@@ -1312,6 +1402,7 @@ export async function POST(request: Request) {
     const generatedTest = completion.choices[0].message.content;
     
     if (!generatedTest) {
+      errors.push("Failed to generate test content");
       throw new Error('Failed to generate test content');
     }
     
@@ -1319,6 +1410,31 @@ export async function POST(request: Request) {
     const parts = generatedTest.split('---');
     const questions = parts[0].trim();
     const answers = parts.length > 1 ? parts[1].trim() : '';
+
+    // End timing
+    const endTime = Date.now();
+    const processingTime = endTime - startTime;
+    logger.log(`Test generation completed in ${processingTime}ms`);
+
+    // Log test generation data to Firebase
+    try {
+      await saveTestGenerationData({
+        url: url,
+        transcript: contentText.substring(0, 10000), // Limit to 10k chars to avoid Firestore limits
+        subject: extractedSubject,
+        testQuestions: questions,
+        studentLevel: formData.studentLevel,
+        studentId: formData.studentId,
+        teacherId: formData.professorId,
+        questionCount: formData.numberOfQuestions,
+        isVideo: isVideo,
+        processingTime: processingTime,
+        errors: errors.length > 0 ? errors : undefined
+      });
+    } catch (logError) {
+      // Don't fail the request if logging fails
+      logger.error('Error logging test generation data:', logError);
+    }
 
     return new NextResponse(
       JSON.stringify({ 
@@ -1336,6 +1452,25 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     logger.error('Error generating test:', error);
+    errors.push(`Final error: ${(error as Error).message}`);
+
+    // Try to log the error to Firebase even if test generation failed
+    try {
+      await saveTestGenerationData({
+        url: "error-generating-test",
+        subject: "Error",
+        testQuestions: "Error generating test: " + (error as Error).message,
+        studentLevel: "unknown",
+        questionCount: 0,
+        isVideo: false,
+        processingTime: Date.now() - startTime,
+        errors: errors
+      });
+    } catch (logError) {
+      // Just continue if logging fails
+      logger.error('Error logging test generation error:', logError);
+    }
+
     return new NextResponse(
       JSON.stringify({ error: `Failed to generate test: ${(error as Error).message}` }),
       { 

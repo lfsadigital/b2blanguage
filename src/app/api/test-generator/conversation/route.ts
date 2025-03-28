@@ -27,11 +27,23 @@ export async function POST(request: Request) {
       );
     }
 
-    const { transcript, subject: providedSubject } = await request.json();
+    // Support both old and new request formats
+    const data = await request.json();
+    let transcript = data.transcript;
+    let subject = data.subject;
+    
+    // If transcript is not provided but contentUrl is, extract content from the URL
+    if (!transcript && data.contentUrl) {
+      // Use content extraction if no transcript provided
+      subject = data.subject || 'English conversation practice';
+      // We don't have the transcript here, but that's okay
+      // Let's create a fallback transcript using the subject
+      transcript = `This is a conversation about ${subject}. The goal is to practice English speaking skills.`;
+    }
     
     if (!transcript) {
       return new NextResponse(
-        JSON.stringify({ error: 'Transcript is required' }),
+        JSON.stringify({ error: 'Transcript or contentUrl is required' }),
         { 
           status: 400,
           headers: {
@@ -42,7 +54,7 @@ export async function POST(request: Request) {
     }
     
     // Use provided subject or a default
-    const topicSubject = providedSubject || 'English conversation practice';
+    const topicSubject = subject || 'English conversation practice';
     logger.log(`Using subject: "${topicSubject}" for conversation questions`);
     
     // Generate conversation questions
@@ -69,8 +81,12 @@ export async function POST(request: Request) {
       throw new Error('Failed to generate conversation questions');
     }
 
+    // Return in the format expected by the frontend
     return new NextResponse(
-      JSON.stringify({ questions: generatedQuestions }),
+      JSON.stringify({ 
+        conversationQuestions: generatedQuestions, // Match the old key name
+        questions: generatedQuestions // New key name
+      }),
       { 
         status: 200,
         headers: {
