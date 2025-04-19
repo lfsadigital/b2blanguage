@@ -51,6 +51,8 @@ Make sure the questions:
 Return ONLY the questions and answers, formatted exactly as shown above.`;
 }
 
+// Remove the old prompt function as it's no longer used and causes type errors
+/*
 export const generateTestPromptOld = (
   url: string,
   contentInfo: string,
@@ -124,3 +126,4 @@ IMPORTANT FORMATTING REQUIREMENTS:
    
 8. DO NOT include phrases like "This is an open-ended question about..." in your answers. Keep answers direct and concise.
    `;
+*/
