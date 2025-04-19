@@ -1132,7 +1132,7 @@ ${lastClassDiary.notes || 'No notes provided'}`
                           } else if (q.type === 'true-false') {
                             return (
                               <div key={idx} className="space-y-2">
-                                <p className="font-medium">{idx + 1}) {q.question}</p>
+                                <p className="font-medium">{idx + 1}) {q.question} (True/False)</p>
                                 {q.reference && <p className="text-sm text-gray-500">[Ref: {q.reference}]</p>}
                               </div>
                             );

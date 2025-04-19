@@ -53,11 +53,24 @@ export async function POST(request: Request) {
         ? data.transcript.substring(0, MAX_TRANSCRIPT_LENGTH) + "... [transcript truncated for processing]"
         : data.transcript;
       
-      // Extract subject (simplified for this route)
+      // AI-based subject extraction from transcript
       let subject = 'Video Transcript Content';
-      const firstFewSentences = transcript.split(/[.!?]/).slice(0, 2).join('. ');
-      if (firstFewSentences.length > 10) {
-        subject = firstFewSentences.substring(0, 80).replace(/\[[\d:]+\]/g, '').trim() || subject;
+      if (openai) {
+        try {
+          const subResponse = await openai.chat.completions.create({
+            model: 'gpt-3.5-turbo',
+            messages: [
+              { role: 'system', content: 'Create a brief, descriptive title (3-7 words) for this transcript.' },
+              { role: 'user', content: transcript }
+            ],
+            temperature: 0.3,
+            max_tokens: 10
+          });
+          const generatedTitle = subResponse.choices[0].message.content?.trim();
+          if (generatedTitle) subject = generatedTitle;
+        } catch (e) {
+          console.error('Subject extraction error:', e);
+        }
       }
       
       console.log("Generating test with OpenAI...");
