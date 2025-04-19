@@ -50,6 +50,8 @@ Make sure the questions:
 4. Are grammatically correct
 5. Follow the exact format specified above
 6. Use the exact phrase 'according to the transcript' at most once; for other questions use varied phrasing such as 'based on the content' or 'from the material provided'.
+7. Vary the correct multiple choice answer positions across A–D (do not always use A).
+8. For true/false questions, mix True and False answers so they are not always True.
 
 Return ONLY the questions and answers, formatted exactly as shown above.`;
 }
