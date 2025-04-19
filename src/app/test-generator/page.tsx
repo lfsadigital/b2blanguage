@@ -487,27 +487,18 @@ export default function TestGeneratorPage() {
       
       // Update all generated content at once
       if (testData && testData.subject) {
-        // Fix poorly formatted subjects with commas - use a more aggressive approach
-        let cleanSubject = testData.subject;
-        
-        // Check if subject contains any commas (we'll clean it regardless)
-        if (cleanSubject.includes(',')) {
-          // Replace all commas with spaces and normalize whitespace
-          cleanSubject = cleanSubject.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
-        }
-        
-        // Use a properly formatted date
-        const formattedDate = new Date().toLocaleDateString();
+        // Clean subject by removing commas and extra whitespace
+        let cleanSubject = testData.subject.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
         
         // Update state with API response
         setGeneratedContent({
-          testTitle: '',
-          testContent: cleanTestContent(testData.test),
+          testTitle: testData.testTitle || '',
+          testContent: testData.testContent || '',
           studentName: data.studentName || 'Student',
           teacherName: data.professorName || currentTeacher?.displayName || 'Teacher',
-          testDate: formattedDate,
+          testDate: testData.testDate || new Date().toLocaleDateString(),
           subject: cleanSubject,
-          questions: parsedQuestions,
+          questions: testData.questions || [],
           conversationTopics: conversationTopics,
           teachingTips: teachingTips,
           contentUrl: data.contentUrl,
