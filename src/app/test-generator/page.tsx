@@ -264,14 +264,13 @@ export default function TestGeneratorPage() {
             progress: 30
           });
           
-          // Use optimized parameters for faster processing
+          // CORRECTED: Use questionCounts instead of questionTypes/numberOfQuestions
           const requestBody = {
             transcript: transcriptData.transcript,
             teacherName: data.professorName,
             studentName: data.studentName,
             studentLevel: data.studentLevel,
-            questionTypes: data.questionTypes,
-            numberOfQuestions: data.numberOfQuestions
+            questionCounts: data.questionCounts // Pass the counts object
           };
           
           // Set up timeout handling
@@ -284,7 +283,7 @@ export default function TestGeneratorPage() {
               headers: {
                 'Content-Type': 'application/json',
               },
-              body: JSON.stringify(requestBody),
+              body: JSON.stringify(requestBody), // Use updated requestBody
               signal: controller.signal
             });
             
@@ -322,12 +321,12 @@ export default function TestGeneratorPage() {
               progress: 40
             });
             
+            // CORRECTED: Use questionCounts in fallbackBody
             const fallbackBody = {
-              ...data,
+              ...data, // Spread original data first
               contentUrl: `Transcript: ${transcriptData.transcript.substring(0, 6000)}...`,
-              studentLevel: data.studentLevel,
-              questionTypes: data.questionTypes,
-              numberOfQuestions: data.numberOfQuestions
+              // No need to include questionTypes/numberOfQuestions here, 
+              // as ...data already includes questionCounts
             };
             
             // No signal/timeout for fallback to avoid abortion
@@ -336,7 +335,7 @@ export default function TestGeneratorPage() {
               headers: {
                 'Content-Type': 'application/json'
               },
-              body: JSON.stringify(fallbackBody)
+              body: JSON.stringify(fallbackBody) // Use updated fallbackBody
             });
           }
         } catch (transcriptError) {
@@ -350,32 +349,24 @@ export default function TestGeneratorPage() {
             progress: 30
           });
           
+          // CORRECTED: Pass data directly as it contains questionCounts
           response = await fetch('/api/test-generator/generate', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-              ...data,
-              studentLevel: data.studentLevel,
-              questionTypes: data.questionTypes,
-              numberOfQuestions: data.numberOfQuestions
-            })
+            body: JSON.stringify(data) // Pass the entire data object
           });
         }
       } else {
         // Standard approach for non-YouTube URLs
+        // CORRECTED: Pass data directly as it contains questionCounts
         response = await fetch('/api/test-generator/generate', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({
-            ...data,
-            studentLevel: data.studentLevel,
-            questionTypes: data.questionTypes,
-            numberOfQuestions: data.numberOfQuestions
-          })
+          body: JSON.stringify(data) // Pass the entire data object
         });
       }
       
@@ -401,8 +392,8 @@ export default function TestGeneratorPage() {
       
       console.log('API response data:', testData);
       
-      // Extract questions from the generated test
-      const parsedQuestions = parseQuestions(testData.questions);
+      // CORRECTED: Parse questions from testContent instead of testData.questions
+      const parsedQuestions = parseQuestions(testData.testContent || '');
       
       // Get conversation topics
       let conversationTopics = [];
