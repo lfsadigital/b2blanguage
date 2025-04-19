@@ -13,9 +13,12 @@ interface TranscriptRequest {
   contentUrl?: string;
   teacherName?: string;
   studentName?: string;
-  studentLevel: string;
-  questionTypes: string[];
-  numberOfQuestions: number;
+  studentLevel: StudentLevel;
+  questionCounts: {
+    'multiple-choice': number;
+    'open-ended': number;
+    'true-false': number;
+  };
 }
 
 export async function POST(request: Request) {
@@ -50,75 +53,47 @@ export async function POST(request: Request) {
         ? data.transcript.substring(0, MAX_TRANSCRIPT_LENGTH) + "... [transcript truncated for processing]"
         : data.transcript;
       
-      // Extract a subject from the transcript (first few sentences)
-      const firstFewSentences = transcript.split(/[.!?]/).slice(0, 3).join('. ');
-      let subject = 'Video Content';
-      
+      // Extract subject (simplified for this route)
+      let subject = 'Video Transcript Content';
+      const firstFewSentences = transcript.split(/[.!?]/).slice(0, 2).join('. ');
       if (firstFewSentences.length > 10) {
-        // Try to extract a cleaner subject
-        subject = firstFewSentences
-          .substring(0, 100)
-          .replace(/\[[\d:]+\]/g, '') // Remove timestamps
-          .trim();
+        subject = firstFewSentences.substring(0, 80).replace(/\[[\d:]+\]/g, '').trim() || subject;
       }
-      
-      // Generate the test using the transcript
-      const contentInfo = `Video transcript: ${transcript}`;
-      const contentUrl = data.contentUrl || "https://www.youtube.com/";
       
       console.log("Generating test with OpenAI...");
       
-      // Use a more performance-optimized approach
       const completion = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo-1106", // Using 3.5 instead of 4 for speed
+        model: "gpt-4", // Use GPT-4 as it respects the format better
         messages: [
           {
             role: "system",
-            content: "You are an English language teacher creating tests for business professionals. Generate a test based on the provided transcript. Be concise and focused."
+            content: "You are an English language teacher creating tests. Generate a test based on the provided transcript, strictly following the requested format and question counts."
           },
           {
             role: "user",
             content: generateTestPrompt(
-              contentUrl,
-              contentInfo,
-              {
-                professorName: data.teacherName || '',
-                professorId: '',
-                studentName: data.studentName || '',
-                studentId: '',
-                contentUrl: contentUrl,
-                studentLevel: data.studentLevel as StudentLevel,
-                questionTypes: data.questionTypes.map(type => type as QuestionType),
-                numberOfQuestions: data.numberOfQuestions || 5,
-                additionalNotes: "This test is based on a client-extracted transcript."
-              },
-              subject,
-              new Date().toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              }),
-              "This test is based on a YouTube video transcript."
+              transcript, // Use the transcript as the primary content
+              data.studentLevel,
+              data.questionCounts // Pass the correct question counts object
             )
           }
         ],
-        temperature: 0.5, // Lower temperature for faster, more consistent results
-        max_tokens: 2500, // Limit response size
+        temperature: 0.6,
+        max_tokens: 3000,
       });
       
       const result = completion.choices[0].message.content;
       
       if (!result) {
-        throw new Error("Failed to generate test content");
+        throw new Error("Failed to generate test content from transcript");
       }
       
       // Parse the result to separate questions and answers
-      const sections = parseTestSections(result);
+      const questions = parseQuestions(result);
       
       return NextResponse.json({
-        test: result,
-        questions: sections.questions,
-        answers: sections.answers,
+        testContent: result, // Return the raw content as well
+        questions,
         subject
       });
       
@@ -138,25 +113,71 @@ export async function POST(request: Request) {
   }
 }
 
-/**
- * Parse test content into sections (questions and answers)
- */
-function parseTestSections(content: string) {
-  // Default values
-  let questions = "";
-  let answers = "";
-  
-  // Look for "Questions:" and "Answers:" sections
-  const questionsMatch = content.match(/Questions?:\s*([\s\S]*?)(?=Answers?:|$)/i);
-  const answersMatch = content.match(/Answers?:\s*([\s\S]*?)(?=$)/i);
-  
-  if (questionsMatch && questionsMatch[1]) {
-    questions = questionsMatch[1].trim();
+// Update the parseQuestions function to match the one in the main generate route
+function parseQuestions(testContent: string) {
+  const questions = [];
+  let currentType = '';
+  let currentQuestion: any = {};
+
+  const lines = testContent.split('\n').filter(line => line.trim());
+
+  for (let line of lines) {
+    line = line.trim();
+
+    // Detect question type headers
+    if (line.toLowerCase().startsWith('multiple choice:')) {
+      currentType = 'multiple-choice';
+      continue;
+    } else if (line.toLowerCase().startsWith('open ended:')) {
+      currentType = 'open-ended';
+      continue;
+    } else if (line.toLowerCase().startsWith('true/false:')) {
+      currentType = 'true-false';
+      continue;
+    }
+
+    // Parse question line
+    if (line.match(/^Q\d+\./)) {
+      if (currentQuestion.question) {
+        questions.push(currentQuestion); // Save the previous question
+      }
+      currentQuestion = {
+        type: currentType,
+        question: line.replace(/^Q\d+\./, '').trim(),
+        options: currentType === 'multiple-choice' ? [] : undefined,
+        answer: undefined
+      };
+    } 
+    // Parse multiple choice options
+    else if (currentType === 'multiple-choice' && line.match(/^[a-d]\)/)) {
+      if (!currentQuestion.options) currentQuestion.options = [];
+      currentQuestion.options.push(line.replace(/^[a-d]\)/, '').trim());
+    } 
+    // Parse answer line
+    else if (line.startsWith('Answer:')) {
+      const answerText = line.replace('Answer:', '').trim();
+      if (currentType === 'multiple-choice') {
+        currentQuestion.answer = answerText.charAt(0).toLowerCase(); // Store only the letter
+      } else if (currentType === 'true-false') {
+        currentQuestion.answer = answerText.toLowerCase() === 'true'; // Store boolean
+      } else {
+        currentQuestion.answer = answerText; // Store the full text for open-ended
+      }
+      questions.push(currentQuestion);
+      currentQuestion = {}; // Reset for the next question
+    } 
+    // Parse sample answer line (for open-ended)
+    else if (line.startsWith('Sample Answer:')) {
+      currentQuestion.answer = line.replace('Sample Answer:', '').trim();
+      questions.push(currentQuestion);
+      currentQuestion = {}; // Reset for the next question
+    }
   }
-  
-  if (answersMatch && answersMatch[1]) {
-    answers = answersMatch[1].trim();
+
+  // Add the last parsed question if it exists
+  if (currentQuestion.question) {
+    questions.push(currentQuestion);
   }
-  
-  return { questions, answers };
+
+  return questions;
 } 
