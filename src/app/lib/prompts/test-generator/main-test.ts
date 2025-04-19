@@ -23,6 +23,8 @@ Please generate exactly:
 
 Total questions: ${totalQuestions}
 
+Please arrange the questions in order: first all Multiple Choice, then Open Ended, and finally True/False.
+
 Format each question type as follows:
 
 Multiple Choice:
@@ -47,6 +49,7 @@ Make sure the questions:
 3. Have clear and unambiguous answers
 4. Are grammatically correct
 5. Follow the exact format specified above
+6. Use the exact phrase 'according to the transcript' at most once; for other questions use varied phrasing such as 'based on the content' or 'from the material provided'.
 
 Return ONLY the questions and answers, formatted exactly as shown above.`;
 }
