@@ -299,7 +299,28 @@ export default function TestGeneratorForm({
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Student Level Selection */}
       <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
-        {/* Professor Selection */}
+        {/* Teacher/Professor Selection */}
+        {userProfile === 'Teacher' && currentTeacher && (
+          <div className="sm:col-span-2">
+            <label htmlFor="professorName" className="block text-sm font-medium text-gray-700">
+              Teacher
+            </label>
+            <div className="mt-1 relative rounded-md shadow-sm">
+              <input
+                type="text"
+                id="professorName"
+                name="professorName"
+                value={formData.professorName}
+                disabled
+                className="block w-full rounded-md border-gray-300 bg-gray-100 text-gray-700 sm:text-sm"
+              />
+              <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                <UserCircleIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">Using your profile as the teacher</p>
+          </div>
+        )}
         {(userProfile === 'Owner' || userProfile === 'Manager') && (
           <div className="sm:col-span-2">
             <label htmlFor="professorId" className="block text-sm font-medium text-gray-700">
@@ -359,6 +380,7 @@ export default function TestGeneratorForm({
               placeholder="Enter URL of article or video"
             />
           </div>
+          <p className="mt-1 text-xs text-gray-600">Supports YouTube URLs or web articles for business content analysis</p>
         </div>
 
         {/* Student Level Selection */}
