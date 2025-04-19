@@ -55,8 +55,11 @@ export default function TestGeneratorForm({
     studentId: '',
     contentUrl: '',
     studentLevel: 'Beginner',
-    questionTypes: ['multiple-choice'], // Default selection
-    numberOfQuestions: 5,
+    questionCounts: {
+      'multiple-choice': 1,
+      'open-ended': 1,
+      'true-false': 1
+    },
     additionalNotes: '',
     useTranscriptApproach: false,
     youtubeVideoId: ''
@@ -220,254 +223,195 @@ export default function TestGeneratorForm({
     }
   };
 
-  const handleCheckboxChange = (type: QuestionType) => {
-    setFormData((prev) => {
-      // If the type is already selected, remove it, otherwise add it
-      const newTypes = prev.questionTypes.includes(type)
-        ? prev.questionTypes.filter(t => t !== type)
-        : [...prev.questionTypes, type];
-      
-      // Ensure at least one type is selected
-      return {
-        ...prev,
-        questionTypes: newTypes.length > 0 ? newTypes : prev.questionTypes,
-      };
-    });
-  };
-  
-  const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    const numValue = parseInt(value, 10);
+  const handleQuestionCountChange = (type: QuestionType, value: string) => {
+    const numValue = parseInt(value) || 0;
+    // Ensure the value is between 0 and 25
+    const validValue = Math.min(Math.max(numValue, 0), 25);
     
-    if (!isNaN(numValue) && numValue > 0 && numValue <= 20) {
-      setFormData((prev) => ({
-        ...prev,
-        [name]: numValue,
-      }));
-    }
+    setFormData(prev => ({
+      ...prev,
+      questionCounts: {
+        ...prev.questionCounts,
+        [type]: validValue
+      }
+    }));
   };
+
+  // Replace the existing question type section with number inputs
+  const renderQuestionTypeInputs = () => (
+    <div className="space-y-4">
+      <h3 className="text-lg font-medium">Number of Questions by Type</h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Multiple Choice
+          </label>
+          <input
+            type="number"
+            min="0"
+            max="25"
+            value={formData.questionCounts['multiple-choice']}
+            onChange={(e) => handleQuestionCountChange('multiple-choice', e.target.value)}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          />
+          <p className="mt-1 text-sm text-gray-500">Standard format with options</p>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            Open Ended
+          </label>
+          <input
+            type="number"
+            min="0"
+            max="25"
+            value={formData.questionCounts['open-ended']}
+            onChange={(e) => handleQuestionCountChange('open-ended', e.target.value)}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          />
+          <p className="mt-1 text-sm text-gray-500">Free-form responses</p>
+        </div>
+        
+        <div>
+          <label className="block text-sm font-medium text-gray-700">
+            True/False
+          </label>
+          <input
+            type="number"
+            min="0"
+            max="25"
+            value={formData.questionCounts['true-false']}
+            onChange={(e) => handleQuestionCountChange('true-false', e.target.value)}
+            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm"
+          />
+          <p className="mt-1 text-sm text-gray-500">Binary choice questions</p>
+        </div>
+      </div>
+      <p className="text-sm text-gray-500 mt-2">
+        Maximum 25 questions per type. Total questions: {
+          Object.values(formData.questionCounts).reduce((a, b) => a + b, 0)
+        }
+      </p>
+    </div>
+  );
 
   return (
-    <form onSubmit={handleSubmit} className="form-container p-6">
-      <div className="space-y-8">
-        <div>
-          <h3 className="text-xl font-semibold text-gray-800 apple-heading">Create New Test</h3>
-          <p className="mt-2 text-sm text-gray-600">
-            Enter the details below to generate a customized English test
-          </p>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Student Level Selection */}
+      <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
+        {/* Professor Selection */}
+        {(userProfile === 'Owner' || userProfile === 'Manager') && (
+          <div className="sm:col-span-2">
+            <label htmlFor="professorId" className="block text-sm font-medium text-gray-700">
+              Professor
+            </label>
+            <select
+              id="professorId"
+              name="professorId"
+              value={formData.professorId}
+              onChange={handleChange}
+              className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm rounded-md"
+            >
+              <option value="">Select a professor</option>
+              {teachers.map((teacher) => (
+                <option key={teacher.id} value={teacher.id}>
+                  {teacher.displayName}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Student Selection */}
+        <div className="sm:col-span-2">
+          <label htmlFor="studentId" className="block text-sm font-medium text-gray-700">
+            Student
+          </label>
+          <select
+            id="studentId"
+            name="studentId"
+            value={formData.studentId}
+            onChange={handleChange}
+            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm rounded-md"
+          >
+            <option value="">Select a student</option>
+            {students.map((student) => (
+              <option key={student.id} value={student.id}>
+                {student.displayName}
+              </option>
+            ))}
+          </select>
         </div>
 
-        <div className="grid grid-cols-1 gap-y-6 gap-x-6 sm:grid-cols-2">
-          <div>
-            <label htmlFor="professorId" className="block text-sm font-medium text-gray-800">
-              Teacher Name
-            </label>
-            <div className="mt-1 relative rounded-md shadow-sm">
-              <select
-                id="professorId"
-                name="professorId"
-                className={`mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md ${
-                  userProfile === 'Teacher' ? 'bg-gray-100 cursor-not-allowed' : ''
-                }`}
-                value={formData.professorId}
-                onChange={handleChange}
-                disabled={userProfile === 'Teacher'}
-                required
-              >
-                {userProfile === 'Teacher' && currentTeacher ? (
-                  <option value={currentTeacher.id}>{currentTeacher.displayName}</option>
-                ) : (
-                  <>
-                    <option value="">Select Teacher</option>
-                    {teachers.map(teacher => (
-                      <option key={teacher.id} value={teacher.id}>
-                        {teacher.displayName}
-                      </option>
-                    ))}
-                  </>
-                )}
-              </select>
-              {userProfile === 'Teacher' && currentTeacher && (
-                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <UserCircleIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
-                </div>
-              )}
-            </div>
-            {userProfile === 'Teacher' && currentTeacher && (
-              <p className="mt-1 text-xs text-gray-500">Using your profile as the teacher</p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="studentId" className="block text-sm font-medium text-gray-800">
-              Student Name
-            </label>
-            <div className="mt-1 relative rounded-md shadow-sm">
-              <select
-                id="studentId"
-                name="studentId"
-                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm rounded-md"
-                value={formData.studentId}
-                onChange={handleChange}
-              >
-                <option value="">Select Student</option>
-                {students.map(student => (
-                  <option key={student.id} value={student.id}>
-                    {student.displayName}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="sm:col-span-2">
-            <label htmlFor="contentUrl" className="block text-sm font-medium text-gray-800">
-              Content URL <span className="text-[var(--error)]">*</span>
-            </label>
-            <div className="mt-1 relative rounded-md">
-              <input
-                type="url"
-                name="contentUrl"
-                id="contentUrl"
-                value={formData.contentUrl}
-                onChange={handleChange}
-                required
-                className="block w-full rounded-lg border-gray-300 focus:ring-[#8B4513] focus:border-[#8B4513] sm:text-sm py-3 px-4"
-                placeholder="YouTube video or article URL"
-              />
-              <p className="mt-1 text-xs text-gray-600">
-                Supports YouTube URLs or web articles for business content analysis
-              </p>
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="studentLevel" className="block text-sm font-medium text-gray-800">
-              Student Level
-            </label>
-            <div className="mt-1 relative rounded-md">
-              <select
-                id="studentLevel"
-                name="studentLevel"
-                value={formData.studentLevel}
-                onChange={handleChange}
-                className="block w-full rounded-lg border-gray-300 focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4 appearance-none"
-                style={{ backgroundImage: "url(\"data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e\")", backgroundPosition: "right 0.5rem center", backgroundRepeat: "no-repeat", backgroundSize: "1.5em 1.5em", paddingRight: "2.5rem" }}
-              >
-                <option value="Beginner">Beginner</option>
-                <option value="Medium">Intermediate</option>
-                <option value="Advanced">Advanced</option>
-              </select>
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="numberOfQuestions" className="block text-sm font-medium text-gray-800">
-              Number of Questions
-            </label>
-            <div className="mt-1 relative rounded-md">
-              <input
-                type="number"
-                name="numberOfQuestions"
-                id="numberOfQuestions"
-                value={formData.numberOfQuestions}
-                onChange={handleNumberChange}
-                min="1"
-                max="20"
-                className="block w-full rounded-lg border-gray-300 focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4"
-              />
-            </div>
-          </div>
-
-          <div className="sm:col-span-2 bg-gray-50 p-5 rounded-xl border border-gray-200">
-            <fieldset>
-              <legend className="text-sm font-medium text-black">Question Types</legend>
-              <div className="mt-4 space-y-3">
-                <div className="flex items-center">
-                  <input
-                    id="multiple-choice"
-                    name="questionTypes"
-                    type="checkbox"
-                    checked={formData.questionTypes.includes('multiple-choice')}
-                    onChange={() => handleCheckboxChange('multiple-choice')}
-                    className="h-5 w-5 text-[var(--primary)] focus:ring-[var(--primary)] border-gray-300 rounded"
-                  />
-                  <label htmlFor="multiple-choice" className="ml-3">
-                    <span className="block text-sm font-medium text-black">Multiple Choice</span>
-                    <span className="block text-xs text-gray-800">Standard format with options</span>
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    id="open-ended"
-                    name="questionTypes"
-                    type="checkbox"
-                    checked={formData.questionTypes.includes('open-ended')}
-                    onChange={() => handleCheckboxChange('open-ended')}
-                    className="h-5 w-5 text-[var(--primary)] focus:ring-[var(--primary)] border-gray-300 rounded"
-                  />
-                  <label htmlFor="open-ended" className="ml-3">
-                    <span className="block text-sm font-medium text-black">Open Ended</span>
-                    <span className="block text-xs text-gray-800">Free-form responses</span>
-                  </label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    id="true-false"
-                    name="questionTypes"
-                    type="checkbox"
-                    checked={formData.questionTypes.includes('true-false')}
-                    onChange={() => handleCheckboxChange('true-false')}
-                    className="h-5 w-5 text-[var(--primary)] focus:ring-[var(--primary)] border-gray-300 rounded"
-                  />
-                  <label htmlFor="true-false" className="ml-3">
-                    <span className="block text-sm font-medium text-black">True/False</span>
-                    <span className="block text-xs text-gray-800">Binary choice questions</span>
-                  </label>
-                </div>
-              </div>
-            </fieldset>
-          </div>
-
-          <div className="sm:col-span-2">
-            <label htmlFor="additionalNotes" className="block text-sm font-medium text-gray-800">
-              Additional Notes
-            </label>
-            <div className="mt-1 relative rounded-md">
-              <textarea
-                id="additionalNotes"
-                name="additionalNotes"
-                rows={3}
-                value={formData.additionalNotes}
-                onChange={handleChange}
-                className="block w-full rounded-lg border-gray-300 focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm py-3 px-4"
-                placeholder="Any specific requirements or focus areas for this test..."
-              />
-            </div>
+        {/* Content URL Input */}
+        <div className="sm:col-span-2">
+          <label htmlFor="contentUrl" className="block text-sm font-medium text-gray-700">
+            Content URL
+          </label>
+          <div className="mt-1">
+            <input
+              type="text"
+              name="contentUrl"
+              id="contentUrl"
+              value={formData.contentUrl}
+              onChange={handleChange}
+              className="shadow-sm focus:ring-[var(--primary)] focus:border-[var(--primary)] block w-full sm:text-sm border-gray-300 rounded-md"
+              placeholder="Enter URL of article or video"
+            />
           </div>
         </div>
 
-        <div className="centered-button-container">
+        {/* Student Level Selection */}
+        <div className="sm:col-span-2">
+          <label htmlFor="studentLevel" className="block text-sm font-medium text-gray-700">
+            Student Level
+          </label>
+          <select
+            id="studentLevel"
+            name="studentLevel"
+            value={formData.studentLevel}
+            onChange={handleChange}
+            className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-[var(--primary)] focus:border-[var(--primary)] sm:text-sm rounded-md"
+          >
+            <option value="Beginner">Beginner</option>
+            <option value="Medium">Medium</option>
+            <option value="Advanced">Advanced</option>
+          </select>
+        </div>
+
+        {/* Question Type Inputs */}
+        {renderQuestionTypeInputs()}
+
+        {/* Additional Notes */}
+        <div className="sm:col-span-2">
+          <label htmlFor="additionalNotes" className="block text-sm font-medium text-gray-700">
+            Additional Notes
+          </label>
+          <div className="mt-1">
+            <textarea
+              id="additionalNotes"
+              name="additionalNotes"
+              rows={3}
+              value={formData.additionalNotes}
+              onChange={handleChange}
+              className="shadow-sm focus:ring-[var(--primary)] focus:border-[var(--primary)] block w-full sm:text-sm border border-gray-300 rounded-md"
+              placeholder="Any specific instructions or notes for the test"
+            />
+          </div>
+        </div>
+
+        {/* Submit Button */}
+        <div className="sm:col-span-2">
           <button
             type="submit"
-            disabled={isGenerating || !formData.contentUrl}
-            className={`apple-button inline-flex items-center px-8 py-3 text-base font-medium text-white ${
-              isGenerating || !formData.contentUrl
-                ? 'opacity-50 cursor-not-allowed'
-                : ''
+            disabled={isGenerating}
+            className={`w-full inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white ${
+              isGenerating
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-[var(--primary)] hover:bg-[var(--primary-dark)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--primary)]'
             }`}
           >
-            {isGenerating ? (
-              <>
-                <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Generating...
-              </>
-            ) : (
-              'Generate Test'
-            )}
+            {isGenerating ? 'Generating...' : 'Generate Test'}
           </button>
         </div>
       </div>

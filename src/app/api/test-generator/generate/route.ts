@@ -1242,424 +1242,194 @@ async function saveTestData(data: any): Promise<string> {
   }
 }
 
-export async function POST(request: Request) {
-  // Version identifier for deployment verification
-  logger.log("=== TEST GENERATOR API v1.2.1 (DEBUG BUILD) ===");
-  
-  // Start timing the request for performance tracking
-  const startTime = Date.now();
-  
-  // Track errors for logging purposes
-  const errors: string[] = [];
-  
-  try {
-    // Check if OpenAI client is available
-    if (!openai) {
-      logger.error("API ERROR: OpenAI API key is not configured");
-      errors.push("OpenAI API key not configured");
-      return new NextResponse(
-        JSON.stringify({ error: "OpenAI API key is not configured" }),
-        { 
-          status: 500,
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-    }
-    
-    logger.log("Starting test generation request processing...");
-    let formData: TestFormData;
-    
-    try {
-      formData = await request.json();
-      logger.log(`Received form data with contentUrl: ${formData.contentUrl?.substring(0, 30)}...`);
-    } catch (parseError) {
-      logger.error("Failed to parse request JSON:", parseError);
-      errors.push(`Request parse error: ${(parseError as Error).message}`);
-      return new NextResponse(
-        JSON.stringify({ error: "Invalid request data format" }),
-        { 
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-    }
-    
-    // Validate and provide defaults for form data
-    if (!formData.questionTypes) {
-      formData.questionTypes = ['multiple-choice', 'open-ended'] as QuestionType[]; // Default question types
+// Add this function before the POST handler
+function parseQuestions(testContent: string) {
+  const questions = [];
+  let currentType = '';
+  let currentQuestion: any = {};
+
+  const lines = testContent.split('\n').filter(line => line.trim());
+
+  for (let line of lines) {
+    line = line.trim();
+
+    // Detect question type
+    if (line.toLowerCase().startsWith('multiple choice:')) {
+      currentType = 'multiple-choice';
+      continue;
+    } else if (line.toLowerCase().startsWith('open ended:')) {
+      currentType = 'open-ended';
+      continue;
+    } else if (line.toLowerCase().startsWith('true/false:')) {
+      currentType = 'true-false';
+      continue;
     }
 
-    if (!formData.studentLevel) {
-      formData.studentLevel = 'Medium' as StudentLevel; // Default student level
-    }
-
-    if (!formData.numberOfQuestions) {
-      formData.numberOfQuestions = 5; // Default number of questions
-    }
-
-    // Ensure professorName and studentName are set
-    formData.professorName = formData.professorName || 'Teacher';
-    formData.studentName = formData.studentName || 'Student';
-
-    const url = formData.contentUrl;
-    const today = new Date().toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
-
-    if (!url) {
-      logger.error("Missing contentUrl in request");
-      errors.push("Missing contentUrl in request");
-      return new NextResponse(
-        JSON.stringify({ error: 'Content URL is required' }),
-        { 
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-    }
-
-    // For articles, get the content
-    // For videos, use YouTube Transcript API with Whisper fallback
-    let contentInfo = "";
-    let hasContent = false;
-    let isVideo = false;
-    let hasTimestamps = false;
-    let extractedSubject = "";
-    let contentText = ""; // Store raw content for subject extraction
-    
-    if (url.includes('youtube.com') || url.includes('youtu.be')) {
-      isVideo = true;
-      try {
-        const { transcript, isYouTubeTranscript, source } = await getVideoTranscript(url);
-        hasTimestamps = isYouTubeTranscript;
-        transcriptSource = source; // This is correct - source will contain the method
-        
-        if (transcript && transcript.length > 100) {
-          contentInfo = `Video transcript: ${transcript}`;
-          contentText = transcript; // Store for subject extraction
-          hasContent = true;
-        } else {
-          errors.push("Video transcript too short or empty");
-          return new NextResponse(
-            JSON.stringify({ error: 'Video transcript is too short or empty' }),
-            { 
-              status: 400,
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            }
-          );
-        }
-      } catch (error) {
-        logger.error('Error getting video transcript:', error);
-        errors.push(`Transcript error: ${(error as Error).message}`);
-        return new NextResponse(
-          JSON.stringify({ error: `Unable to transcribe video: ${(error as Error).message}` }),
-          { 
-            status: 400,
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+    // Parse question based on type
+    if (line.match(/^Q\d+\./)) {
+      // Save previous question if exists
+      if (currentQuestion.question) {
+        questions.push(currentQuestion);
       }
+
+      currentQuestion = {
+        type: currentType,
+        question: line.replace(/^Q\d+\./, '').trim(),
+        options: currentType === 'multiple-choice' ? [] : undefined,
+        answer: undefined
+      };
+    } else if (currentType === 'multiple-choice' && line.match(/^[a-d]\)/)) {
+      if (!currentQuestion.options) {
+        currentQuestion.options = [];
+      }
+      currentQuestion.options.push(line.replace(/^[a-d]\)/, '').trim());
+    } else if (line.startsWith('Answer:')) {
+      currentQuestion.answer = line.replace('Answer:', '').trim();
+      
+      // For multiple choice, store just the letter
+      if (currentType === 'multiple-choice') {
+        currentQuestion.answer = currentQuestion.answer.charAt(0).toLowerCase();
+      }
+      
+      // For true/false, normalize to boolean
+      if (currentType === 'true-false') {
+        currentQuestion.answer = currentQuestion.answer.toLowerCase() === 'true';
+      }
+
+      // Add the completed question
+      questions.push(currentQuestion);
+      currentQuestion = {};
+    } else if (line.startsWith('Sample Answer:')) {
+      currentQuestion.answer = line.replace('Sample Answer:', '').trim();
+      
+      // Add the completed question
+      questions.push(currentQuestion);
+      currentQuestion = {};
+    }
+  }
+
+  // Add the last question if not added
+  if (currentQuestion.question) {
+    questions.push(currentQuestion);
+  }
+
+  return questions;
+}
+
+export async function POST(request: Request) {
+  if (!openai) {
+    return NextResponse.json({ error: 'OpenAI API key is not configured' }, { status: 500 });
+  }
+
+  try {
+    const data: TestFormData = await request.json();
+    const { contentUrl, studentLevel, questionCounts, professorName, studentName } = data;
+
+    // Validate input
+    if (!contentUrl) {
+      return NextResponse.json({ error: 'Content URL is required' }, { status: 400 });
+    }
+
+    if (!studentLevel) {
+      return NextResponse.json({ error: 'Student level is required' }, { status: 400 });
+    }
+
+    // Validate question counts
+    const totalQuestions = Object.values(questionCounts).reduce((a, b) => a + b, 0);
+    if (totalQuestions === 0) {
+      return NextResponse.json({ error: 'At least one question type must be selected' }, { status: 400 });
+    }
+    if (totalQuestions > 75) {
+      return NextResponse.json({ error: 'Total number of questions cannot exceed 75' }, { status: 400 });
+    }
+    
+    // Check individual limits
+    for (const [type, count] of Object.entries(questionCounts)) {
+      if (count > 25) {
+        return NextResponse.json({ error: `Number of ${type} questions cannot exceed 25` }, { status: 400 });
+      }
+    }
+
+    let content: string;
+    let isYouTubeTranscript = false;
+
+    // Get content based on URL type
+    if (contentUrl.startsWith('Transcript:')) {
+      content = contentUrl.substring(11); // Remove 'Transcript: ' prefix
+      isYouTubeTranscript = true;
     } else {
       try {
-        let articleContent;
-        
-        try {
-          logger.log('Trying direct method to get article content...');
-          articleContent = await getArticleContent(url);
-        } catch (directError) {
-          logger.error('Direct method failed, trying fallback for article content:', directError);
-          errors.push(`Direct content extraction failed: ${(directError as Error).message}`);
-          
-          try {
-            articleContent = await getArticleContentFallback(url);
-          } catch (fallbackError) {
-            // Do not generate content about the URL - that's not acceptable
-            logger.error('All extraction methods failed, we cannot process this URL:', fallbackError);
-            errors.push(`Fallback content extraction failed: ${(fallbackError as Error).message}`);
-            throw new Error('Unable to extract real content from this URL. Please try a different article URL or a YouTube video instead.');
-          }
-        }
-        
-        if (articleContent && articleContent.length > 100) {
-          contentInfo = `Article content: ${articleContent}`;
-          contentText = articleContent; // Store for subject extraction
-          hasContent = true;
+        if (contentUrl.includes('youtube.com') || contentUrl.includes('youtu.be')) {
+          const transcriptResult = await getVideoTranscript(contentUrl);
+          content = transcriptResult.transcript;
+          isYouTubeTranscript = transcriptResult.isYouTubeTranscript;
+          transcriptSource = transcriptResult.source;
         } else {
-          errors.push("Article content too short or empty");
-          return new NextResponse(
-            JSON.stringify({ error: 'Article content is too short or empty' }),
-            { 
-              status: 400,
-              headers: {
-                'Content-Type': 'application/json'
-              }
-            }
-          );
+          content = await getArticleContent(contentUrl);
         }
       } catch (error) {
-        logger.error('All article content methods failed:', error);
-        errors.push(`Content extraction error: ${(error as Error).message}`);
-        return new NextResponse(
-          JSON.stringify({ error: `Unable to extract content from URL: ${(error as Error).message}` }),
-          { 
-            status: 400,
-            headers: {
-              'Content-Type': 'application/json'
-            }
-          }
-        );
+        logger.error('Error getting content:', error);
+        return NextResponse.json({ error: `Failed to get content: ${(error as Error).message}` }, { status: 500 });
       }
     }
-    
-    // Verify we have content before proceeding
-    if (!hasContent) {
-      errors.push("No content extracted");
-      return new NextResponse(
-        JSON.stringify({ error: 'No content was extracted from the provided URL' }),
-        { 
-          status: 400,
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-    }
 
-    // Step 1: Extract subject from content (as a separate step)
-    logger.log('Extracting subject from content...');
+    // Extract subject from content
+    let subject: string;
     try {
-      extractedSubject = await extractSubject(url, contentText);
-      logger.log(`Extracted subject: "${extractedSubject}"`);
-    } catch (subjectError) {
-      logger.error('Error during subject extraction:', subjectError);
-      errors.push(`Subject extraction error: ${(subjectError as Error).message}`);
-      extractedSubject = 'English Language Test';
-    }
-
-    const videoInstructions = isVideo ? `
-    - Mark each question with a reference to the specific timestamp in the video as [Ref: MM:SS] at the end of the question
-    - Format timestamps as [Ref: 01:13] with minutes and seconds 
-    - ${hasTimestamps ? "Use the exact timestamps from the transcript whenever possible" : "Create appropriate timestamps based on when the content appears in the video"}
-    ` : '';
-
-    const prompt = generateTestPrompt(
-      url,
-      contentInfo,
-      formData,
-      extractedSubject,
-      today,
-      videoInstructions
-    );
-
-    // Step 2: Generate the test based on content and extracted subject
-    logger.log('Generating test...');
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "You are an expert English teacher creating tests to assess language proficiency for Brazilian students. Your tests focus on grammar, vocabulary, reading comprehension, and language use in context."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.7,
-      max_tokens: 4000,
-    });
-
-    const generatedTest = completion.choices[0].message.content;
-    
-    if (!generatedTest) {
-      errors.push("Failed to generate test content");
-      throw new Error('Failed to generate test content');
-    }
-    
-    // Split the test into questions and answers
-    const parts = generatedTest.split('---');
-    const questions = parts[0].trim();
-    const answers = parts.length > 1 ? parts[1].trim() : '';
-
-    // End timing
-    const endTime = Date.now();
-    const processingTime = endTime - startTime;
-    logger.log(`Test generation completed in ${processingTime}ms`);
-
-    // Make Firebase logging more explicit and wait for completion
-    try {
-      console.log('\n\n=== FIREBASE LOGGING ATTEMPT ===');
-      console.log(`URL: ${url}`);
-      console.log(`Subject: ${extractedSubject}`);
-      console.log(`Test questions length: ${questions?.length || 0}`);
-      console.log(`Is video: ${isVideo}`);
-      console.log(`Transcript source: ${transcriptSource}`);
-      
-      // Store the content in a variable first to ensure proper logging if it's undefined
-      const content = contentText ? contentText.substring(0, 10000) : 'No content available';
-      const testData = {
-        url: url,
-        transcript: content.substring(0, 5000), // Limit to 5k chars to avoid Firestore limits
-        subject: extractedSubject || 'Unknown',
-        testQuestions: questions || 'No questions generated',
-        studentLevel: formData.studentLevel || 'Unknown',
-        studentId: formData.studentId || 'Unknown',
-        teacherId: formData.professorId || 'Unknown',
-        questionCount: formData.numberOfQuestions || 0,
-        isVideo: isVideo,
-        processingTime: processingTime,
-        transcriptSource: transcriptSource,
-        errors: errors.length > 0 ? errors : undefined,
-        savedFromRoute: 'test-generator-explicit',
-        version: '1.3.0',
-        timestamp: new Date().toISOString(), // Add explicit timestamp
-        sentToFirebase: true // Flag to check if data was properly constructed
-      };
-      
-      console.log('Firebase test data prepared, attempting to save...');
-      
-      // Use direct save method first with await
-      try {
-        console.log('Saving with direct method first...');
-        const directData = {
-          ...testData,
-          saveMethod: 'direct-primary'
-        };
-        const directResult = await saveTestData(directData);
-        console.log(`Direct save result: ${directResult}`);
-        
-        if (directResult === 'error') {
-          throw new Error('Direct save returned error status');
-        }
-      } catch (directError) {
-        console.error('Failed to save with direct method:', directError);
-        
-        // If direct method fails, try a very simple object
-        try {
-          console.log('Trying minimal data save...');
-          const minimalData = {
-            url: url,
-            subject: extractedSubject || 'Unknown',
-            saveMethod: 'minimal',
-            savedAt: new Date().toISOString()
-          };
-          const minimalResult = await saveTestData(minimalData);
-          console.log(`Minimal save result: ${minimalResult}`);
-        } catch (minimalError) {
-          console.error('Even minimal save failed:', minimalError);
-        }
-      }
-      
-      // Then try the helper method
-      try {
-        console.log('Saving with helper method...');
-        const helperResult = await saveTestGenerationData(testData);
-        console.log(`Helper save result: ${helperResult}`);
-        
-        if (helperResult === 'error') {
-          console.error('Helper method returned error status');
-        }
-      } catch (helperError) {
-        console.error('Failed to save with helper method:', helperError);
-      }
-      
-      console.log('Firebase save operations completed');
-      console.log('=== END FIREBASE LOGGING ATTEMPT ===\n\n');
+      subject = await extractSubject(contentUrl, content);
     } catch (error) {
-      console.error('Error in main Firebase saving block:', error);
+      logger.error('Error extracting subject:', error);
+      subject = 'Business English'; // Default fallback
     }
 
-    // Return response only after Firebase save attempts are complete
-    return new NextResponse(
-      JSON.stringify({ 
-        test: generatedTest,
-        questions: questions,
-        answers: answers,
-        subject: extractedSubject
-          .replace(/,/g, ' ')
-          .replace(/\s+/g, ' ')
-          .replace(/^(how|what|why|when)\s+/i, '')  // Remove starting question words
-          .replace(/^(the|a|an)\s+/i, '')           // Remove starting articles
-          .replace(/\s+(the|a|an)\s+/gi, ' ')       // Replace articles in the middle with spaces
-          .replace(/\s+in\s+/gi, ' ')               // Clean up common prepositions
-          .replace(/\s+of\s+/gi, ' ')
-          .replace(/\s+with\s+/gi, ' ')
-          .replace(/\s+for\s+/gi, ' ')
-          .replace(/\s+to\s+/gi, ' ')
-          .replace(/\s+and\s+/gi, ' ')
-          .replace(/\s+(and|or|but|so|yet|nor)\s*$/i, '')  // Remove conjunctions at the end
-          .replace(/\s+/g, ' ')                     // Clean up multiple spaces again
-          .trim(),
-        transcriptSource: transcriptSource,
-        firebaseSaveAttempted: true 
-      }),
-      { 
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-  } catch (error) {
-    logger.error('Error generating test:', error);
-    errors.push(`Final error: ${(error as Error).message}`);
-
-    // Try to log the error to Firebase even if test generation failed
+    // Generate test using OpenAI
     try {
-      // Try both approaches
-      try {
-        const helperResult = await saveTestGenerationData({
-          url: "error-generating-test",
-          subject: "Error",
-          testQuestions: "Error generating test: " + (error as Error).message,
-          studentLevel: "unknown",
-          questionCount: 0,
-          isVideo: false,
-          processingTime: Date.now() - startTime,
-          errors: errors
-        });
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "user",
+            content: generateTestPrompt(content, studentLevel, questionCounts)
+          }
+        ],
+        temperature: 0.7,
+      });
 
-        const directResult = await saveTestData({
-          url: "error-generating-test",
-          subject: "Error",
-          testQuestions: "Error generating test: " + (error as Error).message,
-          studentLevel: "unknown",
-          questionCount: 0,
-          isVideo: false,
-          processingTime: Date.now() - startTime,
-          saveMethod: 'direct',
-          errors: errors
-        });
-        
-        logger.log(`Error data saved with helper ID: ${helperResult}, direct ID: ${directResult}`);
-      } catch (innnerError) {
-        logger.error('Error saving test error data with helper:', innnerError);
+      const testContent = completion.choices[0].message.content;
+      if (!testContent) {
+        throw new Error('No test content generated');
       }
-    } catch (logError) {
-      // Just continue if logging fails
-      logger.error('Error logging test generation error:', logError);
+
+      // Parse the generated questions
+      const questions = parseQuestions(testContent);
+
+      // Save test data
+      const testData = {
+        testTitle: `${subject} Test`,
+        testContent,
+        studentName,
+        teacherName: professorName,
+        testDate: new Date().toLocaleDateString(),
+        subject,
+        questions,
+        contentUrl,
+        transcriptSource
+      };
+
+      // Save to database
+      const testId = await saveTestData(testData);
+
+      return NextResponse.json({
+        ...testData,
+        id: testId
+      });
+
+    } catch (error) {
+      logger.error('Error generating test:', error);
+      return NextResponse.json({ error: `Failed to generate test: ${(error as Error).message}` }, { status: 500 });
     }
-
-    return new NextResponse(
-      JSON.stringify({ error: `Failed to generate test: ${(error as Error).message}` }),
-      { 
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+  } catch (error) {
+    logger.error('Error processing request:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

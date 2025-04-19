@@ -1,6 +1,57 @@
 import { TestFormData } from '@/app/lib/types';
 
-export const generateTestPrompt = (
+export function generateTestPrompt(
+  content: string,
+  studentLevel: string,
+  questionCounts: {
+    'multiple-choice': number;
+    'open-ended': number;
+    'true-false': number;
+  }
+): string {
+  const totalQuestions = Object.values(questionCounts).reduce((a, b) => a + b, 0);
+  
+  return `Create an English test based on the following content. The test should be appropriate for a ${studentLevel.toLowerCase()} level student.
+
+Content:
+${content}
+
+Please generate exactly:
+- ${questionCounts['multiple-choice']} multiple choice questions
+- ${questionCounts['open-ended']} open-ended questions
+- ${questionCounts['true-false']} true/false questions
+
+Total questions: ${totalQuestions}
+
+Format each question type as follows:
+
+Multiple Choice:
+Q1. [Question text]
+a) [Option]
+b) [Option]
+c) [Option]
+d) [Option]
+Answer: [Correct option letter]
+
+Open Ended:
+Q1. [Question text]
+Sample Answer: [Expected answer or key points]
+
+True/False:
+Q1. [Statement]
+Answer: [True/False]
+
+Make sure the questions:
+1. Test comprehension of the content
+2. Are appropriate for the ${studentLevel.toLowerCase()} level
+3. Have clear and unambiguous answers
+4. Are grammatically correct
+5. Follow the exact format specified above
+
+Return ONLY the questions and answers, formatted exactly as shown above.`;
+}
+
+export const generateTestPromptOld = (
   url: string,
   contentInfo: string,
   formData: TestFormData,
