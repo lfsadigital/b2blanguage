@@ -1,59 +1,96 @@
-import { TestFormData } from '@/app/lib/types';
+import { TestFormData, QuestionType, StudentLevel } from '@/app/lib/types';
 
+// This function now uses the older, more detailed prompt structure
 export function generateTestPrompt(
   content: string,
-  studentLevel: string,
-  questionCounts: {
-    'multiple-choice': number;
-    'open-ended': number;
-    'true-false': number;
-  }
+  studentLevel: StudentLevel,
+  questionCounts: { [key in QuestionType]: number },
+  formData: Omit<TestFormData, 'questionCounts' | 'studentLevel'>,
+  url: string,
+  contentInfo: string,
+  extractedSubject: string,
+  today: string,
+  videoInstructions: string
 ): string {
   const totalQuestions = Object.values(questionCounts).reduce((a, b) => a + b, 0);
   
-  return `Create an English test based on the following content. The test should be appropriate for a ${studentLevel.toLowerCase()} level student.
+  // Construct the question counts string dynamically
+  const questionCountsString = Object.entries(questionCounts)
+    .filter(([_, count]) => count > 0)
+    .map(([type, count]) => `- ${count} ${type.replace('-', ' ')} questions`)
+    .join('\n');
 
-Content:
-${content}
+  // The restored detailed prompt template
+  return `You are an expert English teacher creating a language proficiency test for Brazilian students. 
+Your task is to create an English test (with questions and answers) based ONLY on the provided content, focusing primarily on assessing English language skills (grammar, vocabulary, comprehension) rather than subject knowledge.
 
+DO NOT make up or invent any facts, information, or data that is not present in the content. Stick strictly to what's in the provided text.
+
+Remember that this is primarily an ENGLISH TEST - use the content as material to test language skills, not to test deep knowledge about the subject itself.
+
+For example, if the content is about soccer, focus on testing vocabulary used in the video/article, grammar structures, reading/listening comprehension, etc. - not on testing the student's knowledge of soccer rules or techniques.
+
+At least one question should be directly based on a small excerpt (no longer than three paragraphs) from the content, asking students to interpret, summarize, or identify key information from it. However, avoid simply copying large portions of the text
+as part of the question—focus on testing understanding rather than memorization. 
+
+Make sure to vary the wording when crating the questions (for instance, don't repreat 'according to the content xxx' in 2+ questions).
+
+For multiple choice questions, make sure to vary the answers (A, B, C, D and not always the same letter as the correct answer). Same for true/false questions.
+
+If you do not receive content to use it for the test, do not create the test. You are not to make up any information, nor any input.
+Content URL: ${url}
+${contentInfo}
+
+Test information:
+- Professor: ${formData.professorName || 'Not specified'}
+- Student: ${formData.studentName || 'Not specified'}
+- Student Level: ${studentLevel || 'Intermediate'}
 Please generate exactly:
-- ${questionCounts['multiple-choice']} multiple choice questions
-- ${questionCounts['open-ended']} open-ended questions
-- ${questionCounts['true-false']} true/false questions
+${questionCountsString}
+- Total questions: ${totalQuestions} (IMPORTANT: You MUST create EXACTLY this total number of questions, respecting the counts per type)
+- Additional Notes: ${formData.additionalNotes || 'None'}
+- Test Subject: ${extractedSubject}
+- Date: ${today}
 
-Total questions: ${totalQuestions}
+${videoInstructions}
 
-Please arrange the questions in order: first all Multiple Choice, then Open Ended, and finally True/False.
+IMPORTANT FORMATTING REQUIREMENTS:
 
-Format each question type as follows:
+1. Format the test header as follows:
+   Professor: ${formData.professorName || 'Not specified'}
+   Student: ${formData.studentName || 'Not specified'}
+   Test about ${extractedSubject}
+   Date: ${today}
+   
+   Questions:
+   
+2. Number questions using the format "1)" rather than "1."
 
-Multiple Choice:
-Q1. [Question text]
-a) [Option]
-b) [Option]
-c) [Option]
-d) [Option]
-Answer: [Correct option letter]
+3. For multiple choice questions:
+   - Provide options as A), B), C), and D)
+   - Only provide one correct answer
+   - Include an appropriate reference timestamp for video content when possible
 
-Open Ended:
-Q1. [Question text]
-Sample Answer: [Expected answer or key points]
+4. For open-ended questions:
+   - Make clear what type of answer is expected (short answer, complete sentence, etc.)
+   
+5. After all questions, include a divider line "---" on its own line
 
-True/False:
-Q1. [Statement]
-Answer: [True/False]
-
-Make sure the questions:
-1. Test comprehension of the content
-2. Are appropriate for the ${studentLevel.toLowerCase()} level
-3. Have clear and unambiguous answers
-4. Are grammatically correct
-5. Follow the exact format specified above
-6. Use the exact phrase 'according to the transcript' at most once; for other questions use varied phrasing such as 'based on the content' or 'from the material provided'.
-7. Vary the correct multiple choice answer positions across A–D (do not always use A).
-8. For true/false questions, mix True and False answers so they are not always True.
-
-Return ONLY the questions and answers, formatted exactly as shown above.`;
+6. After the divider, format the answer key header the same way:
+   Professor: ${formData.professorName || 'Not specified'}
+   Student: ${formData.studentName || 'Not specified'}
+   Test about ${extractedSubject}
+   Date: ${today}
+   
+   Answers:
+   
+7. For the answer section:
+   - For multiple-choice questions: Only include the question number and the letter answer (e.g., "1) B")
+   - For true/false questions: Only include the question number and "True" or "False" (e.g., "7) True")
+   - For open-ended questions: Include a VERY brief answer of MAXIMUM 1 sentence (e.g., "3) Key characteristics of effective communication")
+   
+8. DO NOT include phrases like "This is an open-ended question about..." in your answers. Keep answers direct and concise.
+   `;
 }
 
 // Remove the old prompt function as it's no longer used and causes type errors
