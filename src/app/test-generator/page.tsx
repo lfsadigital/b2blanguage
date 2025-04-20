@@ -826,16 +826,16 @@ ${generatedContent.questions.map((q: any, idx: number) => {
   }
   const prefix = q.type === 'open-ended' ? 'Brief answer: ' : 'Answer: ';
   return `${idx + 1}) ${prefix}${answerText}`;
-}).join('\\n')}
+}).join('\n')}
 
 ===================== CONVERSATION TOPICS =====================
 
-${generatedContent.conversationTopics.map((topic, index) => `${index + 1}. ${topic}`).join('\\n')}
+${generatedContent.conversationTopics.map((topic, index) => `${index + 1}. ${topic}`).join('\n')}
 
 ===================== TEACHING TIPS =====================
 
 ${generatedContent.teachingTips.length > 0
-  ? generatedContent.teachingTips.map(tip => `${tip.category}:\\n${tip.content}`).join('\\n\\n')
+  ? generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).join('\n\n')
   : `Vocabulary:\n1. Extract (verb) - to remove or take out something from a source...\n2. Automation (noun) - the use of technology to perform tasks with minimal human intervention...\n\nGrammar:\nPresent Simple Tense for describing processes...\n\nPronunciation:\nFocus on word stress in technology terminology...`}
 
 ===================== LAST CLASS DIARY =====================
