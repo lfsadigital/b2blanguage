@@ -93,6 +93,85 @@ IMPORTANT FORMATTING REQUIREMENTS:
    `;
 }
 
+// New prompt function specifically for pre-processed transcripts
+export function generateTranscriptTestPrompt(
+  transcript: string,
+  studentLevel: StudentLevel,
+  questionCounts: { [key in QuestionType]: number }
+): string {
+  const totalQuestions = Object.values(questionCounts).reduce((a, b) => a + b, 0);
+  
+  const questionCountsString = Object.entries(questionCounts)
+    .filter(([_, count]) => count > 0)
+    .map(([type, count]) => `- ${count} ${type.replace('-', ' ')} questions`)
+    .join('\n');
+
+  // Simplified prompt focusing only on the provided transcript
+  // Using basic student/teacher names as placeholders since full formData isn't available
+  const today = new Date().toLocaleDateString();
+  const subject = 'Video Transcript Content'; // Generic subject
+
+  return `You are an expert English teacher creating a language proficiency test for Brazilian students. 
+Your task is to create an English test (with questions and answers) based ONLY on the provided TRANSCRIPT CONTENT below, focusing primarily on assessing English language skills (grammar, vocabulary, comprehension).
+
+TRANSCRIPT CONTENT:
+${transcript}
+
+DO NOT make up or invent any facts, information, or data that is not present in the transcript.
+Remember that this is primarily an ENGLISH TEST - use the transcript as material to test language skills.
+At least one question should be directly based on a small excerpt from the transcript.
+Make sure to vary the wording when creating the questions.
+For multiple choice questions, make sure to vary the answers (A, B, C, D).
+
+Test information:
+- Professor: Teacher
+- Student: Student
+- Student Level: ${studentLevel || 'Intermediate'}
+Please generate exactly:
+${questionCountsString}
+- Total questions: ${totalQuestions} (IMPORTANT: You MUST create EXACTLY this total number of questions, respecting the counts per type)
+- Test Subject: ${subject}
+- Date: ${today}
+
+IMPORTANT FORMATTING REQUIREMENTS:
+
+1. Format the test header as follows:
+   Professor: Teacher
+   Student: Student
+   Test about ${subject}
+   Date: ${today}
+   
+   Questions:
+   
+2. Number questions using the format "1)" rather than "1."
+
+3. For multiple choice questions:
+   - Provide options as A), B), C), and D)
+   - Only provide one correct answer
+   - Include an appropriate reference timestamp (e.g., [1:23]) if present in the transcript content before the question.
+
+4. For open-ended questions:
+   - Make clear what type of answer is expected (short answer, complete sentence, etc.)
+   
+5. After all questions, include a divider line "---" on its own line
+
+6. After the divider, format the answer key header the same way:
+   Professor: Teacher
+   Student: Student
+   Test about ${subject}
+   Date: ${today}
+   
+   Answers:
+   
+7. For the answer section:
+   - For multiple-choice questions: Only include the question number and the letter answer (e.g., "1) B")
+   - For true/false questions: Only include the question number and "True" or "False" (e.g., "7) True")
+   - For open-ended questions: Include a VERY brief answer of MAXIMUM 1 sentence.
+   
+8. DO NOT include phrases like "This is an open-ended question about..." in your answers. Keep answers direct and concise.
+   `;
+}
+
 // Remove the old prompt function as it's no longer used and causes type errors
 /*
 export const generateTestPromptOld = (

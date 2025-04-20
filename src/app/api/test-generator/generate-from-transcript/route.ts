@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { generateTestPrompt } from '@/app/lib/prompts/test-generator/main-test';
+import { generateTranscriptTestPrompt } from '@/app/lib/prompts/test-generator/main-test';
 import { StudentLevel, QuestionType } from '@/app/lib/types';
 
 // Initialize OpenAI client
@@ -75,41 +75,19 @@ export async function POST(request: Request) {
       
       console.log("Generating test with OpenAI...");
       
-      // Prepare arguments for the detailed generateTestPrompt function
-      const today = new Date().toLocaleDateString();
-      const formDataForPrompt = {
-        professorName: data.teacherName || 'Teacher',
-        studentName: data.studentName || 'Student',
-        professorId: '', // Not available in this request
-        studentId: '',   // Not available in this request
-        contentUrl: data.contentUrl || '', // Use contentUrl if provided
-        additionalNotes: '', // Not available in this request
-        useTranscriptApproach: true, // Explicitly set for this route
-        youtubeVideoId: '' // Not directly used by prompt, but required by type
-      };
-      const urlForPrompt = data.contentUrl || 'Transcript Source';
-      const contentInfoForPrompt = 'Transcript provided directly.'; // Placeholder
-      const videoInstructionsForPrompt = ''; // No video instructions for transcript
-
       const completion = await openai.chat.completions.create({
         model: "gpt-4", 
         messages: [
           {
             role: "system",
-            content: "You are an English language teacher creating tests..."
+            content: "You are an expert English teacher creating a language proficiency test based on the provided transcript."
           },
           {
             role: "user",
-            content: generateTestPrompt(
+            content: generateTranscriptTestPrompt(
               transcript,
               data.studentLevel,
-              data.questionCounts,
-              formDataForPrompt,
-              urlForPrompt,
-              contentInfoForPrompt,
-              subject,
-              today,
-              videoInstructionsForPrompt
+              data.questionCounts
             )
           }
         ],

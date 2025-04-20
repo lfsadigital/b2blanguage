@@ -1296,6 +1296,12 @@ function parseQuestions(testContent: string): Array<{ type: string; question: st
       }
       // Parse multiple-choice options (e.g., 'A) Option text')
       if (currentQuestion && /^[A-D]\)/.test(line)) {
+        // Ensure options array exists before pushing
+        if (!currentQuestion.options) {
+          currentQuestion.options = [];
+          // Optionally correct the type if it wasn't set correctly initially
+          currentQuestion.type = 'multiple-choice'; 
+        }
         currentQuestion.options!.push(line.replace(/^[A-D]\)\s*/, ''));
       }
     } else {
