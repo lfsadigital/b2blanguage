@@ -42,6 +42,7 @@ async function getArticleContent(url: string): Promise<string> {
       },
     });
     
+    logger.log(`Direct fetch response status: ${response.status}`);
     if (!response.ok) {
       logger.error(`Failed to fetch article: HTTP ${response.status}`);
       throw new Error(`HTTP error: ${response.status}`);
@@ -49,6 +50,7 @@ async function getArticleContent(url: string): Promise<string> {
     
     const html = await response.text();
     logger.log(`Received HTML content of length: ${html.length}`);
+    logger.log(`Direct fetch HTML start: ${html.substring(0, 500)}...`);
     
     if (html.length < 1000) {
       logger.log('HTML content might be too short, possibly blocked or empty:', html.substring(0, 200));
@@ -59,7 +61,7 @@ async function getArticleContent(url: string): Promise<string> {
     logger.error('Error with direct fetch approach:', error);
     
     // Try another method if direct fetch fails - sometimes CORS or other issues prevent direct fetching
-    logger.log('Attempting alternative article extraction method...');
+    logger.log('Attempting alternative article extraction method via proxy...');
     
     try {
       // We'll use an external API service that specializes in content extraction
@@ -86,12 +88,14 @@ async function getArticleContent(url: string): Promise<string> {
       
       const proxyData = await proxyResponse.json();
       
+      logger.log(`Proxy fetch response status: ${proxyResponse.status}, Success: ${proxyData.success}`);
       if (!proxyData.success) {
         logger.error('Proxy fetch failed:', proxyData.error);
         throw new Error(`Proxy fetch failed: ${proxyData.error}`);
       }
       
       logger.log(`Proxy successful, received body of length: ${proxyData.bodyLength}`);
+      logger.log(`Proxy fetch HTML start: ${proxyData.body ? proxyData.body.substring(0, 500) : 'No body received'}...`);
       
       return processHtmlContent(proxyData.body);
     } catch (proxyError) {
@@ -103,6 +107,7 @@ async function getArticleContent(url: string): Promise<string> {
 
 // Helper function to process HTML content into plain text
 function processHtmlContent(html: string): string {
+  logger.log(`Processing HTML content starting with: ${html.substring(0, 500)}...`);
   // Basic HTML to text conversion
   const text = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, ' ')
                    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, ' ')
@@ -110,6 +115,8 @@ function processHtmlContent(html: string): string {
                    .replace(/\s+/g, ' ')
                    .trim();
   
+  logger.log(`Raw extracted text content length: ${text.length}`);
+  logger.log(`Raw extracted text start: ${text.substring(0, 500)}...`);
   logger.log(`Extracted text content of length: ${text.length}`);
   
   if (!text || text.length < 100) {
@@ -129,12 +136,17 @@ function processHtmlContent(html: string): string {
     );
     const end = text.substring(text.length - Math.floor(maxLength * 0.4));
     
-    logger.log(`Content too long (${text.length} chars), using segmented approach`);
-    return `${beginning}...[content truncated]...${middle}...[content truncated]...${end}`;
+    const truncatedText = `${beginning}...[content truncated]...${middle}...[content truncated]...${end}`;
+    logger.log(`Content too long (${text.length} chars), using segmented approach. Final length: ${truncatedText.length}`);
+    logger.log(`Truncated text start: ${truncatedText.substring(0, 500)}...`);
+    return truncatedText;
   }
   
   // For regular content, just take the beginning up to maxLength
-  return text.substring(0, maxLength);
+  const finalText = text.substring(0, maxLength);
+  logger.log(`Final processed text length: ${finalText.length}`);
+  logger.log(`Final processed text start: ${finalText.substring(0, 500)}...`);
+  return finalText;
 }
 
 async function getArticleContentFallback(url: string): Promise<string> {
