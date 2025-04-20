@@ -1324,7 +1324,7 @@ export async function POST(request: Request) {
 
   try {
     const data: TestFormData = await request.json();
-    const { contentUrl, studentLevel, questionCounts, professorName, studentName } = data;
+    const { contentUrl, studentLevel, questionCounts, professorName, studentName, professorId, studentId, additionalNotes, youtubeVideoId } = data;
 
     // Validate input
     if (!contentUrl) {
@@ -1383,17 +1383,39 @@ export async function POST(request: Request) {
       subject = 'Business English'; // Default fallback
     }
 
-    // Generate test using OpenAI
+    // Generate test using OpenAI with detailed prompt parameters
     try {
-    const completion = await openai.chat.completions.create({
+      // Prepare arguments for detailed generateTestPrompt
+      const today = new Date().toLocaleDateString();
+      const formDataForPrompt = {
+        professorName,
+        studentName,
+        professorId,
+        studentId,
+        contentUrl,
+        additionalNotes,
+        useTranscriptApproach: false,
+        youtubeVideoId: youtubeVideoId || ''
+      };
+      const urlForPrompt = contentUrl;
+      const contentInfoForPrompt = 'Article content provided directly.';
+      const videoInstructionsForPrompt = '';
+      const prompt = generateTestPrompt(
+        content,
+        studentLevel,
+        questionCounts,
+        formDataForPrompt,
+        urlForPrompt,
+        contentInfoForPrompt,
+        subject,
+        today,
+        videoInstructionsForPrompt
+      );
+
+      const completion = await openai.chat.completions.create({
         model: "gpt-4",
-      messages: [
-        {
-          role: "user",
-            content: generateTestPrompt(content, studentLevel, questionCounts)
-        }
-      ],
-      temperature: 0.8,
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.8
       });
 
       const testContent = completion.choices[0].message.content;
