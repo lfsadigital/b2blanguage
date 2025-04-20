@@ -75,19 +75,41 @@ export async function POST(request: Request) {
       
       console.log("Generating test with OpenAI...");
       
+      // Prepare arguments for the detailed generateTestPrompt function
+      const today = new Date().toLocaleDateString();
+      const formDataForPrompt = {
+        professorName: data.teacherName || 'Teacher',
+        studentName: data.studentName || 'Student',
+        professorId: '', // Not available in this request
+        studentId: '',   // Not available in this request
+        contentUrl: data.contentUrl || '', // Use contentUrl if provided
+        additionalNotes: '', // Not available in this request
+        useTranscriptApproach: true, // Explicitly set for this route
+        youtubeVideoId: '' // Not directly used by prompt, but required by type
+      };
+      const urlForPrompt = data.contentUrl || 'Transcript Source';
+      const contentInfoForPrompt = 'Transcript provided directly.'; // Placeholder
+      const videoInstructionsForPrompt = ''; // No video instructions for transcript
+
       const completion = await openai.chat.completions.create({
-        model: "gpt-4", // Use GPT-4 as it respects the format better
+        model: "gpt-4", 
         messages: [
           {
             role: "system",
-            content: "You are an English language teacher creating tests. Generate a test based on the provided transcript, strictly following the requested format and question counts."
+            content: "You are an English language teacher creating tests..."
           },
           {
             role: "user",
             content: generateTestPrompt(
-              transcript, // Use the transcript as the primary content
+              transcript,
               data.studentLevel,
-              data.questionCounts // Pass the correct question counts object
+              data.questionCounts,
+              formDataForPrompt,
+              urlForPrompt,
+              contentInfoForPrompt,
+              subject,
+              today,
+              videoInstructionsForPrompt
             )
           }
         ],
