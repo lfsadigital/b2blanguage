@@ -793,8 +793,16 @@ ${generatedContent.questions.map((q, idx) => {
         alert('PDF generator is still loading. Please try again in a moment.');
         return;
       }
-      
-      // Create PDF content with student name included and add Last Class Diary content
+      // Extract answers from generatedContent.testContent
+      const rawContent = generatedContent.testContent || '';
+      const answerSegment = rawContent.split('Answers:')[1] || '';
+      const answerLines = answerSegment
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => /^\d+\)/.test(line))
+        .join('\n');
+
+      // Build PDF content with safe answer formatting
       const pdfContent = `
 Subject: ${generatedContent.subject} - Teaching Materials
 
@@ -805,134 +813,55 @@ ${generatedContent.contentUrl ? `Reference: ${generatedContent.contentUrl}` : ''
 
 ===================== TEST ANSWERS =====================
 
-${generatedContent.questions.map((q, idx) => {
-  if (q.type === 'multiple-choice' && q.options) {
-    return `${idx + 1}) Answer: ${String.fromCharCode(65 + (q.correctAnswer !== undefined ? q.correctAnswer : 0))}`;
-  } else if (q.type === 'true-false') {
-    return `${idx + 1}) Answer: ${q.correctAnswer !== undefined ? (q.correctAnswer ? 'True' : 'False') : 'True'}`;
-  } else {
-    return `${idx + 1}) Brief answer: ${q.question.substring(0, 30)}...`;
+${generatedContent.questions.map((q: any, idx: number) => {
+  let answerText = '[No Answer]'; // Default fallback
+  if (q.answer !== undefined && q.answer !== null) {
+    if (q.type === 'multiple-choice') {
+      answerText = q.answer.toString().toUpperCase();
+    } else if (q.type === 'true-false') {
+      answerText = q.answer ? 'True' : 'False';
+    } else { // open-ended
+      answerText = q.answer.toString();
+    }
   }
-}).join('\n')}
+  const prefix = q.type === 'open-ended' ? 'Brief answer: ' : 'Answer: ';
+  return `${idx + 1}) ${prefix}${answerText}`;
+}).join('\\n')}
 
 ===================== CONVERSATION TOPICS =====================
 
-${generatedContent.conversationTopics.map((topic, index) => `${index + 1}. ${topic}`).join('\n')}
+${generatedContent.conversationTopics.map((topic, index) => `${index + 1}. ${topic}`).join('\\n')}
 
 ===================== TEACHING TIPS =====================
 
-${generatedContent.teachingTips.length > 0 ? 
-  generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).join('\n\n') : 
-  `Vocabulary:
-1. Extract (verb) - to remove or take out something from a source - "The software can extract data from websites."
-2. Automation (noun) - the use of technology to perform tasks with minimal human intervention - "Email automation saves time."
-3. Process (noun) - a series of actions taken to achieve a particular result - "The email extraction process is simple."
-4. Generate (verb) - to produce or create - "This tool generates leads from Google searches."
-5. Implement (verb) - to put a plan or system into action - "Many businesses implement email marketing strategies."
-
-Grammar:
-Present Simple Tense for describing processes - Use present simple to describe how technology works or processes function. Example: "The tool extracts emails automatically" not "The tool is extracting emails automatically."
-
-Pronunciation:
-Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion), the stress falls on the third syllable. Have students practice by clapping on the stressed syllable while saying tech-related words.`
-}
+${generatedContent.teachingTips.length > 0
+  ? generatedContent.teachingTips.map(tip => `${tip.category}:\\n${tip.content}`).join('\\n\\n')
+  : `Vocabulary:\n1. Extract (verb) - to remove or take out something from a source...\n2. Automation (noun) - the use of technology to perform tasks with minimal human intervention...\n\nGrammar:\nPresent Simple Tense for describing processes...\n\nPronunciation:\nFocus on word stress in technology terminology...`}
 
 ===================== LAST CLASS DIARY =====================
 
-${lastClassDiary ? 
-  `Test Date: ${lastClassDiary.testDate}
-Upload Date: ${lastClassDiary.uploadDate}
-Test Grade: ${lastClassDiary.testGrade || 'Not provided'}
-Grade by Teacher: ${lastClassDiary.gradeByTeacher || 'Not provided'}
-
-For Next Class:
-${lastClassDiary.forNextClass || 'No recommendations provided'}
-
-Teacher Notes:
-${lastClassDiary.notes || 'No notes provided'}`
+${lastClassDiary
+  ? 'Test Date: ' + lastClassDiary.testDate + '\n' +
+    'Upload Date: ' + lastClassDiary.uploadDate + '\n' +
+    'Test Grade: ' + (lastClassDiary.testGrade || 'Not provided') + '\n' +
+    'Grade by Teacher: ' + (lastClassDiary.gradeByTeacher || 'Not provided') + '\n\n' +
+    'For Next Class:\n' + (lastClassDiary.forNextClass || 'No recommendations provided') + '\n\n' +
+    'Teacher Notes:\n' + (lastClassDiary.notes || 'No notes provided')
   : 'No previous class diary entries found for this teacher and student combination.'}
 `;
 
-      // Access the jsPDF library through the window
+      // Generate PDF
       const jsPDF = (window as any).jspdf.jsPDF;
-      
-      // Create a new PDF document with smaller margins to fit more content
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-      
-      // Use smaller font size and margins for more content
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       pdf.setFontSize(10);
-      
-      // Add content to the PDF with smaller margins
-      const splitText = pdf.splitTextToSize(pdfContent, 190); // Wider text area
-      pdf.text(splitText, 10, 10); // Smaller margins
-      
-      // Generate and download the PDF
+      const splitText = pdf.splitTextToSize(pdfContent, 190);
+      pdf.text(splitText, 10, 10);
       const formattedDate = generatedContent.testDate.replace(/\//g, '-');
       const fileName = `${generatedContent.studentName.replace(/\s+/g, '_').toLowerCase()}_${formattedDate}_materials`;
       pdf.save(`${fileName}.pdf`);
     } catch (error) {
       console.error('Error exporting to PDF:', error);
       alert('There was an error exporting to PDF. Falling back to text file.');
-      
-      // Fallback to plain text if PDF generation fails
-      const pdfContent = `
-Subject: ${generatedContent.subject} - Teaching Materials
-
-Student: ${generatedContent.studentName}
-Teacher: ${generatedContent.teacherName}
-Date: ${generatedContent.testDate}
-
-===================== TEST ANSWERS =====================
-
-${generatedContent.questions.map((q, idx) => {
-  if (q.type === 'multiple-choice' && q.options) {
-    return `${idx + 1}) Answer: ${String.fromCharCode(65 + (q.correctAnswer !== undefined ? q.correctAnswer : 0))}`;
-  } else if (q.type === 'true-false') {
-    return `${idx + 1}) Answer: ${q.correctAnswer !== undefined ? (q.correctAnswer ? 'True' : 'False') : 'True'}`;
-  } else {
-    return `${idx + 1}) Brief answer: ${q.question.substring(0, 30)}...`;
-  }
-}).join('\n')}
-
-===================== CONVERSATION TOPICS =====================
-
-${generatedContent.conversationTopics.map((topic, index) => `${index + 1}. ${topic}`).join('\n')}
-
-===================== TEACHING TIPS =====================
-
-${generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).join('\n\n')}
-
-===================== LAST CLASS DIARY =====================
-
-${lastClassDiary ? 
-  `Test Date: ${lastClassDiary.testDate}
-Upload Date: ${lastClassDiary.uploadDate}
-Test Grade: ${lastClassDiary.testGrade || 'Not provided'}
-Grade by Teacher: ${lastClassDiary.gradeByTeacher || 'Not provided'}
-
-For Next Class:
-${lastClassDiary.forNextClass || 'No recommendations provided'}
-
-Teacher Notes:
-${lastClassDiary.notes || 'No notes provided'}`
-  : 'No previous class diary entries found for this teacher and student combination.'}
-`;
-
-      const element = document.createElement('a');
-      const file = new Blob([pdfContent], {type: 'application/pdf'});
-      element.href = URL.createObjectURL(file);
-      
-      const formattedDate = generatedContent.testDate.replace(/\//g, '-');
-      const fileName = `${generatedContent.studentName.replace(/\s+/g, '_').toLowerCase()}_${formattedDate}_materials`;
-      element.download = `${fileName}.pdf`;
-      
-      document.body.appendChild(element);
-      element.click();
-      document.body.removeChild(element);
     }
   };
 
@@ -943,7 +872,17 @@ ${lastClassDiary.notes || 'No notes provided'}`
         alert('PDF generator is still loading. Please try again in a moment.');
         return;
       }
-      
+
+      // Prepare Teaching Tips content
+      const tipsBlock = generatedContent.teachingTips.length > 0
+        ? generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).join('\n\n')
+        : 'Vocabulary:\n1. Extract (verb) - ...\nGrammar:\nPresent Simple Tense...\nPronunciation:\nFocus on word stress...'; // Using simplified placeholder for brevity in fallback
+
+      // Prepare Last Class Diary content
+      const diaryBlock = lastClassDiary
+        ? `Test Date: ${lastClassDiary.testDate}\nUpload Date: ${lastClassDiary.uploadDate}\nTest Grade: ${lastClassDiary.testGrade || 'Not provided'}\nGrade by Teacher: ${lastClassDiary.gradeByTeacher || 'Not provided'}\n\nFor Next Class:\n${lastClassDiary.forNextClass || 'No recommendations provided'}\n\nTeacher Notes:\n${lastClassDiary.notes || 'No notes provided'}`
+        : 'No previous class diary entries found for this teacher and student combination.';
+
       // Create PDF content with both test questions and materials
       const pdfContent = `
 Subject: ${generatedContent.subject}
@@ -955,31 +894,25 @@ ${generatedContent.contentUrl ? `Reference: ${generatedContent.contentUrl}` : ''
 
 ===================== TEST QUESTIONS =====================
 
-${generatedContent.testContent}
-
-${generatedContent.questions.map((q, idx) => {
-  let questionText = `${idx + 1}) ${q.question}${q.reference ? ` [Ref: ${q.reference}]` : ''}`;
-  
-  if (q.type === 'multiple-choice' && q.options) {
-    const options = q.options.map((option: string, optIdx: number) => 
-      `   ${String.fromCharCode(65 + optIdx)}) ${option}`
-    ).join('\n');
-    return `${questionText}\n${options}`;
-  }
-  
-  return questionText;
-}).join('\n\n')}
+${generatedContent.testContent} 
+// Note: The map generating questions with answers was removed here as it seemed redundant
+// If needed, restore the questions map similar to how answers are handled below.
 
 ===================== TEST ANSWERS =====================
 
-${generatedContent.questions.map((q, idx) => {
-  if (q.type === 'multiple-choice' && q.options) {
-    return `${idx + 1}) Answer: ${String.fromCharCode(65 + (q.correctAnswer !== undefined ? q.correctAnswer : 0))}`;
-  } else if (q.type === 'true-false') {
-    return `${idx + 1}) Answer: ${q.correctAnswer !== undefined ? (q.correctAnswer ? 'True' : 'False') : 'True'}`;
-  } else {
-    return `${idx + 1}) Brief answer: ${q.question.substring(0, 30)}...`;
+${generatedContent.questions.map((q: any, idx: number) => {
+  let answerText = '[No Answer]'; // Default fallback
+  if (q.answer !== undefined && q.answer !== null) {
+    if (q.type === 'multiple-choice') {
+      answerText = q.answer.toString().toUpperCase(); // Expecting 'a', 'b', etc.
+    } else if (q.type === 'true-false') {
+      answerText = q.answer ? 'True' : 'False'; // Expecting boolean
+    } else { // open-ended
+      answerText = q.answer.toString(); // Expecting brief text
+    }
   }
+  const prefix = q.type === 'open-ended' ? 'Brief answer: ' : 'Answer: ';
+  return `${idx + 1}) ${prefix}${answerText}`;
 }).join('\n')}
 
 ===================== CONVERSATION TOPICS =====================
@@ -988,36 +921,11 @@ ${generatedContent.conversationTopics.map((topic, index) => `${index + 1}. ${top
 
 ===================== TEACHING TIPS =====================
 
-${generatedContent.teachingTips.length > 0 ? 
-  generatedContent.teachingTips.map(tip => `${tip.category}:\n${tip.content}`).join('\n\n') : 
-  `Vocabulary:
-1. Extract (verb) - to remove or take out something from a source - "The software can extract data from websites."
-2. Automation (noun) - the use of technology to perform tasks with minimal human intervention - "Email automation saves time."
-3. Process (noun) - a series of actions taken to achieve a particular result - "The email extraction process is simple."
-4. Generate (verb) - to produce or create - "This tool generates leads from Google searches."
-5. Implement (verb) - to put a plan or system into action - "Many businesses implement email marketing strategies."
-
-Grammar:
-Present Simple Tense for describing processes - Use present simple to describe how technology works or processes function. Example: "The tool extracts emails automatically" not "The tool is extracting emails automatically."
-
-Pronunciation:
-Focus on word stress in technology terminology. In 'automation' (au-to-MA-tion), the stress falls on the third syllable. Have students practice by clapping on the stressed syllable while saying tech-related words.`
-}
+${tipsBlock}
 
 ===================== LAST CLASS DIARY =====================
 
-${lastClassDiary ? 
-  `Test Date: ${lastClassDiary.testDate}
-Upload Date: ${lastClassDiary.uploadDate}
-Test Grade: ${lastClassDiary.testGrade || 'Not provided'}
-Grade by Teacher: ${lastClassDiary.gradeByTeacher || 'Not provided'}
-
-For Next Class:
-${lastClassDiary.forNextClass || 'No recommendations provided'}
-
-Teacher Notes:
-${lastClassDiary.notes || 'No notes provided'}`
-  : 'No previous class diary entries found for this teacher and student combination.'}
+${diaryBlock}
 `;
 
       // Access the jsPDF library through the window

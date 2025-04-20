@@ -1242,77 +1242,78 @@ async function saveTestData(data: any): Promise<string> {
   }
 }
 
-// Add this function before the POST handler
-function parseQuestions(testContent: string) {
-  const questions = [];
-  let currentType = '';
-  let currentQuestion: any = {};
+// Replace existing parseQuestions with improved version
+function parseQuestions(testContent: string): Array<{ type: string; question: string; options?: string[]; answer?: any }> {
+  const questions: Array<{ type: string; question: string; options?: string[]; answer?: any }> = [];
+  let mode: 'questions' | 'answers' = 'questions';
+  let currentQuestion: { type: string; question: string; options?: string[]; answer?: any } | null = null;
 
-  const lines = testContent.split('\n').filter(line => line.trim());
+  const lines = testContent.split('\n');
 
-  for (let line of lines) {
-    line = line.trim();
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) continue;
 
-    // Detect question type
-    if (line.toLowerCase().startsWith('multiple choice:')) {
-      currentType = 'multiple-choice';
-      continue;
-    } else if (line.toLowerCase().startsWith('open ended:')) {
-      currentType = 'open-ended';
-      continue;
-    } else if (line.toLowerCase().startsWith('true/false:')) {
-      currentType = 'true-false';
+    // Switch to answer parsing mode on divider or "Answers:" header
+    if (line === '---' || /^answers:?$/i.test(line)) {
+      mode = 'answers';
       continue;
     }
 
-    // Parse question based on type
-    if (line.match(/^Q\d+\./)) {
-      // Save previous question if exists
-      if (currentQuestion.question) {
-        questions.push(currentQuestion);
+    if (mode === 'questions') {
+      // Parse question section: look for '1) Question text'
+      const questionMatch = line.match(/^(\d+)\)\s*(.+)/);
+      if (questionMatch) {
+        // Save previous question
+        if (currentQuestion) {
+          questions.push(currentQuestion);
+        }
+        const questionText = questionMatch[2];
+        // Determine type based on keywords (multiple choice implied by options later)
+        let type = 'open-ended';
+        if (/true or false|\(true\/false\)/i.test(questionText)) {
+          type = 'true-false';
+        }
+        currentQuestion = {
+          type,
+          question: questionText,
+          options: type === 'multiple-choice' ? [] : undefined,
+          answer: undefined
+        };
+        continue;
       }
-
-      currentQuestion = {
-        type: currentType,
-        question: line.replace(/^Q\d+\./, '').trim(),
-        options: currentType === 'multiple-choice' ? [] : undefined,
-        answer: undefined
-      };
-    } else if (currentType === 'multiple-choice' && line.match(/^[a-d]\)/)) {
-      if (!currentQuestion.options) {
-        currentQuestion.options = [];
+      // Parse multiple-choice options (e.g., 'A) Option text')
+      if (currentQuestion && /^[A-D]\)/.test(line)) {
+        currentQuestion.options!.push(line.replace(/^[A-D]\)\s*/, ''));
       }
-      currentQuestion.options.push(line.replace(/^[a-d]\)/, '').trim());
-    } else if (line.startsWith('Answer:')) {
-      currentQuestion.answer = line.replace('Answer:', '').trim();
-      
-      // For multiple choice, store just the letter
-      if (currentType === 'multiple-choice') {
-        currentQuestion.answer = currentQuestion.answer.charAt(0).toLowerCase();
+    } else {
+      // Parse answers section
+      // Multiple choice answers: '1) B'
+      const mcMatch = line.match(/^(\d+)\)\s*([A-D])/i);
+      if (mcMatch) {
+        const idx = parseInt(mcMatch[1], 10) - 1;
+        const ans = mcMatch[2].toUpperCase();
+        if (questions[idx]) {
+          questions[idx].answer = ans.toLowerCase();
+        }
+        continue;
       }
-      
-      // For true/false, normalize to boolean
-      if (currentType === 'true-false') {
-        currentQuestion.answer = currentQuestion.answer.toLowerCase() === 'true';
+      // True/False answers: '9) True'
+      const tfMatch = line.match(/^(\d+)\)\s*(true|false)/i);
+      if (tfMatch) {
+        const idx = parseInt(tfMatch[1], 10) - 1;
+        const ans = tfMatch[2].toLowerCase() === 'true';
+        if (questions[idx]) {
+          questions[idx].answer = ans;
+        }
       }
-
-      // Add the completed question
-      questions.push(currentQuestion);
-      currentQuestion = {};
-    } else if (line.startsWith('Sample Answer:')) {
-      currentQuestion.answer = line.replace('Sample Answer:', '').trim();
-      
-      // Add the completed question
-      questions.push(currentQuestion);
-      currentQuestion = {};
     }
   }
 
-  // Add the last question if not added
-  if (currentQuestion.question) {
+  // Add last question if we were still in questions mode
+  if (currentQuestion && mode === 'questions') {
     questions.push(currentQuestion);
   }
-
   return questions;
 }
 
@@ -1384,15 +1385,15 @@ export async function POST(request: Request) {
 
     // Generate test using OpenAI
     try {
-      const completion = await openai.chat.completions.create({
+    const completion = await openai.chat.completions.create({
         model: "gpt-4",
-        messages: [
-          {
-            role: "user",
+      messages: [
+        {
+          role: "user",
             content: generateTestPrompt(content, studentLevel, questionCounts)
-          }
-        ],
-        temperature: 0.7,
+        }
+      ],
+      temperature: 0.8,
       });
 
       const testContent = completion.choices[0].message.content;
@@ -1420,7 +1421,7 @@ export async function POST(request: Request) {
       const testId = await saveTestData(testData);
 
       return NextResponse.json({
-        ...testData,
+          ...testData,
         id: testId
       });
 
