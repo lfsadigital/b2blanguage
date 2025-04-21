@@ -879,6 +879,12 @@ async function getTranscriptWithSupadata(videoId: string): Promise<{ transcript:
  * Get YouTube transcript using our custom service
  */
 async function getTranscriptWithCustomService(videoId: string): Promise<{ transcript: string, isYouTubeTranscript: boolean, source: string }> {
+  // Ensure custom transcript service is configured
+  const apiUrl = process.env.TRANSCRIPT_API_URL;
+  const apiKey = process.env.TRANSCRIPT_API_KEY;
+  if (!apiUrl || !apiKey) {
+    throw new Error('Custom transcript service not configured. Please set TRANSCRIPT_API_URL and TRANSCRIPT_API_KEY.');
+  }
   try {
     logger.log(`Fetching transcript for video ID: ${videoId}`);
     
